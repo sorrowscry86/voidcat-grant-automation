@@ -1,0 +1,20 @@
+{
+  "name": "voidcat-grant-search-api",
+  "version": "1.0.0",
+  "description": "VoidCat RDC Federal Grant Search API",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --env production",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": ["grants", "federal", "api", "cloudflare", "workers"],
+  "author": "VoidCat RDC",
+  "license": "MIT",
+  "dependencies": {
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

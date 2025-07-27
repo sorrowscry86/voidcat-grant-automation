@@ -1,0 +1,22 @@
+name = "voidcat-grant-search-api"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "grant-search-api"
+
+[[env.production.d1_databases]]
+binding = "VOIDCAT_DB"
+database_name = "voidcat-users"
+database_id = "b22bd380-29ca-4a22-be8a-655a382a58a1"
+
+[[env.production.kv_namespaces]]
+binding = "OAUTH_KV"
+id = "ae1f4c3087dd4b208a449f7fbd7c93d3"
+
+[[env.production.r2_buckets]]
+binding = "ASSETS"
+bucket_name = "voidcat-assets"
+
+[vars]
+ENVIRONMENT = "production"

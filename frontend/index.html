@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoidCat RDC - Federal Grant Automation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <meta name="description" content="AI-powered federal grant discovery and proposal automation for startups and small businesses">
+    <meta name="keywords" content="federal grants, SBIR, STTR, grant automation, AI proposal generation">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div x-data="grantApp()" class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">VoidCat RDC</h1>
+                    <p class="text-gray-600">Federal Grant Automation Platform</p>
+                    <p class="text-sm text-green-600 font-semibold">🚀 Now Live - MVP Version</p>
+                </div>
+                <div class="flex space-x-4">
+                    <template x-if="!user">
+                        <button @click="showRegister = true" 
+                                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                            Get Started Free
+                        </button>
+                    </template>
+                    <template x-if="user">
+                        <div class="text-right">
+                            <p class="text-sm text-gray-600">Welcome, <span x-text="user.email"></span></p>
+                            <p class="text-xs text-gray-500 capitalize">Tier: <span x-text="user.subscription_tier"></span></p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </header>
+
+        <!-- Search Section -->
+        <div class="bg-white rounded-lg shadow-sm border p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">🔍 Search Grant Opportunities</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <input x-model="searchQuery" 
+                       placeholder="Search keywords (AI, defense, energy...)"
+                       class="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <select x-model="selectedAgency" 
+                        class="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Agencies</option>
+                    <option value="defense">Department of Defense</option>
+                    <option value="nsf">National Science Foundation</option>
+                    <option value="energy">Department of Energy</option>
+                    <option value="darpa">DARPA</option>
+                    <option value="nasa">NASA</option>
+                </select>
+                <button @click="searchGrants()" 
+                        :disabled="loading"
+                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
+                    <span x-show="!loading">Search Grants</span>
+                    <span x-show="loading">Searching...</span>
+                </button>
+            </div>
+            <div x-show="grants.length > 0" class="text-sm text-gray-600">
+                Found <span x-text="grants.length"></span> matching opportunities
+            </div>
+        </div>        <!-- Registration Modal -->
+        <div x-show="showRegister" 
+             class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+             x-transition>
+            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-lg font-semibold mb-4">🚀 Register for Free Access</h3>
+                <form @submit.prevent="register()">
+                    <div class="space-y-4">
+                        <input x-model="registerForm.name" 
+                               placeholder="Full Name" 
+                               required
+                               class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                        <input x-model="registerForm.email" 
+                               placeholder="Email Address" 
+                               type="email"
+                               required
+                               class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                        <input x-model="registerForm.company" 
+                               placeholder="Company Name (Optional)" 
+                               class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                        <div class="text-xs text-gray-500">
+                            Free tier includes 1 grant application per month. Upgrade for unlimited access.
+                        </div>
+                        <div class="flex space-x-4">
+                            <button type="submit" 
+                                    :disabled="registering"
+                                    class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                                <span x-show="!registering">Register</span>
+                                <span x-show="registering">Registering...</span>
+                            </button>
+                            <button @click="showRegister = false" 
+                                    type="button"
+                                    class="flex-1 border border-gray-300 py-2 rounded-lg hover:bg-gray-50">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Grant Results -->
+        <div x-show="grants.length > 0" class="space-y-4">
+            <template x-for="grant in grants" :key="grant.id">
+                <div class="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex-1">
+                            <h4 class="text-lg font-semibold text-blue-600 mb-1" x-text="grant.title"></h4>
+                            <p class="text-gray-600 font-medium" x-text="grant.agency"></p>
+                            <p class="text-sm text-gray-500" x-text="grant.program"></p>
+                        </div>
+                        <div class="text-right ml-4">
+                            <p class="text-lg font-bold text-green-600" x-text="grant.amount"></p>
+                            <p class="text-sm text-gray-500">
+                                📅 Deadline: <span x-text="formatDate(grant.deadline)"></span>
+                            </p>
+                            <div class="flex items-center mt-2">
+                                <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                                    <div class="bg-blue-600 h-2 rounded-full transition-all" 
+                                         :style="`width: ${grant.matching_score * 100}%`"></div>
+                                </div>
+                                <span class="text-xs text-gray-600" 
+                                      x-text="`${Math.round(grant.matching_score * 100)}% match`"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-gray-700 mb-4" x-text="grant.description"></p>
+                    <p class="text-sm text-gray-600 mb-4">
+                        <strong>✅ Eligibility:</strong> <span x-text="grant.eligibility"></span>
+                    </p>
+                    
+                    <div class="flex flex-wrap gap-3">
+                        <button @click="viewGrant(grant.id)" 
+                                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm">
+                            📋 View Details
+                        </button>
+                        <button @click="generateProposal(grant.id)" 
+                                :disabled="!user"
+                                class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 transition-colors text-sm">
+                            🤖 Generate Proposal
+                        </button>
+                        <button class="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50 transition-colors text-sm">
+                            💾 Save for Later
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Loading State -->
+        <div x-show="loading" class="text-center py-8">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="mt-2 text-gray-600">Loading grant opportunities...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div x-show="!loading && grants.length === 0 && searchPerformed" 
+             class="text-center py-12">
+            <div class="text-gray-400 text-6xl mb-4">📋</div>
+            <h3 class="text-lg font-semibold text-gray-600 mb-2">No grants found</h3>
+            <p class="text-gray-500">Try adjusting your search criteria or browse all opportunities.</p>
+        </div>        <!-- Features Section -->
+        <div x-show="!searchPerformed" class="mt-12">
+            <h2 class="text-2xl font-semibold text-center mb-8">🎯 Why Choose VoidCat RDC?</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="text-center p-6 bg-white rounded-lg shadow-sm">
+                    <div class="text-4xl mb-4">🎯</div>
+                    <h3 class="text-lg font-semibold mb-2">Smart Matching</h3>
+                    <p class="text-gray-600">AI-powered grant discovery that matches your company's capabilities with the most relevant opportunities.</p>
+                </div>
+                <div class="text-center p-6 bg-white rounded-lg shadow-sm">
+                    <div class="text-4xl mb-4">⚡</div>
+                    <h3 class="text-lg font-semibold mb-2">Fast Proposals</h3>
+                    <p class="text-gray-600">Generate professional grant proposals in minutes, not weeks, using our AI writing assistant.</p>
+                </div>
+                <div class="text-center p-6 bg-white rounded-lg shadow-sm">
+                    <div class="text-4xl mb-4">📊</div>
+                    <h3 class="text-lg font-semibold mb-2">Success Tracking</h3>
+                    <p class="text-gray-600">Monitor your applications, track deadlines, and analyze success rates to improve future submissions.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-12 text-center text-gray-500 text-sm">
+            <p>&copy; 2025 VoidCat RDC. Federal Grant Automation Platform.</p>
+            <p class="mt-1">Helping startups secure federal funding through AI-powered grant discovery and proposal generation.</p>
+        </footer>
+    </div>
+
+    <script>
+        function grantApp() {
+            return {
+                // State
+                user: null,
+                apiKey: localStorage.getItem('voidcat_api_key'),
+                grants: [],
+                loading: false,
+                registering: false,
+                searchPerformed: false,
+                showRegister: false,
+                
+                // Form data
+                searchQuery: '',
+                selectedAgency: '',
+                registerForm: {
+                    name: '',
+                    email: '',
+                    company: ''
+                },
+
+                // API Configuration - Updated for GitHub Pages deployment
+                apiBase: 'https://grant-search-api.sorrowscry86.workers.dev',
+
+                // Initialize
+                async init() {
+                    console.log('VoidCat Grant App Initializing...');
+                    if (this.apiKey) {
+                        await this.checkAuth();
+                    }
+                    // Auto-search on load to show available grants
+                    await this.searchGrants();
+                },
+
+                // Authentication
+                async checkAuth() {
+                    try {
+                        const response = await fetch(`${this.apiBase}/api/users/me`, {
+                            headers: {
+                                'Authorization': `Bearer ${this.apiKey}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.user = data.user;
+                            console.log('User authenticated:', this.user);
+                        } else {
+                            localStorage.removeItem('voidcat_api_key');
+                            this.apiKey = null;
+                        }
+                    } catch (error) {
+                        console.error('Auth check failed:', error);
+                    }
+                },
+
+                // Registration
+                async register() {
+                    this.registering = true;
+                    try {
+                        const response = await fetch(`${this.apiBase}/api/users/register`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.registerForm)
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.apiKey = data.api_key;
+                            localStorage.setItem('voidcat_api_key', this.apiKey);
+                            await this.checkAuth();
+                            this.showRegister = false;
+                            this.registerForm = { name: '', email: '', company: '' };
+                            alert('🎉 Registration successful! You can now generate proposals.');
+                        } else {
+                            const error = await response.json();
+                            alert('Registration failed: ' + error.error);
+                        }
+                    } catch (error) {
+                        alert('Registration failed: ' + error.message);
+                    } finally {
+                        this.registering = false;
+                    }
+                },
+
+                // Grant search
+                async searchGrants() {
+                    this.loading = true;
+                    try {
+                        const params = new URLSearchParams();
+                        if (this.searchQuery) params.append('query', this.searchQuery);
+                        if (this.selectedAgency) params.append('agency', this.selectedAgency);
+
+                        const response = await fetch(`${this.apiBase}/api/grants/search?${params}`);
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.grants = data.grants;
+                            console.log('Found grants:', data.grants.length);
+                        } else {
+                            console.error('Search failed:', data.error);
+                            this.grants = [];
+                        }
+                    } catch (error) {
+                        console.error('Search error:', error);
+                        this.grants = [];
+                    } finally {
+                        this.loading = false;
+                        this.searchPerformed = true;
+                    }
+                },
+
+                // View grant details
+                async viewGrant(grantId) {
+                    try {
+                        const response = await fetch(`${this.apiBase}/api/grants/${grantId}`);
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            const grant = data.grant;
+                            const details = `
+📋 Grant Details: ${grant.title}
+
+🏛️ Agency: ${grant.agency}
+💰 Amount: ${grant.amount}
+📅 Deadline: ${this.formatDate(grant.deadline)}
+
+📝 Description:
+${grant.full_description}
+
+✅ Requirements:
+${grant.requirements.map(r => '• ' + r).join('\n')}
+
+⚖️ Evaluation Criteria:
+${grant.evaluation_criteria.map(c => '• ' + c).join('\n')}
+
+📄 Submission Requirements:
+${grant.submission_requirements.map(s => '• ' + s).join('\n')}
+
+📞 Contact:
+${grant.contact.name}
+${grant.contact.email}
+${grant.contact.phone}
+                            `;
+                            alert(details);
+                        }
+                    } catch (error) {
+                        console.error('Error viewing grant:', error);
+                        alert('Error loading grant details. Please try again.');
+                    }
+                },
+
+                // Generate proposal
+                async generateProposal(grantId) {
+                    if (!this.user) {
+                        this.showRegister = true;
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`${this.apiBase}/api/grants/generate-proposal`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${this.apiKey}`
+                            },
+                            body: JSON.stringify({
+                                grant_id: grantId,
+                                company_info: {
+                                    name: 'VoidCat RDC',
+                                    capabilities: 'AI/ML development, software engineering, federal compliance'
+                                }
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            const proposal = data.proposal;
+                            const proposalText = `
+🤖 AI-Generated Proposal Preview
+
+📝 Executive Summary:
+${proposal.executive_summary}
+
+🔬 Technical Approach:
+${proposal.technical_approach}
+
+💼 Commercial Potential:
+${proposal.commercial_potential}
+
+💰 Budget Summary:
+• Personnel: $${proposal.budget_summary.personnel.toLocaleString()}
+• Equipment: $${proposal.budget_summary.equipment.toLocaleString()}
+• Overhead: $${proposal.budget_summary.overhead.toLocaleString()}
+• Total: $${proposal.budget_summary.total.toLocaleString()}
+
+📅 Timeline:
+${proposal.timeline.map(t => `• ${t.phase}: ${t.task}`).join('\n')}
+
+Generated at: ${new Date(data.generated_at).toLocaleString()}
+
+Note: This is an AI-generated draft. Review and customize before submission.
+                            `;
+                            alert(proposalText);
+                        } else {
+                            alert('Error generating proposal: ' + data.error);
+                        }
+                    } catch (error) {
+                        console.error('Error generating proposal:', error);
+                        alert('Error generating proposal. Please try again.');
+                    }
+                },
+
+                // Utilities
+                formatDate(dateString) {
+                    return new Date(dateString).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
