@@ -3,6 +3,7 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import Stripe from 'stripe';
 
 const app = new Hono();
 
@@ -74,6 +75,42 @@ const MOCK_GRANTS = [
     description: 'AI technologies for autonomous spacecraft operations, planetary exploration, and space science data analysis.',
     eligibility: 'U.S. and foreign entities (excluding China)',
     matching_score: 0.88
+  },
+  {
+    id: 'DARPA-25-006',
+    title: 'Artificial Intelligence Next Campaign',
+    agency: 'DARPA',
+    program: 'AI Next',
+    deadline: '2025-03-15',
+    amount: '$5,000,000',
+    description: 'Revolutionary AI research for national security applications including autonomous systems, cybersecurity, and logistics optimization.',
+    eligibility: 'Research institutions and innovative companies',
+    matching_score: 0.91,
+    tags: ['AI', 'Machine Learning', 'Defense', 'Research']
+  },
+  {
+    id: 'NIH-25-007',
+    title: 'AI for Medical Diagnosis',
+    agency: 'National Institutes of Health',
+    program: 'STTR Phase II',
+    deadline: '2025-04-30',
+    amount: '$2,000,000',
+    description: 'Developing AI systems for early disease detection and personalized treatment recommendations.',
+    eligibility: 'Small businesses partnering with research institutions',
+    matching_score: 0.88,
+    tags: ['Healthcare', 'AI', 'Diagnostics', 'STTR']
+  },
+  {
+    id: 'DOE-25-008',
+    title: 'Smart Grid AI Optimization',
+    agency: 'Department of Energy',
+    program: 'Grid Modernization',
+    deadline: '2025-06-01',
+    amount: '$3,500,000',
+    description: 'AI-powered optimization of electrical grid systems for improved efficiency and renewable energy integration.',
+    eligibility: 'US companies with energy sector experience',
+    matching_score: 0.85,
+    tags: ['Energy', 'Smart Grid', 'AI', 'Infrastructure']
   }
 ];
 
@@ -280,6 +317,47 @@ app.get('/api/users/me', async (c) => {
 // AI proposal generation endpoint
 app.post('/api/grants/generate-proposal', async (c) => {
   try {
+    // Check authentication
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ success: false, error: 'Authentication required' }, 401);
+    }
+
+    const apiKey = authHeader.replace('Bearer ', '');
+    
+    // Get user and check usage limits
+    try {
+      const db = await getDB(c.env);
+      const user = await db.prepare(`
+        SELECT id, email, subscription_tier, usage_count
+        FROM users WHERE api_key = ?
+      `).bind(apiKey).first();
+
+      if (!user) {
+        return c.json({ success: false, error: 'Invalid API key' }, 401);
+      }
+
+      // Check usage limits for free users
+      if (user.subscription_tier === 'free' && (user.usage_count || 0) >= 1) {
+        return c.json({
+          success: false,
+          error: 'Free tier limit reached',
+          upgrade_required: true,
+          message: 'Upgrade to Pro for unlimited grant applications'
+        }, 429);
+      }
+
+      // Increment usage count for free users
+      if (user.subscription_tier === 'free') {
+        await db.prepare(`
+          UPDATE users SET usage_count = COALESCE(usage_count, 0) + 1 
+          WHERE api_key = ?
+        `).bind(apiKey).run();
+      }
+    } catch (dbError) {
+      console.log('Database error, continuing in demo mode:', dbError);
+    }
+
     const { grant_id, company_info } = await c.req.json();
     
     const grant = MOCK_GRANTS.find(g => g.id === grant_id);
@@ -330,6 +408,79 @@ app.get('/health', (c) => {
   });
 });
 
+// Stripe Checkout Session Creation
+app.post('/api/stripe/create-checkout', async (c) => {
+  const stripe = new Stripe(c.env.STRIPE_SECRET_KEY);
+  
+  try {
+    const { email } = await c.req.json();
+    
+    if (!email) {
+      return c.json({ error: 'User email is required' }, 400);
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: 'price_1RpOdV3YDbGiItIJSxMyZyzv', // VoidCat Pro Subscription - $99/month
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `https://sorrowscry86.github.io/voidcat-grant-automation/frontend/index.html?payment=success`,
+      cancel_url: `https://sorrowscry86.github.io/voidcat-grant-automation/frontend/index.html?payment=cancelled`,
+      customer_email: email,
+      metadata: {
+        email: email,
+      }
+    });
+
+    return c.json({ sessionId: session.id });
+  } catch (e) {
+    return c.json({ error: { message: e.message } }, 500);
+  }
+});
+
+// Stripe Webhook Handler
+app.post('/api/stripe/webhook', async (c) => {
+  const stripe = new Stripe(c.env.STRIPE_SECRET_KEY);
+  const signature = c.req.header('stripe-signature');
+  const body = await c.req.text();
+
+  let event;
+
+  try {
+    event = await stripe.webhooks.constructEvent(
+      body,
+      signature,
+      c.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    return c.json({ error: `Webhook Error: ${err.message}` }, 400);
+  }
+
+  // Handle the event
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const customerEmail = session.customer_email;
+
+    // Update user's subscription tier in database
+    try {
+      const db = await getDB(c.env);
+      await db.prepare('UPDATE users SET subscription_tier = ?, stripe_customer_id = ?, stripe_subscription_id = ? WHERE email = ?')
+        .bind('pro', session.customer, session.subscription, customerEmail)
+        .run();
+
+      console.log(`Payment successful for ${customerEmail}. Subscription updated to Pro.`);
+    } catch (dbError) {
+      console.error('Database update failed:', dbError);
+    }
+  }
+
+  return c.json({ received: true });
+});
+
 // Root endpoint
 app.get('/', (c) => {
   return c.json({
@@ -341,7 +492,9 @@ app.get('/', (c) => {
       'GET /api/grants/:id', 
       'POST /api/users/register',
       'GET /api/users/me',
-      'POST /api/grants/generate-proposal'
+      'POST /api/grants/generate-proposal',
+      'POST /api/stripe/create-checkout',
+      'POST /api/stripe/webhook'
     ]
   });
 });

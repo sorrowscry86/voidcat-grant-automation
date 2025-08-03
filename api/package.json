@@ -12,7 +12,8 @@
   "author": "VoidCat RDC",
   "license": "MIT",
   "dependencies": {
-    "hono": "^4.0.0"
+    "hono": "^4.0.0",
+    "stripe": "^15.8.0"
   },
   "devDependencies": {
     "wrangler": "^3.0.0"
