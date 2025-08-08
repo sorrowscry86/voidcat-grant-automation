@@ -7,9 +7,9 @@ import Stripe from 'stripe';
 
 const app = new Hono();
 
-// CORS middleware
+// CORS middleware - Allow all origins for now
 app.use('*', cors({
-  origin: ['https://voidcat-grants.pages.dev', 'http://localhost:3000', 'https://sorrowscry86.github.io'],
+  origin: '*',
   allowHeaders: ['Content-Type', 'Authorization'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 }));

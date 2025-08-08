@@ -80,6 +80,9 @@
             </div>
             <div x-show="grants.length > 0" class="text-sm text-gray-600">
                 Found <span x-text="grants.length"></span> matching opportunities
+                <span x-show="usingDemoData" class="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">
+                    📋 Demo Data (API unavailable)
+                </span>
             </div>
         </div>        <!-- Registration Modal -->
         <div x-show="showRegister" 
@@ -359,6 +362,7 @@
                 showRegister: false,
                 upgradeToProModal: false,
                 showUpgradePrompt: false,
+                usingDemoData: false,
                 
                 // Form data
                 searchQuery: '',
@@ -489,29 +493,78 @@
                 // Grant search
                 async searchGrants() {
                     this.loading = true;
+                    console.log('🔍 Starting grant search...');
+                    
                     try {
                         const params = new URLSearchParams();
                         if (this.searchQuery) params.append('query', this.searchQuery);
                         if (this.selectedAgency) params.append('agency', this.selectedAgency);
 
-                        const response = await fetch(`${this.apiBase}/api/grants/search?${params}`);
-                        const data = await response.json();
+                        console.log('📡 Attempting API call to:', `${this.apiBase}/api/grants/search?${params}`);
                         
-                        if (data.success) {
+                        const response = await fetch(`${this.apiBase}/api/grants/search?${params}`, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            mode: 'cors'
+                        });
+                        
+                        console.log('📡 API Response status:', response.status);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        console.log('📡 API Response data:', data);
+                        
+                        if (data.success && data.grants) {
                             this.grants = data.grants;
-                            console.log('Found grants:', data.grants.length);
+                            this.usingDemoData = false;
+                            console.log('✅ Found grants from API:', data.grants.length);
                         } else {
-                            console.error('Search failed:', data.error);
-                            this.grants = [];
+                            console.error('❌ Search failed:', data.error);
+                            throw new Error('API returned unsuccessful response');
                         }
                     } catch (error) {
-                        console.error('Search error:', error);
-                        // Fallback to demo data when API is not accessible
-                        console.log('Using demo data due to API connectivity issues');
-                        this.grants = this.demoGrants;
+                        console.error('❌ Search error:', error.message);
+                        console.log('🔄 Falling back to demo data due to API connectivity issues');
+                        
+                        // Apply filters to demo data if any
+                        let filteredGrants = [...this.demoGrants];
+                        
+                        if (this.searchQuery) {
+                            const query = this.searchQuery.toLowerCase();
+                            filteredGrants = filteredGrants.filter(grant => 
+                                grant.title.toLowerCase().includes(query) ||
+                                grant.description.toLowerCase().includes(query) ||
+                                grant.program.toLowerCase().includes(query) ||
+                                grant.agency.toLowerCase().includes(query)
+                            );
+                        }
+                        
+                        if (this.selectedAgency) {
+                            const agencyMap = {
+                                'defense': 'department of defense',
+                                'nsf': 'national science foundation',
+                                'energy': 'department of energy',
+                                'darpa': 'darpa',
+                                'nasa': 'nasa'
+                            };
+                            const searchAgency = agencyMap[this.selectedAgency.toLowerCase()] || this.selectedAgency.toLowerCase();
+                            filteredGrants = filteredGrants.filter(grant => 
+                                grant.agency.toLowerCase().includes(searchAgency)
+                            );
+                        }
+                        
+                        this.grants = filteredGrants;
+                        this.usingDemoData = true;
+                        console.log('✅ Using demo data:', filteredGrants.length, 'grants');
                     } finally {
                         this.loading = false;
                         this.searchPerformed = true;
+                        console.log('🏁 Search completed. Total grants:', this.grants.length);
                     }
                 },
 
