@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoidCat RDC - Test Frontend</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div x-data="testApp()" class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-4">VoidCat RDC - Frontend Test</h1>
+        
+        <div class="bg-white p-6 rounded-lg shadow mb-4">
+            <h2 class="text-xl font-semibold mb-4">API Test</h2>
+            <button @click="testAPI()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                Test API Connection
+            </button>
+            <div x-show="apiResult" class="mt-4 p-4 bg-gray-100 rounded">
+                <pre x-text="apiResult"></pre>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow mb-4">
+            <h2 class="text-xl font-semibold mb-4">Grant Search Test</h2>
+            <button @click="testGrantSearch()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                Test Grant Search
+            </button>
+            <div x-show="searchResult" class="mt-4 p-4 bg-gray-100 rounded">
+                <pre x-text="searchResult"></pre>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h2 class="text-xl font-semibold mb-4">Demo Data Test</h2>
+            <button @click="showDemoData()" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                Show Demo Data
+            </button>
+            <div x-show="demoResult" class="mt-4 p-4 bg-gray-100 rounded">
+                <pre x-text="demoResult"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function testApp() {
+            return {
+                apiResult: '',
+                searchResult: '',
+                demoResult: '',
+                apiBase: 'https://grant-search-api.sorrowscry86.workers.dev',
+
+                async testAPI() {
+                    try {
+                        console.log('Testing API connection...');
+                        const response = await fetch(`${this.apiBase}/health`);
+                        const data = await response.json();
+                        this.apiResult = JSON.stringify(data, null, 2);
+                        console.log('API test result:', data);
+                    } catch (error) {
+                        this.apiResult = `Error: ${error.message}`;
+                        console.error('API test error:', error);
+                    }
+                },
+
+                async testGrantSearch() {
+                    try {
+                        console.log('Testing grant search...');
+                        const response = await fetch(`${this.apiBase}/api/grants/search`);
+                        const data = await response.json();
+                        this.searchResult = JSON.stringify(data, null, 2);
+                        console.log('Grant search result:', data);
+                    } catch (error) {
+                        this.searchResult = `Error: ${error.message}`;
+                        console.error('Grant search error:', error);
+                    }
+                },
+
+                showDemoData() {
+                    const demoGrants = [
+                        {
+                            id: 'SBIR-25-001',
+                            title: 'AI for Defense Applications',
+                            agency: 'Department of Defense',
+                            program: 'SBIR Phase I',
+                            deadline: '2025-09-15',
+                            amount: '$250,000',
+                            description: 'Seeking innovative AI solutions for defense applications including autonomous systems, cybersecurity, and logistics optimization.',
+                            eligibility: 'Small businesses with <500 employees',
+                            matching_score: 0.95
+                        },
+                        {
+                            id: 'DARPA-25-006',
+                            title: 'Artificial Intelligence Next Campaign',
+                            agency: 'DARPA',
+                            program: 'AI Next',
+                            deadline: '2025-03-15',
+                            amount: '$5,000,000',
+                            description: 'Revolutionary AI research for national security applications including autonomous systems, cybersecurity, and logistics optimization.',
+                            eligibility: 'Research institutions and innovative companies',
+                            matching_score: 0.91
+                        }
+                    ];
+                    this.demoResult = JSON.stringify(demoGrants, null, 2);
+                    console.log('Demo data:', demoGrants);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,4 +1,15 @@
 import { Page, Locator, expect } from '@playwright/test';
+import { TIMEOUTS, safeAction, waitForPageLoad, safeClick, safeFill } from '../utils/testUtils';
+
+// Extend Window interface to include Alpine.js
+declare global {
+  interface Window {
+    Alpine?: {
+      // Add Alpine.js types here if needed
+      // This tells TypeScript that window.Alpine might exist
+    };
+  }
+}
 
 export class HomePage {
   readonly page: Page;
@@ -14,6 +25,7 @@ export class HomePage {
   readonly emptyStateHeading: Locator;
   readonly emptyStateMessage: Locator;
   readonly featuresSection: Locator;
+  readonly upgradeButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -29,19 +41,52 @@ export class HomePage {
     this.emptyStateHeading = page.getByRole('heading', { name: 'No grants found' });
     this.emptyStateMessage = page.getByText('Try adjusting your search criteria or browse all opportunities.');
     this.featuresSection = page.getByRole('heading', { name: '🎯 Why Choose VoidCat RDC?' });
+    this.upgradeButton = page.getByRole('button', { name: 'Upgrade to Pro' });
   }
 
   async goto() {
-    await this.page.goto('index.html');
-    // Wait for Alpine.js to initialize
-    await this.page.waitForFunction(() => window.Alpine !== undefined);
-    await this.page.waitForLoadState('networkidle');
+    await safeAction(
+      async () => {
+        await this.page.goto('index.html');
+        await waitForPageLoad(this.page);
+        
+        // Wait for Alpine.js to be available with type safety and timeout
+        await this.page.waitForFunction(
+          () => typeof window !== 'undefined' && window.Alpine !== undefined,
+          null,
+          { timeout: TIMEOUTS.MEDIUM }
+        );
+        
+        // Wait for critical elements to be visible
+        await this.waitForPageLoad();
+      },
+      'Failed to load home page',
+      TIMEOUTS.PAGE_LOAD
+    );
   }
 
-  async waitForPageLoad() {
-    await expect(this.title).toBeVisible();
-    await expect(this.subtitle).toBeVisible();
-    await expect(this.searchInput).toBeVisible();
+  async waitForPageLoad(timeout = TIMEOUTS.MEDIUM) {
+    await safeAction(
+      async () => {
+        await expect(this.title).toBeVisible({ timeout });
+        await expect(this.subtitle).toBeVisible({ timeout });
+        await expect(this.searchInput).toBeVisible({ timeout });
+      },
+      'Page did not load successfully',
+      timeout
+    );
+  }
+
+  async performSearch(query: string, timeout: number = TIMEOUTS.MEDIUM) {
+    await safeAction(
+      async () => {
+        await this.searchInput.fill(query);
+        await this.searchButton.click();
+        await this.page.waitForLoadState('networkidle');
+      },
+      `Failed to perform search for query: ${query}`,
+      timeout
+    );
   }
 
   async searchFor(keywords: string, agency?: string) {
@@ -52,22 +97,57 @@ export class HomePage {
     await this.searchButton.click();
   }
 
-  async waitForSearchResults() {
-    // Wait for loading state to finish
-    await this.page.waitForFunction(() => {
-      const loadingSpinner = document.querySelector('.animate-spin');
-      return !loadingSpinner || loadingSpinner.closest('[x-show="loading"]')?.style.display === 'none';
-    });
+  async waitForSearchResults(timeout = 10000) {
+    // Wait for loading state to finish with proper type safety
+    await this.page.waitForFunction(([selector, xShowAttr]) => {
+      const loadingSpinner = document.querySelector(selector);
+      if (!loadingSpinner) return true;
+      
+      const parent = loadingSpinner.closest(`[${xShowAttr}]`);
+      if (!parent) return true;
+      
+      // Type-safe check for style.display
+      const style = window.getComputedStyle(parent);
+      return style.display === 'none';
+    }, ['.animate-spin', 'x-show'], { timeout });
+    
+    // Additional wait for any animations or transitions
+    await this.page.waitForTimeout(500);
   }
 
-  async clickGetStarted() {
-    await this.getStartedButton.click();
+  async clickGetStarted(timeout: number = TIMEOUTS.MEDIUM) {
+    await safeAction(
+      async () => {
+        await this.getStartedButton.click();
+        await this.page.waitForLoadState('networkidle');
+      },
+      'Failed to click Get Started button',
+      timeout
+    );
   }
 
-  async verifyEmptyState() {
-    await expect(this.emptyStateIcon).toBeVisible();
-    await expect(this.emptyStateHeading).toBeVisible();
-    await expect(this.emptyStateMessage).toBeVisible();
+  async waitForGrants(timeout: number = TIMEOUTS.MEDIUM) {
+    await safeAction(
+      async () => {
+        const element = this.page.locator('.grant-card');
+        await element.waitFor({ state: 'attached', timeout });
+      },
+      'Timed out waiting for grant cards to load',
+      timeout
+    );
+  }
+
+  async verifyEmptyState(timeout: number = TIMEOUTS.MEDIUM) {
+    const assertions = [
+      this.emptyStateIcon.isVisible(),
+      this.emptyStateHeading.isVisible(),
+      this.emptyStateMessage.isVisible()
+    ];
+    
+    // Wait for all assertions to pass or fail together
+    await Promise.all(assertions.map(assertion => 
+      expect(assertion).resolves.toBe(true)
+    ));
   }
 
   async verifyFeaturesVisible() {

@@ -53,4 +53,38 @@ export class RegistrationModal {
   async verifyTierInfo() {
     await expect(this.tierInfo).toBeVisible();
   }
+
+  async registerUser(user: { name: string; email: string; company?: string }) {
+    await this.waitForVisible();
+    await this.fillRegistrationForm(user.name, user.email, user.company);
+    
+    // Mock the API response for successful registration
+    await this.page.route('**/api/register', route => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          user: {
+            id: 'test-user-123',
+            email: user.email,
+            name: user.name,
+            company: user.company || '',
+            subscription_tier: 'free',
+            usage_count: 0,
+            usage_limit: 1
+          },
+          token: 'test-jwt-token-123'
+        })
+      });
+    });
+    
+    await this.submitRegistration();
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  async verifyTierInfoText() {
+    await expect(this.tierInfo).toContainText('Free tier includes');
+    await expect(this.tierInfo).toContainText('1 grant application per month');
+  }
 }

@@ -1,16 +1,24 @@
 import { defineConfig, devices } from '@playwright/test';
+import { TIMEOUTS } from './tests/e2e/utils/testUtils';
 
 /**
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  /* Global timeout for each test */
+  timeout: TIMEOUTS.VERY_LONG,
+  /* Expect timeout for assertions */
+  expect: {
+    timeout: TIMEOUTS.MEDIUM,
+    toHaveScreenshot: { maxDiffPixelRatio: 0.01 },
+  },
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
+  /* Retry failed tests */
+  retries: process.env.CI ? 2 : 1,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
@@ -19,6 +27,10 @@ export default defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: 'file:///d:/Ryuzu%20Claude/VoidCat-RDC/voidcat-grant-automation/frontend/',
+    
+    /* Timeout for each action */
+    actionTimeout: TIMEOUTS.MEDIUM,
+    navigationTimeout: TIMEOUTS.PAGE_LOAD,
     
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',

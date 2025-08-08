@@ -45,10 +45,10 @@ npx wrangler deploy --env production
 
 ## 📊 Current Infrastructure
 
-### Cloudflare Account: `2794a6beb680cf1122f51c1c625e190f`
-- ✅ D1 Database: `voidcat-users` (ID: b22bd380-29ca-4a22-be8a-655a382a58a1)
+### Cloudflare Resources
+- ✅ D1 Database: `voidcat-users`
 - ✅ R2 Bucket: `voidcat-assets`
-- ✅ KV Namespace: `OAUTH_KV` (ID: ae1f4c3087dd4b208a449f7fbd7c93d3)
+- ✅ KV Namespace: `OAUTH_KV`
 - ✅ Workers: `remote-mcp-server`, `my-mcp-server`
 
 ## 🎯 Features Implemented
@@ -121,6 +121,11 @@ POST /api/grants/generate-proposal  - AI proposal generation
 - Platform: https://grant-search-api.sorrowscry86.workers.dev
 - Frontend: TBD (GitHub Pages deployment)
 - Support: Federal funding assistance for technology startups
+
+### Team Information
+- **Team**: VoidCat RDC Team
+- **Maintainer/Lead**: Wykeve (sorrowscry86@voidcat.org)
+- **License**: MIT
 
 ---
 
