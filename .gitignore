@@ -3,7 +3,8 @@ node_modules/
 npm-debug.log
 yarn-debug.log
 yarn-error.log
-package-lock.json
+## Do not ignore package-lock.json; it ensures deterministic installs
+# package-lock.json
 
 # Environment variables
 .env
