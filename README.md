@@ -2,6 +2,8 @@
 
 🚀 **LIVE MVP**: AI-powered federal grant discovery and proposal automation for startups and small businesses.
 
+📋 **[Complete Platform Documentation](grant-automation-platform.md)** - Comprehensive technical and business specification
+
 ## 🎯 Project Overview
 
 **Revenue Target**: $500 Month 1 → $2,500 Month 3 → $10,000+ Month 6
@@ -121,6 +123,7 @@ POST /api/grants/generate-proposal  - AI proposal generation
 - Platform: https://grant-search-api.sorrowscry86.workers.dev
 - Frontend: TBD (GitHub Pages deployment)
 - Support: Federal funding assistance for technology startups
+- **Complete Documentation**: [grant-automation-platform.md](grant-automation-platform.md)
 
 ### Team Information
 - **Team**: VoidCat RDC Team
