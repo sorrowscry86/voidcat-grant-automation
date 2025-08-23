@@ -704,7 +704,7 @@ Note: This is an AI-generated draft. Review and customize before submission.
                         if (data.sessionId) {
                             // Initialize Stripe and redirect to checkout
                             // Stripe key configured for production
-                            const stripe = Stripe('pk_live_51RpO9f3YDbGiItIJNapblUftBvu2On2E354N6mQbJPDUOes1gdOjpVaUUJTrmWhEwj0wuxxICuk8y7j2GeisOS5I00njVdFrlx');
+                            const stripe = Stripe('pk_live_YOUR_PUBLISHABLE_KEY_HERE');
                             const result = await stripe.redirectToCheckout({
                                 sessionId: data.sessionId
                             });

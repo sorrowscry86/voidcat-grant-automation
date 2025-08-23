@@ -196,6 +196,55 @@ Don’t
 
 ---
 
+## GitHub Secrets
+
+- Inspect Cloudflare Worker config and API code to identify which secrets/bindings are used.
+- Add or update GitHub Actions workflows to consume those secrets and deploy.
+
+## GitHub Secrets & Cloudflare Config
+- Required: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- Optional: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`
+
+Steps:
+1) Create a Cloudflare API token with these permissions:
+- Account → Workers Scripts: Edit
+- Optionally add D1: Edit, KV: Edit, R2: Edit if you want CI to manage those.
+
+2) Add GitHub Secrets (UI)
+- Navigate to `Settings` → `Secrets and variables` → `Actions` → `New repository secret`.
+- Add:
+  - `CLOUDFLARE_API_TOKEN`
+  - `CLOUDFLARE_ACCOUNT_ID`
+  - Optional Stripe: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`
+
+3) Or add GitHub Secrets (CLI)
+- From the repo root:
+  - `gh secret set CLOUDFLARE_API_TOKEN --body "<token>"`
+  - `gh secret set CLOUDFLARE_ACCOUNT_ID --body "<account_id>"`
+  - `gh secret set STRIPE_SECRET_KEY --body "sk_test_..."` (optional)
+  - `gh secret set STRIPE_PUBLISHABLE_KEY --body "pk_test_..."` (optional)
+  - `gh secret set STRIPE_PRICE_ID --body "price_..."` (optional)
+  - `gh secret set STRIPE_WEBHOOK_SECRET --body "whsec_..."` (optional)
+
+4) Optional: Set Cloudflare Worker secrets directly for local/dev
+- From ``:
+  - `npx wrangler secret put STRIPE_SECRET_KEY --env production`
+  - `npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env production`
+  - `npx wrangler secret put STRIPE_PRICE_ID --env production`
+  - `npx wrangler secret put STRIPE_WEBHOOK_SECRET --env production`
+
+5) Trigger deploy and verify
+- Push a commit that touches files under ``, or manually run the workflow: Actions → “Deploy Cloudflare Worker (API)”.
+- Verify health:
+  - `curl https://grant-search-api.sorrowscry86.workers.dev/health`
+  - Expect: `{ "status": "ok" }`
+
+6) Make the repo public
+- UI: `Settings` → `General` → “Change repository visibility” → Public
+- CLI: `gh repo edit --visibility public`
+
+---
+
 ## Quick Links
 
 - Frontend entry: `frontend/index.html`

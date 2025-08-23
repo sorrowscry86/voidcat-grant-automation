@@ -25,23 +25,48 @@
 - **Framework**: Alpine.js + Tailwind CSS
 - **Deployment**: GitHub Pages or Cloudflare Pages
 
-## 🚀 Quick Deployment
+## 🚀 Complete Deployment
 
-### 1. Deploy API to Cloudflare Workers
+### Automated Deployment (Recommended)
+```bash
+# Deploy both API and frontend with one command
+./deploy.sh
+```
+
+**What this does**:
+- ✅ Deploys API to Cloudflare Workers
+- ✅ Triggers frontend deployment via GitHub Actions
+- ✅ Validates deployment status
+- ✅ Tests API connectivity
+
+### Manual Deployment
+
+#### 1. Deploy API to Cloudflare Workers
 ```bash
 cd api
 npm install
 npx wrangler deploy --env production
 ```
 
-### 2. Deploy Frontend
-**Option A: GitHub Pages**
-- Push to GitHub repository
-- Enable GitHub Pages from `frontend/` directory
+#### 2. Deploy Frontend
+```bash
+# Commit and push to main/master branch
+git add .
+git commit -m "Deploy: Frontend updates"
+git push origin main
+```
 
-**Option B: Cloudflare Pages**
-- Connect repository to Cloudflare Pages
-- Set build directory to `frontend/`
+### Validate Deployment
+```bash
+# Check deployment status
+./validate-deployment.sh
+```
+
+## 📍 Live URLs
+
+- **API**: https://grant-search-api.sorrowscry86.workers.dev
+- **Frontend**: https://[username].github.io/voidcat-grant-automation
+- **Health Check**: https://grant-search-api.sorrowscry86.workers.dev/health
 
 ## 📊 Current Infrastructure
 
@@ -130,3 +155,73 @@ POST /api/grants/generate-proposal  - AI proposal generation
 ---
 
 *Deployed: July 27, 2025 | Status: LIVE MVP*
+
+## 🔐 GitHub Secrets & Cloudflare Config
+
+Use GitHub Secrets for CI and Cloudflare Secrets for runtime. No secrets should live in code or `.env` files in this repo.
+
+### Required (for CI deploys)
+- `CLOUDFLARE_API_TOKEN` – API token with at least:
+	- Account > Workers Scripts: Edit
+	- Optional if managed in CI: D1 Database: Edit, Workers KV Storage: Edit, R2: Edit
+- `CLOUDFLARE_ACCOUNT_ID` – Your Cloudflare account ID
+
+### Optional (Stripe, syncs to Worker secret store)
+- `STRIPE_SECRET_KEY` – Server-side secret key (sk_live_... or sk_test_...)
+- `STRIPE_PUBLISHABLE_KEY` – Client publishable key (pk_live_... or pk_test_...)
+- `STRIPE_PRICE_ID` – Current subscription price ID (price_...)
+- `STRIPE_WEBHOOK_SECRET` – Webhook signing secret (whsec_...)
+
+The CI workflow at `.github/workflows/deploy-worker.yml` will:
+- Deploy the Worker with Wrangler using the Cloudflare secrets
+- If any Stripe secrets are provided, push them into the Worker (production env) via `wrangler secret put`
+
+### Set secrets in GitHub (UI)
+GitHub → Repository → Settings → Secrets and variables → Actions → New repository secret → add the keys above.
+
+### Set secrets in GitHub (CLI, Windows PowerShell)
+Requires GitHub CLI (`gh`) authenticated to your account:
+
+```powershell
+# From the repo root
+gh secret set CLOUDFLARE_API_TOKEN --body "<token>"
+gh secret set CLOUDFLARE_ACCOUNT_ID --body "<account_id>"
+
+# Optional Stripe
+gh secret set STRIPE_SECRET_KEY --body "sk_test_..."  # or sk_live_...
+gh secret set STRIPE_PUBLISHABLE_KEY --body "pk_test_..."  # or pk_live_...
+gh secret set STRIPE_PRICE_ID --body "price_..."
+gh secret set STRIPE_WEBHOOK_SECRET --body "whsec_..."
+```
+
+### Set secrets directly in Cloudflare (optional local dev)
+From `api/` with Wrangler installed and logged in:
+
+```powershell
+cd api
+npx wrangler secret put STRIPE_SECRET_KEY --env production
+npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env production
+npx wrangler secret put STRIPE_PRICE_ID --env production
+npx wrangler secret put STRIPE_WEBHOOK_SECRET --env production
+```
+
+### Verify deployment
+1) Push a commit touching files under `api/` or run the workflow manually (Actions → Deploy Cloudflare Worker)
+2) Check the run logs for a successful `wrangler deploy`
+3) Hit the health endpoint:
+
+```powershell
+curl https://grant-search-api.sorrowscry86.workers.dev/health
+```
+
+You should receive `{ "status": "ok" }`.
+
+### Make the repository public (after secrets are set)
+- GitHub UI: Settings → General → Danger Zone → Change repository visibility → Public
+- GitHub CLI (Windows PowerShell):
+
+```powershell
+gh repo edit --visibility public
+```
+
+Security note: `.gitignore` excludes local env files, caches, test artifacts, and other sensitive content. Keep secrets exclusively in GitHub/Cloudflare secret stores.

@@ -1,0 +1,61 @@
+name: Deploy Cloudflare Worker (API)
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'api/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy API Worker
+    runs-on: ubuntu-latest
+    env:
+      # Required for Wrangler auth
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Optional Stripe secrets (synced to Cloudflare if provided)
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+      STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install API dependencies
+        working-directory: ./api
+        run: |
+          npm ci
+
+      - name: Wrangler Version
+        working-directory: ./api
+        run: |
+          npx wrangler --version
+
+      - name: Sync Stripe secrets to Cloudflare (optional)
+        if: env.STRIPE_SECRET_KEY != '' || env.STRIPE_PUBLISHABLE_KEY != '' || env.STRIPE_PRICE_ID != '' || env.STRIPE_WEBHOOK_SECRET != ''
+        working-directory: ./api
+        shell: bash
+        run: |
+          if [ -n "$STRIPE_SECRET_KEY" ]; then echo "$STRIPE_SECRET_KEY" | npx wrangler secret put STRIPE_SECRET_KEY --env production; fi
+          if [ -n "$STRIPE_PUBLISHABLE_KEY" ]; then echo "$STRIPE_PUBLISHABLE_KEY" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env production; fi
+          if [ -n "$STRIPE_PRICE_ID" ]; then echo "$STRIPE_PRICE_ID" | npx wrangler secret put STRIPE_PRICE_ID --env production; fi
+          if [ -n "$STRIPE_WEBHOOK_SECRET" ]; then echo "$STRIPE_WEBHOOK_SECRET" | npx wrangler secret put STRIPE_WEBHOOK_SECRET --env production; fi
+
+      - name: Deploy Worker (production)
+        working-directory: ./api
+        run: |
+          npx wrangler deploy --env production
