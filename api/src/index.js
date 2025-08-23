@@ -539,6 +539,14 @@ app.get('/health', (c) => {
   });
 });
 
+// Public Stripe configuration endpoint
+app.get('/api/public/stripe-config', (c) => {
+  return c.json({
+    publishable_key: c.env.STRIPE_PUBLIC_KEY || c.env.STRIPE_PUBLISHABLE_KEY,
+    price_id: c.env.STRIPE_PRICE_ID
+  });
+});
+
 // Stripe Checkout Session Creation
 app.post('/api/stripe/create-checkout', async (c) => {
   const stripe = new Stripe(c.env.STRIPE_SECRET_KEY);
@@ -626,6 +634,7 @@ app.get('/', (c) => {
       'POST /api/users/register',
       'GET /api/users/me',
       'POST /api/grants/generate-proposal',
+      'GET /api/public/stripe-config',
       'POST /api/stripe/create-checkout',
       'POST /api/stripe/webhook'
     ]

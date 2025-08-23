@@ -688,6 +688,15 @@ Note: This is an AI-generated draft. Review and customize before submission.
                     }
 
                     try {
+                        // First, get Stripe configuration
+                        const configResponse = await fetch(`${this.apiBase}/api/public/stripe-config`);
+                        const config = await configResponse.json();
+                        
+                        if (!config.publishable_key) {
+                            alert('Payment system configuration error. Please try again later.');
+                            return;
+                        }
+
                         const response = await fetch(`${this.apiBase}/api/stripe/create-checkout`, {
                             method: 'POST',
                             headers: {
@@ -702,9 +711,8 @@ Note: This is an AI-generated draft. Review and customize before submission.
 
                         const data = await response.json();
                         if (data.sessionId) {
-                            // Initialize Stripe and redirect to checkout
-                            // Stripe key configured for production
-                            const stripe = Stripe('pk_live_YOUR_PUBLISHABLE_KEY_HERE');
+                            // Initialize Stripe with dynamic publishable key and redirect to checkout
+                            const stripe = Stripe(config.publishable_key);
                             const result = await stripe.redirectToCheckout({
                                 sessionId: data.sessionId
                             });
