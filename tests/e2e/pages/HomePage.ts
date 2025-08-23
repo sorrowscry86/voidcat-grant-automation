@@ -37,7 +37,7 @@ export class HomePage {
     this.agencySelect = page.getByRole('combobox');
     this.searchButton = page.getByRole('button', { name: /Search Grants|Searching/ });
     this.loadingIndicator = page.getByText('Loading grant opportunities...');
-    this.emptyStateIcon = page.getByText('📋');
+    this.emptyStateIcon = page.locator('.text-gray-400.text-6xl.mb-4').getByText('📋');
     this.emptyStateHeading = page.getByRole('heading', { name: 'No grants found' });
     this.emptyStateMessage = page.getByText('Try adjusting your search criteria or browse all opportunities.');
     this.featuresSection = page.getByRole('heading', { name: '🎯 Why Choose VoidCat RDC?' });
@@ -166,8 +166,9 @@ export class HomePage {
           await expect(grantCards.first()).toBeVisible({ timeout });
           console.log('✅ Search results found (API or demo data)');
         } else {
-          // Check for empty state
-          await expect(this.emptyStateIcon).toBeVisible({ timeout });
+          // Check for empty state with more specific selector
+          const emptyStateContainer = this.page.locator('.text-gray-400.text-6xl.mb-4');
+          await expect(emptyStateContainer).toBeVisible({ timeout });
           console.log('✅ Empty state shown');
         }
       },
