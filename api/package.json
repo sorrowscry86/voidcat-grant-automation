@@ -8,7 +8,13 @@
     "deploy": "wrangler deploy --env production",
     "test": "echo \"No tests specified\" && exit 0"
   },
-  "keywords": ["grants", "federal", "api", "cloudflare", "workers"],
+  "keywords": [
+    "grants",
+    "federal",
+    "api",
+    "cloudflare",
+    "workers"
+  ],
   "author": "VoidCat RDC",
   "license": "MIT",
   "dependencies": {
@@ -16,6 +22,6 @@
     "stripe": "^15.8.0"
   },
   "devDependencies": {
-    "wrangler": "^3.0.0"
+    "wrangler": "^4.32.0"
   }
 }

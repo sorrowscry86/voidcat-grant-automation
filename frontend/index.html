@@ -346,6 +346,11 @@
         <footer class="mt-12 text-center text-gray-500 text-sm">
             <p>&copy; 2025 VoidCat RDC. Federal Grant Automation Platform.</p>
             <p class="mt-1">Helping startups secure federal funding through AI-powered grant discovery and proposal generation.</p>
+            <div class="mt-4 flex justify-center space-x-6">
+                <a href="privacy-policy.html" class="text-blue-600 hover:text-blue-800 transition-colors">Privacy Policy</a>
+                <a href="terms-of-service.html" class="text-blue-600 hover:text-blue-800 transition-colors">Terms of Service</a>
+                <a href="mailto:support@voidcat.org" class="text-blue-600 hover:text-blue-800 transition-colors">Support</a>
+            </div>
         </footer>
     </div>
 
@@ -690,16 +695,16 @@ Note: This is an AI-generated draft. Review and customize before submission.
                                 'Authorization': `Bearer ${this.apiKey}`
                             },
                             body: JSON.stringify({
-                                email: this.user.email,
-                                price_id: process.env.STRIPE_PRICE_ID || 'price_placeholder'
+                                email: this.user.email
+                                // Note: price_id is configured on the backend
                             })
                         });
 
                         const data = await response.json();
                         if (data.sessionId) {
                             // Initialize Stripe and redirect to checkout
-                            // TODO: Replace with environment variable in production
-                            const stripe = Stripe(process.env.STRIPE_PUBLIC_KEY || 'pk_test_sample');
+                            // Stripe key configured for production
+                            const stripe = Stripe('pk_live_51RpO9f3YDbGiItIJNapblUftBvu2On2E354N6mQbJPDUOes1gdOjpVaUUJTrmWhEwj0wuxxICuk8y7j2GeisOS5I00njVdFrlx');
                             const result = await stripe.redirectToCheckout({
                                 sessionId: data.sessionId
                             });

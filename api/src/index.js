@@ -7,9 +7,15 @@ import Stripe from 'stripe';
 
 const app = new Hono();
 
-// CORS middleware - Allow all origins for now
+// CORS middleware - Restrict to specific domains for production
 app.use('*', cors({
-  origin: '*',
+  origin: [
+    'https://sorrowscry86.github.io',
+    'https://voidcat.org',
+    'https://www.voidcat.org',
+    'http://localhost:3000', // For local development
+    'http://localhost:8080'  // For local development
+  ],
   allowHeaders: ['Content-Type', 'Authorization'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 }));
@@ -19,7 +25,18 @@ async function getDB(env) {
   return env.VOIDCAT_DB; // D1 database binding
 }
 
-// Mock grant data for immediate deployment
+// Configuration for data sources
+const DATA_CONFIG = {
+  USE_LIVE_DATA: false, // Set to true when ready to use live grant feeds
+  LIVE_DATA_SOURCES: {
+    GRANTS_GOV_API: 'https://www.grants.gov/grantsws/rest/opportunities/search/',
+    SBIR_API: 'https://www.sbir.gov/api/opportunities.json',
+    NSF_API: 'https://www.nsf.gov/awardsearch/download.jsp'
+  }
+};
+
+// Mock grant data for immediate deployment (Phase 1)
+// TODO: Replace with live data feeds in Phase 2 development
 const MOCK_GRANTS = [
   {
     id: 'SBIR-25-001',
@@ -30,7 +47,8 @@ const MOCK_GRANTS = [
     amount: '$250,000',
     description: 'Seeking innovative AI solutions for defense applications including autonomous systems, cybersecurity, and logistics optimization.',
     eligibility: 'Small businesses with <500 employees',
-    matching_score: 0.95
+    matching_score: 0.95,
+    data_source: 'mock' // Track data source for transparency
   },
   {
     id: 'NSF-25-002', 
@@ -41,7 +59,8 @@ const MOCK_GRANTS = [
     amount: '$20,000,000',
     description: 'Multi-institutional AI research institutes focused on advancing AI for materials discovery, climate science, and healthcare.',
     eligibility: 'Academic institutions with industry partners',
-    matching_score: 0.87
+    matching_score: 0.87,
+    data_source: 'mock'
   },
   {
     id: 'DOE-25-003',
@@ -52,7 +71,8 @@ const MOCK_GRANTS = [
     amount: '$3,000,000',
     description: 'Computational science research for energy applications including renewable energy optimization and grid management.',
     eligibility: 'Universities, labs, industry',
-    matching_score: 0.82
+    matching_score: 0.82,
+    data_source: 'mock'
   },
   {
     id: 'DARPA-25-004',
@@ -63,7 +83,8 @@ const MOCK_GRANTS = [
     amount: '$1,500,000',
     description: 'Developing AI systems that can explain their decision-making processes for military applications.',
     eligibility: 'U.S. organizations with security clearance capability',
-    matching_score: 0.91
+    matching_score: 0.91,
+    data_source: 'mock'
   },
   {
     id: 'NASA-25-005',
@@ -74,7 +95,8 @@ const MOCK_GRANTS = [
     amount: '$800,000',
     description: 'AI technologies for autonomous spacecraft operations, planetary exploration, and space science data analysis.',
     eligibility: 'U.S. and foreign entities (excluding China)',
-    matching_score: 0.88
+    matching_score: 0.88,
+    data_source: 'mock'
   },
   {
     id: 'DARPA-25-006',
@@ -86,7 +108,8 @@ const MOCK_GRANTS = [
     description: 'Revolutionary AI research for national security applications including autonomous systems, cybersecurity, and logistics optimization.',
     eligibility: 'Research institutions and innovative companies',
     matching_score: 0.91,
-    tags: ['AI', 'Machine Learning', 'Defense', 'Research']
+    tags: ['AI', 'Machine Learning', 'Defense', 'Research'],
+    data_source: 'mock'
   },
   {
     id: 'NIH-25-007',
@@ -98,7 +121,8 @@ const MOCK_GRANTS = [
     description: 'Developing AI systems for early disease detection and personalized treatment recommendations.',
     eligibility: 'Small businesses partnering with research institutions',
     matching_score: 0.88,
-    tags: ['Healthcare', 'AI', 'Diagnostics', 'STTR']
+    tags: ['Healthcare', 'AI', 'Diagnostics', 'STTR'],
+    data_source: 'mock'
   },
   {
     id: 'DOE-25-008',
@@ -110,16 +134,50 @@ const MOCK_GRANTS = [
     description: 'AI-powered optimization of electrical grid systems for improved efficiency and renewable energy integration.',
     eligibility: 'US companies with energy sector experience',
     matching_score: 0.85,
-    tags: ['Energy', 'Smart Grid', 'AI', 'Infrastructure']
+    tags: ['Energy', 'Smart Grid', 'AI', 'Infrastructure'],
+    data_source: 'mock'
   }
 ];
+
+// Future live data integration function
+async function fetchLiveGrantData(query, agency) {
+  // TODO: Implement live data fetching in Phase 2
+  // This will integrate with grants.gov API, SBIR.gov, NSF, etc.
+  if (DATA_CONFIG.USE_LIVE_DATA) {
+    try {
+      // Example implementation for grants.gov API
+      const response = await fetch(`${DATA_CONFIG.LIVE_DATA_SOURCES.GRANTS_GOV_API}?keyword=${query}&agency=${agency}`);
+      const liveData = await response.json();
+      return liveData.map(grant => ({
+        ...grant,
+        data_source: 'live',
+        matching_score: calculateMatchingScore(grant, query)
+      }));
+    } catch (error) {
+      console.error('Live data fetch failed, falling back to mock data:', error);
+      return MOCK_GRANTS;
+    }
+  }
+  return MOCK_GRANTS;
+}
+
+// Calculate matching score for grants (placeholder algorithm)
+function calculateMatchingScore(grant, query) {
+  // TODO: Implement sophisticated matching algorithm
+  // For now, simple keyword matching
+  const keywords = query?.toLowerCase().split(' ') || [];
+  const grantText = `${grant.title} ${grant.description}`.toLowerCase();
+  const matches = keywords.filter(keyword => grantText.includes(keyword)).length;
+  return Math.min(0.5 + (matches * 0.1), 1.0);
+}
 
 // Basic grant search endpoint
 app.get('/api/grants/search', async (c) => {
   try {
     const { query, agency, deadline, amount } = c.req.query();
     
-    let filteredGrants = MOCK_GRANTS;
+    // Fetch grants from configured data source (mock or live)
+    let filteredGrants = await fetchLiveGrantData(query, agency);
     
     if (query) {
       filteredGrants = filteredGrants.filter(grant => 
@@ -147,7 +205,10 @@ app.get('/api/grants/search', async (c) => {
       success: true,
       count: filteredGrants.length,
       grants: filteredGrants,
-      timestamp: new Date().toISOString()
+      data_source: DATA_CONFIG.USE_LIVE_DATA ? 'live' : 'mock',
+      timestamp: new Date().toISOString(),
+      // Phase 2 readiness indicator
+      live_data_ready: DATA_CONFIG.USE_LIVE_DATA
     });
 
   } catch (error) {
@@ -227,12 +288,27 @@ app.post('/api/users/register', async (c) => {
     
     try {
       const db = await getDB(c.env);
+      
+      // Check if user already exists
+      const existingUser = await db.prepare(`
+        SELECT email FROM users WHERE email = ?
+      `).bind(email).first();
+      
+      if (existingUser) {
+        return c.json({
+          success: false,
+          error: 'User already exists',
+          message: 'An account with this email already exists'
+        }, 409);
+      }
+      
       const result = await db.prepare(`
-        INSERT INTO users (email, api_key, subscription_tier)
-        VALUES (?, ?, 'free')
+        INSERT INTO users (email, api_key, subscription_tier, created_at)
+        VALUES (?, ?, 'free', CURRENT_TIMESTAMP)
       `).bind(email, apiKey).run();
 
       if (result.success) {
+        console.log(`User registered successfully: ${email}`);
         return c.json({
           success: true,
           message: 'User registered successfully',
@@ -240,15 +316,40 @@ app.post('/api/users/register', async (c) => {
           subscription_tier: 'free'
         });
       } else {
-        throw new Error('Database insertion failed');
+        console.error('Database insertion failed:', result);
+        throw new Error(`Database insertion failed: ${result.error || 'Unknown error'}`);
       }
     } catch (dbError) {
-      // Fallback for demo purposes when DB not available
+      console.error('Database error during registration:', dbError);
+      
+      // Check if it's a constraint violation (duplicate email)
+      if (dbError.message && dbError.message.includes('UNIQUE constraint failed')) {
+        return c.json({
+          success: false,
+          error: 'User already exists',
+          message: 'An account with this email already exists'
+        }, 409);
+      }
+      
+      // For production, we should not fall back to demo mode
+      // This masks real database issues that need to be addressed
+      if (c.env.ENVIRONMENT === 'production') {
+        return c.json({
+          success: false,
+          error: 'Registration failed',
+          message: 'Unable to create account. Please try again later.',
+          details: 'Database service unavailable'
+        }, 503);
+      }
+      
+      // Demo mode fallback only for development
+      console.warn('Using demo mode fallback - this should not happen in production');
       return c.json({
         success: true,
         message: 'User registered successfully (demo mode)',
         api_key: apiKey,
-        subscription_tier: 'free'
+        subscription_tier: 'free',
+        demo_mode: true
       });
     }
 
@@ -279,6 +380,7 @@ app.get('/api/users/me', async (c) => {
       `).bind(apiKey).first();
 
       if (!user) {
+        console.warn(`Invalid API key attempted: ${apiKey.substring(0, 8)}...`);
         return c.json({ success: false, error: 'Invalid API key' }, 401);
       }
 
@@ -288,12 +390,24 @@ app.get('/api/users/me', async (c) => {
           id: user.id,
           email: user.email,
           subscription_tier: user.subscription_tier,
-          usage_count: user.usage_count,
+          usage_count: user.usage_count || 0,
           created_at: user.created_at
         }
       });
     } catch (dbError) {
-      // Demo mode fallback
+      console.error('Database error during authentication:', dbError);
+      
+      // For production, return proper error instead of demo mode
+      if (c.env.ENVIRONMENT === 'production') {
+        return c.json({
+          success: false,
+          error: 'Authentication service unavailable',
+          message: 'Please try again later'
+        }, 503);
+      }
+      
+      // Demo mode fallback only for development
+      console.warn('Using demo mode fallback for authentication');
       return c.json({
         success: true,
         user: {
@@ -302,7 +416,8 @@ app.get('/api/users/me', async (c) => {
           subscription_tier: 'free',
           usage_count: 0,
           created_at: new Date().toISOString()
-        }
+        },
+        demo_mode: true
       });
     }
 
@@ -349,13 +464,29 @@ app.post('/api/grants/generate-proposal', async (c) => {
 
       // Increment usage count for free users
       if (user.subscription_tier === 'free') {
-        await db.prepare(`
+        const updateResult = await db.prepare(`
           UPDATE users SET usage_count = COALESCE(usage_count, 0) + 1 
           WHERE api_key = ?
         `).bind(apiKey).run();
+        
+        if (!updateResult.success) {
+          console.error('Failed to update usage count:', updateResult);
+          // Continue anyway - don't block proposal generation for this
+        }
       }
     } catch (dbError) {
-      console.log('Database error, continuing in demo mode:', dbError);
+      console.error('Database error during proposal generation:', dbError);
+      
+      // For production, we should handle this more gracefully
+      if (c.env.ENVIRONMENT === 'production') {
+        return c.json({
+          success: false,
+          error: 'Service temporarily unavailable',
+          message: 'Please try again later'
+        }, 503);
+      }
+      
+      console.warn('Continuing in demo mode due to database error');
     }
 
     const { grant_id, company_info } = await c.req.json();
@@ -423,7 +554,9 @@ app.post('/api/stripe/create-checkout', async (c) => {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: 'price_1RpOdV3YDbGiItIJSxMyZyzv', // VoidCat Pro Subscription - $99/month
+          // TODO: Replace with your actual Stripe price ID
+          // Get this from your Stripe Dashboard -> Products -> VoidCat Pro -> Pricing
+          price: c.env.STRIPE_PRICE_ID || 'price_1RpOdV3YDbGiItIJSxMyZyzv', // REPLACE WITH ACTUAL PRICE ID
           quantity: 1,
         },
       ],

@@ -23,8 +23,11 @@ out/
 
 # Testing
 coverage/
-test-results/
+test-results/*
+!test-results/.gitkeep
 playwright-report/
+test-frontend.html
+verify-production.js
 
 # OS specific files
 .DS_Store
@@ -47,3 +50,24 @@ yarn-error.log*
 *.tmp
 *.swp
 *.swo
+
+# Security files
+SECURITY-SETUP.md
+*.pem
+*.key
+*.crt
+secret-*
+secrets.*
+
+# Stripe CLI tools
+stripe-cli.zip
+stripe.exe
+stripe_*
+
+# Documentation (sensitive operational details)
+GEMINI.md
+PRODUCTION-LAUNCH-CHECKLIST.md
+STRIPE-CLI-GUIDE.md
+
+# Ignore insiders AI rules
+.github/instructions/codacy.instructions.md
