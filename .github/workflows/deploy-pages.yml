@@ -66,11 +66,22 @@ jobs:
             echo "⚠️ API grant search may have issues - continuing deployment"
           fi
         
+      - name: Prepare Frontend for Deployment
+        run: |
+          echo "📁 Preparing frontend files for deployment..."
+          # Create a temporary directory for deployment
+          mkdir -p ./deploy-temp
+          # Copy frontend files to root of deployment directory
+          cp -r ./frontend/* ./deploy-temp/
+          # Create .nojekyll file to bypass Jekyll processing
+          touch ./deploy-temp/.nojekyll
+          echo "✅ Frontend files prepared for deployment"
+        
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload frontend directory
-          path: './frontend'
+          # Upload the prepared deployment directory
+          path: './deploy-temp'
           
       - name: Deploy to GitHub Pages
         id: deployment
