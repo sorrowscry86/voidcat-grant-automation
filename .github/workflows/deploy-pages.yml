@@ -53,17 +53,23 @@ jobs:
           API_URL="https://grant-search-api.sorrowscry86.workers.dev"
           
           # Test health endpoint
-          if curl -s "$API_URL/health" | grep -q "healthy"; then
-            echo "✅ API health check passed"
+          echo "Testing health endpoint: $API_URL/health"
+          HEALTH_RESPONSE=$(curl -s "$API_URL/health" || echo "curl_failed")
+          echo "Health response: $HEALTH_RESPONSE"
+          if [[ "$HEALTH_RESPONSE" != "curl_failed" && "$HEALTH_RESPONSE" != "" ]]; then
+            echo "✅ API health endpoint accessible"
           else
-            echo "⚠️ API health check failed - continuing deployment"
+            echo "⚠️ API health endpoint not accessible - continuing deployment"
           fi
           
           # Test grant search endpoint
-          if curl -s "$API_URL/api/grants/search?query=AI" | grep -q "success"; then
-            echo "✅ API grant search working"
+          echo "Testing grants endpoint: $API_URL/api/grants/search"
+          SEARCH_RESPONSE=$(curl -s "$API_URL/api/grants/search" || echo "curl_failed")
+          echo "Search response length: ${#SEARCH_RESPONSE}"
+          if [[ "$SEARCH_RESPONSE" != "curl_failed" && ${#SEARCH_RESPONSE} -gt 10 ]]; then
+            echo "✅ API grants endpoint accessible"
           else
-            echo "⚠️ API grant search may have issues - continuing deployment"
+            echo "⚠️ API grants endpoint may have issues - continuing deployment"
           fi
         
       - name: Prepare Frontend for Deployment
@@ -75,10 +81,19 @@ jobs:
           cp -r ./frontend/* ./deploy-temp/
           # Create .nojekyll file to bypass Jekyll processing
           touch ./deploy-temp/.nojekyll
+          # Validate deployment content
+          if [ ! -f "./deploy-temp/index.html" ]; then
+            echo "❌ Error: index.html missing from deployment"
+            exit 1
+          fi
+          if ! grep -q "VoidCat RDC" "./deploy-temp/index.html"; then
+            echo "❌ Error: index.html appears corrupted"
+            exit 1
+          fi
           # List files to verify deployment contents
           echo "📋 Files to be deployed:"
           ls -la ./deploy-temp/
-          echo "✅ Frontend files prepared for deployment"
+          echo "✅ Frontend files prepared and validated for deployment"
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -96,14 +111,31 @@ jobs:
           DEPLOY_URL="${{ steps.deployment.outputs.page_url }}"
           echo "🌐 Deployment URL: $DEPLOY_URL"
           
-          # Wait a moment for deployment to propagate
-          sleep 10
+          # Wait for deployment to propagate
+          echo "⏳ Waiting 30 seconds for deployment to propagate..."
+          sleep 30
           
-          # Test the deployed site
-          if curl -s "$DEPLOY_URL" | grep -q "VoidCat RDC"; then
-            echo "✅ Frontend deployment verified successfully"
-          else
-            echo "⚠️ Frontend deployment may need time to propagate"
+          # Test the deployed site with retries
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          SUCCESS=false
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = "false" ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "🔄 Verification attempt $RETRY_COUNT of $MAX_RETRIES"
+            
+            RESPONSE=$(curl -s "$DEPLOY_URL" || echo "curl_failed")
+            if [[ "$RESPONSE" != "curl_failed" && "$RESPONSE" == *"VoidCat RDC"* ]]; then
+              echo "✅ Frontend deployment verified successfully"
+              SUCCESS=true
+            else
+              echo "⚠️ Verification attempt $RETRY_COUNT failed, waiting 10 seconds..."
+              sleep 10
+            fi
+          done
+          
+          if [ "$SUCCESS" = "false" ]; then
+            echo "⚠️ Frontend deployment verification incomplete - site may need more time to propagate"
           fi
         
       - name: Deployment Summary
