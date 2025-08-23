@@ -77,20 +77,21 @@ test.describe('Proposal Generation', () => {
         body: JSON.stringify({
           success: true,
           proposal: {
-            executive_summary: 'This innovative project leverages cutting-edge AI technologies...',
-            technical_approach: 'Our solution employs a multi-layered approach...',
-            commercial_potential: 'The proposed technology has significant commercial applications...',
+            executive_summary: 'Our organization proposes an innovative solution to address advanced artificial intelligence challenges as outlined in AI for Defense Applications. Leveraging our proven expertise in advanced technology development capabilities and deep understanding of Department of Defense mission requirements, we will develop a breakthrough technology that directly supports National security applications. Our approach combines cutting-edge research methodologies with practical implementation strategies, targeting measurable outcomes that advance both scientific knowledge and operational capabilities.',
+            technical_approach: 'Our technical approach employs a systematic, multi-phase methodology combining deep neural networks, reinforcement learning, computer vision, natural language processing to achieve breakthrough performance in artificial intelligence and machine learning. The core innovation centers on novel neural architecture design optimized for real-time processing, supported by advanced transfer learning techniques for limited data scenarios and explainable AI methods for mission-critical applications.',
+            commercial_potential: 'The proposed technology demonstrates exceptional commercial potential across multiple high-growth market segments including Enterprise AI, Defense AI, Healthcare AI, Autonomous systems. With the global market valued at $150B+ global AI market and growing at 35% CAGR through 2030, our innovation addresses critical unmet needs that represent significant revenue opportunities.',
             budget_summary: {
-              personnel: 150000,
-              equipment: 50000,
+              personnel: 162500,
+              equipment: 37500,
               overhead: 50000,
               total: 250000
             },
             timeline: [
-              { phase: "Months 1-3", task: "Requirements analysis and system design" },
-              { phase: "Months 4-6", task: "Core algorithm development and testing" },
-              { phase: "Months 7-9", task: "System integration and validation" },
-              { phase: "Months 10-12", task: "Performance evaluation and delivery" }
+              { phase: "Months 1-2", task: "Literature review, requirements analysis, and team mobilization" },
+              { phase: "Months 3-4", task: "Algorithm development and initial prototype design" },
+              { phase: "Months 5-6", task: "Proof-of-concept implementation and preliminary testing" },
+              { phase: "Months 7-8", task: "Performance evaluation, validation, and Phase II planning" },
+              { phase: "Month 9", task: "Final reporting, documentation, and technology transition preparation" }
             ]
           },
           grant_id: 'SBIR-25-001',
@@ -127,6 +128,37 @@ test.describe('Proposal Generation', () => {
     
     // Wait for proposal generation modal/section to appear
     await expect(page.locator('text=Proposal Generated')).toBeVisible({ timeout: 10000 });
+    
+    // Validate that the generated proposal contains the expected JSON structure
+    // Check for executive summary content (should be substantive, not placeholder)
+    const executiveSummaryContent = await page.locator('[data-testid="executive-summary"], .executive-summary, text=executive_summary').first();
+    await expect(executiveSummaryContent).toBeVisible();
+    
+    // Check for technical approach content
+    const technicalApproachContent = await page.locator('[data-testid="technical-approach"], .technical-approach, text=technical_approach').first();
+    await expect(technicalApproachContent).toBeVisible();
+    
+    // Check for commercial potential content  
+    const commercialPotentialContent = await page.locator('[data-testid="commercial-potential"], .commercial-potential, text=commercial_potential').first();
+    await expect(commercialPotentialContent).toBeVisible();
+    
+    // Verify budget summary is displayed with proper structure
+    const budgetContent = await page.locator('[data-testid="budget-summary"], .budget-summary, text=personnel').first();
+    await expect(budgetContent).toBeVisible();
+    
+    // Verify timeline is displayed with multiple phases
+    const timelineContent = await page.locator('[data-testid="timeline"], .timeline, text=Months').first();
+    await expect(timelineContent).toBeVisible();
+    
+    // Optional: Verify the content is well-formed and substantive (not just placeholder text)
+    // This would check that the AI-generated content meets quality standards
+    const proposalText = await page.locator('.proposal-content, [data-testid="proposal-content"]').textContent();
+    if (proposalText) {
+      // Verify content contains domain-specific keywords indicating sophisticated generation
+      expect(proposalText).toMatch(/(innovative|breakthrough|cutting-edge|advanced|methodology|optimization)/i);
+      // Verify content is substantive (more than basic placeholder length)
+      expect(proposalText.length).toBeGreaterThan(500);
+    }
     
     // Verify proposal content is displayed
     await expect(page.locator('text=Executive Summary')).toBeVisible();
