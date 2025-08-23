@@ -3,7 +3,8 @@ node_modules/
 npm-debug.log
 yarn-debug.log
 yarn-error.log
-package-lock.json
+# Note: package-lock.json SHOULD be committed for consistent installs
+# package-lock.json should NOT be ignored
 
 # Environment variables
 .env
@@ -11,33 +12,49 @@ package-lock.json
 .env.development
 .env.test
 .env.production
+.env.*
+!.env.example
+
+# Cloudflare Workers
+.wrangler/
+.dev.vars
+.worker-next/
+.miniflare-cache/
 
 # Build outputs
 dist/
 build/
 out/
+.next/
+.nuxt/
+.output/
 
-# Cloudflare Workers
-.wrangler/
-.dev.vars
-
-# Testing
+# Testing outputs
 coverage/
 test-results/*
 !test-results/.gitkeep
 playwright-report/
+.playwright/
 test-frontend.html
 verify-production.js
 
 # OS specific files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
 # IDE specific files
 .idea/
 .vscode/
 *.sublime-project
 *.sublime-workspace
+*.code-workspace
+.history/
 
 # Logs
 logs/
@@ -45,29 +62,113 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
 
 # Temporary files
 *.tmp
+*.temp
 *.swp
 *.swo
+*~
 
-# Security files
+# Security and sensitive files
 SECURITY-SETUP.md
 *.pem
 *.key
 *.crt
+*.p12
+*.pfx
 secret-*
 secrets.*
+.secrets/
+auth.json
+credentials.json
 
 # Stripe CLI tools
 stripe-cli.zip
 stripe.exe
 stripe_*
+.stripe/
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
 
 # Documentation (sensitive operational details)
 GEMINI.md
 PRODUCTION-LAUNCH-CHECKLIST.md
 STRIPE-CLI-GUIDE.md
+INTERNAL-*.md
+
+# AI/LLM specific
+.aicommits
+.ai/
+models/
+*.model
+*.pkl
+*.pickle
+
+# Performance monitoring
+.tsbuildinfo
+*.tgz
+
+# Deployment
+.vercel/
+.netlify/
+
+# Cache directories
+.cache/
+.tmp/
+.temp/
+
+# Editor directories and files
+.vs/
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+!.vscode/recommended-extensions.json
+
+# TypeScript
+*.tsbuildinfo
+
+# ESLint
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.parcel-cache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
 
 # Ignore insiders AI rules
 .github/instructions/codacy.instructions.md
+
+# Lock files for other package managers
+yarn.lock
+pnpm-lock.yaml
