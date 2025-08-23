@@ -173,11 +173,26 @@ Do
 - Keep secrets out of the frontend; add/publicize only publishable config
 - Add tests for new endpoints and critical flows before/with changes
 - Update docs (README, AI-Comms, this file) when workflows change
+- Ensure sensitive files are properly .gitignored before pushing to GitHub.
+- Ensure `package-lock.json` is committed to ensure consistent dependency installations.
 
 Don’t
 - Don’t inject secrets into `frontend/index.html`
 - Don’t rely on `process.env` in browser JavaScript
 - Don’t ship changes without verifying `npm run test` and a clean report
+- Don't commit `node_modules/`
+
+---
+
+## Git Configuration & Workflow
+
+- **Git LFS (Large File Storage)**:
+  - Configured via `.gitattributes` to handle media files, large documents, AI/ML assets, test outputs, and archives.
+  - Ensure LFS is installed and initialized locally (`git lfs install`).
+  - Migrate existing large files to LFS (`git lfs migrate import`).
+- **.gitignore**:
+  - Excludes `node_modules/`, temp files, and caches.
+  - **Must NOT exclude** `package-lock.json`.
 
 ---
 
