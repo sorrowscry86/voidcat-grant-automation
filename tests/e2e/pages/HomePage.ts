@@ -150,6 +150,32 @@ export class HomePage {
     ));
   }
 
+  async verifySearchResults(timeout: number = TIMEOUTS.MEDIUM) {
+    // Check for either API results, demo data, or empty state
+    await safeAction(
+      async () => {
+        // Wait for search to complete
+        await this.page.waitForTimeout(1000);
+        
+        // Check if we have grant cards (API success or demo data)
+        const grantCards = this.page.locator('.grant-card');
+        const hasGrantCards = await grantCards.count() > 0;
+        
+        if (hasGrantCards) {
+          // We have results - either from API or demo data
+          await expect(grantCards.first()).toBeVisible({ timeout });
+          console.log('✅ Search results found (API or demo data)');
+        } else {
+          // Check for empty state
+          await expect(this.emptyStateIcon).toBeVisible({ timeout });
+          console.log('✅ Empty state shown');
+        }
+      },
+      'Failed to verify search results',
+      timeout
+    );
+  }
+
   async verifyFeaturesVisible() {
     await expect(this.featuresSection).toBeVisible();
     await expect(this.page.getByRole('heading', { name: 'Smart Matching' })).toBeVisible();

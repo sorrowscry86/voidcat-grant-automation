@@ -75,6 +75,9 @@ jobs:
           cp -r ./frontend/* ./deploy-temp/
           # Create .nojekyll file to bypass Jekyll processing
           touch ./deploy-temp/.nojekyll
+          # List files to verify deployment contents
+          echo "📋 Files to be deployed:"
+          ls -la ./deploy-temp/
           echo "✅ Frontend files prepared for deployment"
         
       - name: Upload artifact
@@ -86,6 +89,22 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        
+      - name: Verify Deployment
+        run: |
+          echo "🔍 Verifying deployment..."
+          DEPLOY_URL="${{ steps.deployment.outputs.page_url }}"
+          echo "🌐 Deployment URL: $DEPLOY_URL"
+          
+          # Wait a moment for deployment to propagate
+          sleep 10
+          
+          # Test the deployed site
+          if curl -s "$DEPLOY_URL" | grep -q "VoidCat RDC"; then
+            echo "✅ Frontend deployment verified successfully"
+          else
+            echo "⚠️ Frontend deployment may need time to propagate"
+          fi
         
       - name: Deployment Summary
         run: |

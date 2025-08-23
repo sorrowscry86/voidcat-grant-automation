@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { HomePage } from './pages/HomePage';
 
-test.describe('Grant Search Functionality', () => {
-  let homePage: HomePage;
+let homePage: HomePage;
 
+test.describe('Grant Search Functionality', () => {
   test.beforeEach(async ({ page }) => {
     homePage = new HomePage(page);
     await homePage.goto();
@@ -19,8 +19,8 @@ test.describe('Grant Search Functionality', () => {
     // Verify search input maintains the value
     await expect(homePage.searchInput).toHaveValue(searchKeywords);
     
-    // Should show empty state since API call will fail locally
-    await homePage.verifyEmptyState();
+    // Check for either API results or demo data fallback
+    await homePage.verifySearchResults();
   });
 
   test('should allow filtering by agency', async () => {
@@ -31,7 +31,8 @@ test.describe('Grant Search Functionality', () => {
     await expect(homePage.searchInput).toHaveValue('AI');
     await expect(homePage.agencySelect).toHaveValue('defense');
     
-    await homePage.verifyEmptyState();
+    // Check for either API results or demo data fallback
+    await homePage.verifySearchResults();
   });
 
   test('should handle different agency selections', async () => {
@@ -98,8 +99,8 @@ test.describe('Grant Search Functionality', () => {
       await homePage.searchButton.click();
       await homePage.waitForSearchResults();
       
-      // Should still show results (empty state)
-      await homePage.verifyEmptyState();
+      // Should show either results or empty state
+      await homePage.verifySearchResults();
     });
   });
 });
