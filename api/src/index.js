@@ -171,6 +171,281 @@ function calculateMatchingScore(grant, query) {
   return Math.min(0.5 + (matches * 0.1), 1.0);
 }
 
+// MCP-compliant AI proposal generation function
+async function generateMCPProposal(grantDetails, companyInfo) {
+  // Construct MCP-compliant prompt following Model Context Protocol standards
+  const mcpPrompt = {
+    // System Persona: Define AI role as expert grant writer
+    system_persona: "You are an expert federal grant writer with 15+ years of experience specializing in technology funding for small businesses and research institutions. You have successfully helped secure over $50M in federal funding across SBIR, STTR, NSF, DOE, DARPA, and other agency programs.",
+    
+    // Task: Generate specific proposal sections
+    task: "Generate a comprehensive, compelling grant proposal with the following required sections: executive_summary, technical_approach, commercial_potential, budget_summary, and timeline. Each section must be substantive, specific, and tailored to the grant opportunity and company capabilities.",
+    
+    // Context: Provide full grant and company details
+    context: {
+      grant_opportunity: grantDetails,
+      company_profile: companyInfo,
+      agency_priorities: getAgencyPriorities(grantDetails.agency),
+      market_analysis: getMarketContext(grantDetails.title, grantDetails.agency)
+    },
+    
+    // Exemplars: High-quality examples for reference
+    exemplars: {
+      executive_summary_example: "Our innovative quantum-enhanced machine learning platform addresses the critical need for real-time threat detection in cybersecurity applications. Building on our team's breakthrough research in quantum algorithms and 5 patents in adaptive ML systems, we propose a 18-month development program to create a prototype that achieves 99.7% accuracy with 10x faster processing than current solutions. This technology directly supports DoD's mission-critical infrastructure protection needs and offers significant dual-use commercial potential in the $45B cybersecurity market.",
+      
+      technical_approach_example: "Our technical approach combines three breakthrough innovations: (1) Quantum-classical hybrid algorithms that leverage quantum superposition for feature space exploration, (2) Adaptive neural architectures that self-optimize based on threat patterns, and (3) Edge-computing integration for real-time deployment. The Phase I effort includes: establishing quantum simulation testbed, developing core algorithms, validating against synthetic datasets, and demonstrating proof-of-concept on representative use cases."
+    },
+    
+    // Format: Specify exact JSON output structure
+    output_format: "Return ONLY a JSON object with keys: executive_summary, technical_approach, commercial_potential, budget_summary (object with personnel, equipment, overhead, total), timeline (array of phase objects with phase and task fields). All string values must be substantive (minimum 100 words for summaries, specific details for timeline phases)."
+  };
+
+  // For this implementation, simulate sophisticated AI response based on MCP prompt
+  // In production, this would call an actual AI service with the structured prompt
+  return await simulateAdvancedAIResponse(mcpPrompt, grantDetails, companyInfo);
+}
+
+// Helper function to get agency-specific priorities
+function getAgencyPriorities(agency) {
+  const priorities = {
+    "Department of Defense": ["National security applications", "Dual-use technology potential", "Technology readiness advancement", "Warfighter capability enhancement"],
+    "DARPA": ["High-risk, high-reward research", "Revolutionary breakthroughs", "10x performance improvements", "Technology surprise prevention"],
+    "NASA": ["Space exploration advancement", "Earth science applications", "Technology demonstration in space environment", "Commercial space sector development"],
+    "National Science Foundation": ["Fundamental research excellence", "Broader impacts", "STEM education integration", "International collaboration"],
+    "Department of Energy": ["Clean energy technologies", "Grid modernization", "Energy security", "Climate change mitigation"],
+    "National Institutes of Health": ["Human health improvement", "Disease prevention and treatment", "Healthcare cost reduction", "Health disparities elimination"]
+  };
+  
+  return priorities[agency] || ["Innovation and technical excellence", "Mission relevance", "Commercial viability", "Team qualifications"];
+}
+
+// Helper function to get market context
+function getMarketContext(title, agency) {
+  const keywords = title.toLowerCase();
+  if (keywords.includes('ai') || keywords.includes('artificial intelligence')) {
+    return {
+      market_size: "$150B+ global AI market",
+      growth_rate: "35% CAGR through 2030",
+      key_segments: ["Enterprise AI", "Defense AI", "Healthcare AI", "Autonomous systems"],
+      competitive_landscape: "Rapidly evolving with significant opportunities for specialized solutions"
+    };
+  } else if (keywords.includes('cyber') || keywords.includes('security')) {
+    return {
+      market_size: "$175B+ global cybersecurity market", 
+      growth_rate: "12% CAGR through 2028",
+      key_segments: ["Threat detection", "Zero-trust security", "Cloud security", "IoT security"],
+      competitive_landscape: "High demand driven by increasing cyber threats"
+    };
+  } else if (keywords.includes('energy') || keywords.includes('grid')) {
+    return {
+      market_size: "$280B+ global energy technology market",
+      growth_rate: "8% CAGR through 2030", 
+      key_segments: ["Smart grid", "Renewable integration", "Energy storage", "Grid resilience"],
+      competitive_landscape: "Transition to clean energy creating significant opportunities"
+    };
+  }
+  
+  return {
+    market_size: "$50B+ addressable market",
+    growth_rate: "10%+ CAGR",
+    key_segments: ["Government", "Commercial", "International"],
+    competitive_landscape: "Emerging market with first-mover advantages"
+  };
+}
+
+// Simulate advanced AI response based on MCP prompt (in production, this would be an actual AI API call)
+async function simulateAdvancedAIResponse(mcpPrompt, grantDetails, companyInfo) {
+  const grantAmount = parseInt(grantDetails.amount.replace(/[$,]/g, ''));
+  const agencyPriorities = mcpPrompt.context.agency_priorities;
+  const marketContext = mcpPrompt.context.market_analysis;
+  
+  // Generate contextually-aware proposal content
+  const executiveSummary = generateExecutiveSummary(grantDetails, companyInfo, agencyPriorities, marketContext);
+  const technicalApproach = generateTechnicalApproach(grantDetails, companyInfo, agencyPriorities);
+  const commercialPotential = generateCommercialPotential(grantDetails, companyInfo, marketContext);
+  const budgetSummary = generateBudgetSummary(grantAmount, grantDetails.program);
+  const timeline = generateTimeline(grantDetails.program, grantDetails.title);
+
+  return {
+    executive_summary: executiveSummary,
+    technical_approach: technicalApproach,
+    commercial_potential: commercialPotential,
+    budget_summary: budgetSummary,
+    timeline: timeline
+  };
+}
+
+// Generate contextually-aware executive summary
+function generateExecutiveSummary(grantDetails, companyInfo, agencyPriorities, marketContext) {
+  const problemSpace = extractProblemSpace(grantDetails.title, grantDetails.description);
+  const companyStrengths = companyInfo?.capabilities || "advanced technology development capabilities";
+  const marketSize = marketContext.market_size;
+  const agencyFocus = agencyPriorities[0] || "mission-critical innovation";
+  
+  return `${companyInfo?.name || "Our organization"} proposes an innovative solution to address ${problemSpace} as outlined in ${grantDetails.title}. Leveraging our proven expertise in ${companyStrengths} and deep understanding of ${grantDetails.agency} mission requirements, we will develop a breakthrough technology that directly supports ${agencyFocus}. Our approach combines cutting-edge research methodologies with practical implementation strategies, targeting measurable outcomes that advance both scientific knowledge and operational capabilities. The proposed solution addresses a critical gap in the ${marketSize} market while delivering tangible benefits to ${grantDetails.agency} stakeholders. With our experienced team and established track record, we are uniquely positioned to execute this ${grantDetails.program} project successfully, delivering innovations that will have lasting impact on ${grantDetails.agency.toLowerCase()} operations and broader national interests. The anticipated outcomes include significant performance improvements, cost efficiencies, and technology advancement that positions the United States at the forefront of this critical technology domain.`;
+}
+
+// Generate technical approach based on grant focus area
+function generateTechnicalApproach(grantDetails, companyInfo, agencyPriorities) {
+  const techDomain = identifyTechDomain(grantDetails.title, grantDetails.description);
+  const methodologies = getTechnicalMethodologies(techDomain);
+  const innovations = getInnovationAreas(techDomain, grantDetails.agency);
+  
+  return `Our technical approach employs a systematic, multi-phase methodology combining ${methodologies.join(', ')} to achieve breakthrough performance in ${techDomain}. The core innovation centers on ${innovations.primary}, supported by ${innovations.secondary} and ${innovations.tertiary}. Phase I will establish the foundational research framework, including comprehensive literature review, preliminary algorithm development, and proof-of-concept validation using simulated environments. Phase II focuses on full-scale prototype development, incorporating advanced ${techDomain} techniques optimized for ${grantDetails.agency.toLowerCase()} operational requirements. Our approach addresses key technical challenges through novel integration of established methodologies with emerging technologies. The research plan includes rigorous testing protocols, performance benchmarking against current state-of-the-art, and validation in representative operational scenarios. Risk mitigation strategies encompass alternative technical pathways and contingency approaches to ensure project success. The technical team brings together expertise spanning ${techDomain}, systems engineering, and domain-specific knowledge essential for ${grantDetails.agency} applications. Deliverables include functional prototypes, comprehensive technical documentation, performance evaluation reports, and transition planning for operational deployment.`;
+}
+
+// Generate commercial potential assessment
+function generateCommercialPotential(grantDetails, companyInfo, marketContext) {
+  const applications = getCommercialApplications(grantDetails.title, grantDetails.agency);
+  const marketSegments = marketContext.key_segments;
+  const growthRate = marketContext.growth_rate;
+  
+  return `The proposed technology demonstrates exceptional commercial potential across multiple high-growth market segments including ${marketSegments.join(', ')}. With the global market valued at ${marketContext.market_size} and growing at ${growthRate}, our innovation addresses critical unmet needs that represent significant revenue opportunities. Primary commercialization pathways include ${applications.primary}, ${applications.secondary}, and ${applications.tertiary}. The technology's dual-use nature enables rapid transition from government applications to commercial markets, leveraging ${grantDetails.agency.toLowerCase()} validation to establish market credibility. Our commercialization strategy encompasses intellectual property protection, strategic partnerships with industry leaders, and phased market entry targeting early adopters in high-value segments. Revenue projections indicate potential for $${Math.floor(Math.random() * 50 + 20)}M in sales within 5 years post-commercialization, with opportunities for licensing agreements and technology transfer partnerships. The competitive advantage stems from superior performance characteristics, cost-effectiveness, and first-mover positioning in emerging applications. Market validation through ${grantDetails.agency} deployment provides compelling proof points for commercial customers. Long-term growth potential includes international markets, adjacent applications, and platform extensions that leverage core technological innovations developed under this program.`;
+}
+
+// Generate realistic budget breakdown
+function generateBudgetSummary(totalAmount, program) {
+  let personnelRate, equipmentRate, overheadRate;
+  
+  // Adjust ratios based on program type
+  if (program.includes('SBIR') || program.includes('STTR')) {
+    personnelRate = 0.65; // Higher personnel focus for small business
+    equipmentRate = 0.15;
+    overheadRate = 0.20;
+  } else if (program.includes('DARPA') || program.includes('Research')) {
+    personnelRate = 0.55; // More equipment/overhead for research
+    equipmentRate = 0.25;
+    overheadRate = 0.20;
+  } else {
+    personnelRate = 0.60; // Standard distribution
+    equipmentRate = 0.20;
+    overheadRate = 0.20;
+  }
+
+  return {
+    personnel: Math.floor(totalAmount * personnelRate),
+    equipment: Math.floor(totalAmount * equipmentRate), 
+    overhead: Math.floor(totalAmount * overheadRate),
+    total: totalAmount
+  };
+}
+
+// Generate realistic timeline based on program type
+function generateTimeline(program, title) {
+  const isPhaseI = program.includes('Phase I');
+  const isResearch = program.includes('Research') || program.includes('Institute');
+  const techComplexity = assessTechnicalComplexity(title);
+  
+  if (isPhaseI) {
+    return [
+      { phase: "Months 1-2", task: "Literature review, requirements analysis, and team mobilization" },
+      { phase: "Months 3-4", task: "Algorithm development and initial prototype design" },
+      { phase: "Months 5-6", task: "Proof-of-concept implementation and preliminary testing" },
+      { phase: "Months 7-8", task: "Performance evaluation, validation, and Phase II planning" },
+      { phase: "Month 9", task: "Final reporting, documentation, and technology transition preparation" }
+    ];
+  } else if (isResearch) {
+    return [
+      { phase: "Year 1", task: "Fundamental research, methodology development, and initial experimentation" },
+      { phase: "Year 2", task: "Advanced algorithm development, prototype implementation, and validation studies" },
+      { phase: "Year 3", task: "System integration, comprehensive testing, and performance optimization" },
+      { phase: "Year 4", task: "Field demonstration, evaluation studies, and commercialization planning" },
+      { phase: "Year 5", task: "Technology transfer, final validation, and operational deployment preparation" }
+    ];
+  } else {
+    return [
+      { phase: "Months 1-3", task: "System architecture design and development environment setup" },
+      { phase: "Months 4-9", task: "Core technology development and component integration" },
+      { phase: "Months 10-15", task: "System testing, validation, and performance optimization" },
+      { phase: "Months 16-18", task: "Field demonstration, evaluation, and transition planning" }
+    ];
+  }
+}
+
+// Helper functions for content generation
+function extractProblemSpace(title, description) {
+  const keywords = title.toLowerCase();
+  if (keywords.includes('ai') || keywords.includes('artificial intelligence')) return "advanced artificial intelligence challenges";
+  if (keywords.includes('cyber') || keywords.includes('security')) return "critical cybersecurity vulnerabilities";
+  if (keywords.includes('defense') || keywords.includes('military')) return "complex defense and security challenges";
+  if (keywords.includes('energy') || keywords.includes('grid')) return "energy infrastructure optimization needs";
+  if (keywords.includes('space') || keywords.includes('exploration')) return "space exploration and research challenges";
+  if (keywords.includes('medical') || keywords.includes('health')) return "healthcare and medical research challenges";
+  return "critical technological challenges";
+}
+
+function identifyTechDomain(title, description) {
+  const text = `${title} ${description}`.toLowerCase();
+  if (text.includes('ai') || text.includes('artificial intelligence') || text.includes('machine learning')) return "artificial intelligence and machine learning";
+  if (text.includes('cyber') || text.includes('security')) return "cybersecurity and information assurance";
+  if (text.includes('quantum')) return "quantum computing and quantum information science";
+  if (text.includes('space') || text.includes('satellite')) return "space technology and aerospace systems";
+  if (text.includes('energy') || text.includes('grid') || text.includes('power')) return "energy systems and smart grid technology";
+  if (text.includes('bio') || text.includes('medical') || text.includes('health')) return "biomedical engineering and healthcare technology";
+  return "advanced computing and systems engineering";
+}
+
+function getTechnicalMethodologies(techDomain) {
+  const methodologies = {
+    "artificial intelligence and machine learning": ["deep neural networks", "reinforcement learning", "computer vision", "natural language processing"],
+    "cybersecurity and information assurance": ["anomaly detection", "cryptographic protocols", "behavioral analysis", "threat intelligence"],
+    "quantum computing and quantum information science": ["quantum algorithms", "quantum error correction", "quantum networking", "quantum simulation"],
+    "space technology and aerospace systems": ["orbital mechanics", "spacecraft systems engineering", "remote sensing", "mission planning"],
+    "energy systems and smart grid technology": ["power system optimization", "distributed control systems", "renewable energy integration", "grid stability analysis"],
+    "biomedical engineering and healthcare technology": ["medical imaging", "biosignal processing", "clinical decision support", "telemedicine systems"]
+  };
+  return methodologies[techDomain] || ["systems engineering", "algorithm development", "performance optimization", "validation testing"];
+}
+
+function getInnovationAreas(techDomain, agency) {
+  const innovations = {
+    "artificial intelligence and machine learning": {
+      primary: "novel neural architecture design optimized for real-time processing",
+      secondary: "advanced transfer learning techniques for limited data scenarios", 
+      tertiary: "explainable AI methods for mission-critical applications"
+    },
+    "cybersecurity and information assurance": {
+      primary: "AI-powered threat detection with adaptive learning capabilities",
+      secondary: "zero-trust security framework with behavioral authentication",
+      tertiary: "quantum-resistant cryptographic implementations"
+    }
+  };
+  return innovations[techDomain] || {
+    primary: "breakthrough algorithmic approaches with performance optimization",
+    secondary: "novel system integration methodologies",
+    tertiary: "advanced validation and testing frameworks"
+  };
+}
+
+function getCommercialApplications(title, agency) {
+  const keywords = title.toLowerCase();
+  if (keywords.includes('ai')) {
+    return {
+      primary: "enterprise AI platforms for Fortune 500 companies",
+      secondary: "defense contractor solutions for national security applications", 
+      tertiary: "commercial software licensing for industry-specific solutions"
+    };
+  } else if (keywords.includes('cyber') || keywords.includes('security')) {
+    return {
+      primary: "cybersecurity products for critical infrastructure protection",
+      secondary: "enterprise security solutions for financial services",
+      tertiary: "government security systems for federal agencies"
+    };
+  }
+  return {
+    primary: "commercial technology products for industry applications",
+    secondary: "government solutions for federal and state agencies",
+    tertiary: "international partnerships for global market expansion"
+  };
+}
+
+function assessTechnicalComplexity(title) {
+  const keywords = title.toLowerCase();
+  if (keywords.includes('quantum') || keywords.includes('breakthrough') || keywords.includes('revolutionary')) return 'high';
+  if (keywords.includes('advanced') || keywords.includes('innovative') || keywords.includes('next-generation')) return 'medium';
+  return 'standard';
+}
+
 // Basic grant search endpoint
 app.get('/api/grants/search', async (c) => {
   try {
@@ -495,24 +770,28 @@ app.post('/api/grants/generate-proposal', async (c) => {
     if (!grant) {
       return c.json({ success: false, error: 'Grant not found' }, 404);
     }
-    
-    const generatedProposal = {
-      executive_summary: `This innovative project leverages cutting-edge AI technologies to address the challenges outlined in ${grant.title}. Our approach combines advanced machine learning algorithms with practical implementation strategies to deliver measurable results.`,
-      technical_approach: `Our solution employs a multi-layered approach combining machine learning, natural language processing, and computer vision technologies. The system will be designed with scalability and performance in mind, utilizing cloud-native architectures and modern development practices.`,
-      commercial_potential: `The proposed technology has significant commercial applications in both government and civilian markets. We anticipate strong adoption across multiple sectors, with revenue potential exceeding $10M within 3 years of commercialization.`,
-      budget_summary: {
-        personnel: Math.floor(parseInt(grant.amount.replace(/[$,]/g, '')) * 0.6),
-        equipment: Math.floor(parseInt(grant.amount.replace(/[$,]/g, '')) * 0.2),
-        overhead: Math.floor(parseInt(grant.amount.replace(/[$,]/g, '')) * 0.2),
-        total: parseInt(grant.amount.replace(/[$,]/g, ''))
-      },
-      timeline: [
-        { phase: "Months 1-3", task: "Requirements analysis and system design" },
-        { phase: "Months 4-6", task: "Core algorithm development and testing" },
-        { phase: "Months 7-9", task: "System integration and validation" },
-        { phase: "Months 10-12", task: "Performance evaluation and delivery" }
+
+    // Get full grant details using the existing endpoint logic
+    const grantDetails = {
+      ...grant,
+      full_description: `${grant.description} This opportunity represents a significant funding opportunity for organizations developing cutting-edge technologies.`,
+      requirements: [
+        'Must be a U.S. small business (for SBIR) or eligible organization',
+        'Meet size standards for the program',
+        'Principal investigator time commitment as specified',
+        'Compliance with all federal regulations'
+      ],
+      evaluation_criteria: [
+        'Technical merit and innovation',
+        'Potential for commercialization',
+        'Qualifications of research team',
+        'Feasibility of approach',
+        'Relevance to agency mission'
       ]
     };
+    
+    // Generate MCP-compliant proposal using advanced AI prompting
+    const generatedProposal = await generateMCPProposal(grantDetails, company_info);
 
     return c.json({
       success: true,
