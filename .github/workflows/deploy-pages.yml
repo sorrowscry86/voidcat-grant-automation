@@ -96,7 +96,7 @@ jobs:
           echo "✅ Frontend files prepared and validated for deployment"
         
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           # Upload the prepared deployment directory
           path: './deploy-temp'
