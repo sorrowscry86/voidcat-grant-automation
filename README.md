@@ -2,8 +2,6 @@
 
 🚀 **LIVE MVP**: AI-powered federal grant discovery and proposal automation for startups and small businesses.
 
-📋 **[Complete Platform Documentation](grant-automation-platform.md)** - Comprehensive technical and business specification
-
 ## 🎯 Project Overview
 
 **Revenue Target**: $500 Month 1 → $2,500 Month 3 → $10,000+ Month 6
@@ -27,48 +25,23 @@
 - **Framework**: Alpine.js + Tailwind CSS
 - **Deployment**: GitHub Pages or Cloudflare Pages
 
-## 🚀 Complete Deployment
+## 🚀 Quick Deployment
 
-### Automated Deployment (Recommended)
-```bash
-# Deploy both API and frontend with one command
-./deploy.sh
-```
-
-**What this does**:
-- ✅ Deploys API to Cloudflare Workers
-- ✅ Triggers frontend deployment via GitHub Actions
-- ✅ Validates deployment status
-- ✅ Tests API connectivity
-
-### Manual Deployment
-
-#### 1. Deploy API to Cloudflare Workers
+### 1. Deploy API to Cloudflare Workers
 ```bash
 cd api
 npm install
 npx wrangler deploy --env production
 ```
 
-#### 2. Deploy Frontend
-```bash
-# Commit and push to main/master branch
-git add .
-git commit -m "Deploy: Frontend updates"
-git push origin main
-```
+### 2. Deploy Frontend
+**Option A: GitHub Pages**
+- Push to GitHub repository
+- Enable GitHub Pages from `frontend/` directory
 
-### Validate Deployment
-```bash
-# Check deployment status
-./validate-deployment.sh
-```
-
-## 📍 Live URLs
-
-- **API**: https://grant-search-api.sorrowscry86.workers.dev
-- **Frontend**: https://[username].github.io/voidcat-grant-automation
-- **Health Check**: https://grant-search-api.sorrowscry86.workers.dev/health
+**Option B: Cloudflare Pages**
+- Connect repository to Cloudflare Pages
+- Set build directory to `frontend/`
 
 ## 📊 Current Infrastructure
 
@@ -148,7 +121,6 @@ POST /api/grants/generate-proposal  - AI proposal generation
 - Platform: https://grant-search-api.sorrowscry86.workers.dev
 - Frontend: TBD (GitHub Pages deployment)
 - Support: Federal funding assistance for technology startups
-- **Complete Documentation**: [grant-automation-platform.md](grant-automation-platform.md)
 
 ### Team Information
 - **Team**: VoidCat RDC Team
