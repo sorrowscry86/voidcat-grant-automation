@@ -146,7 +146,22 @@ async function fetchLiveGrantData(query, agency) {
   if (DATA_CONFIG.USE_LIVE_DATA) {
     try {
       // Example implementation for grants.gov API
-      const response = await fetch(`${DATA_CONFIG.LIVE_DATA_SOURCES.GRANTS_GOV_API}?keyword=${query}&agency=${agency}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(`${DATA_CONFIG.LIVE_DATA_SOURCES.GRANTS_GOV_API}?keyword=${encodeURIComponent(query)}&agency=${encodeURIComponent(agency)}`, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'VoidCat Grant Search API/1.0'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`Grant data API returned ${response.status}: ${response.statusText}`);
+      }
+      
       const liveData = await response.json();
       return liveData.map(grant => ({
         ...grant,
@@ -154,7 +169,12 @@ async function fetchLiveGrantData(query, agency) {
         matching_score: calculateMatchingScore(grant, query)
       }));
     } catch (error) {
-      console.error('Live data fetch failed, falling back to mock data:', error);
+      console.error('Live data fetch failed, falling back to mock data:', {
+        error: error.message,
+        query,
+        agency,
+        timestamp: new Date().toISOString()
+      });
       return MOCK_GRANTS;
     }
   }
@@ -451,46 +471,94 @@ app.get('/api/grants/search', async (c) => {
   try {
     const { query, agency, deadline, amount } = c.req.query();
     
+    // Validate input parameters
+    if (query && query.length > 200) {
+      return c.json({
+        success: false,
+        error: 'Search query is too long. Please use fewer than 200 characters.',
+        code: 'QUERY_TOO_LONG'
+      }, 400);
+    }
+    
     // Fetch grants from configured data source (mock or live)
-    let filteredGrants = await fetchLiveGrantData(query, agency);
-    
-    if (query) {
-      filteredGrants = filteredGrants.filter(grant => 
-        grant.title.toLowerCase().includes(query.toLowerCase()) ||
-        grant.description.toLowerCase().includes(query.toLowerCase()) ||
-        grant.program.toLowerCase().includes(query.toLowerCase())
-      );
+    let filteredGrants;
+    try {
+      filteredGrants = await fetchLiveGrantData(query, agency);
+    } catch (dataError) {
+      console.error('Grant data fetch failed:', dataError);
+      return c.json({
+        success: false,
+        error: 'Grant database is temporarily unavailable. Please try again in a few minutes.',
+        code: 'DATA_SOURCE_UNAVAILABLE'
+      }, 503);
     }
     
-    if (agency) {
-      const agencyMap = {
-        'defense': 'department of defense',
-        'nsf': 'national science foundation',
-        'energy': 'department of energy',
-        'darpa': 'darpa',
-        'nasa': 'nasa'
-      };
-      const searchAgency = agencyMap[agency.toLowerCase()] || agency.toLowerCase();
-      filteredGrants = filteredGrants.filter(grant => 
-        grant.agency.toLowerCase().includes(searchAgency)
-      );
-    }
+    try {
+      // Apply search filters
+      if (query) {
+        const searchQuery = query.toLowerCase().trim();
+        filteredGrants = filteredGrants.filter(grant => 
+          grant.title.toLowerCase().includes(searchQuery) ||
+          grant.description.toLowerCase().includes(searchQuery) ||
+          grant.program.toLowerCase().includes(searchQuery)
+        );
+      }
+      
+      if (agency) {
+        const agencyMap = {
+          'defense': 'department of defense',
+          'nsf': 'national science foundation',
+          'energy': 'department of energy',
+          'darpa': 'darpa',
+          'nasa': 'nasa'
+        };
+        const searchAgency = agencyMap[agency.toLowerCase()] || agency.toLowerCase();
+        filteredGrants = filteredGrants.filter(grant => 
+          grant.agency.toLowerCase().includes(searchAgency)
+        );
+      }
+      
+      // Apply deadline filter if provided
+      if (deadline) {
+        const targetDate = new Date(deadline);
+        if (isNaN(targetDate.getTime())) {
+          return c.json({
+            success: false,
+            error: 'Invalid deadline format. Please use YYYY-MM-DD format.',
+            code: 'INVALID_DATE_FORMAT'
+          }, 400);
+        }
+        
+        filteredGrants = filteredGrants.filter(grant => {
+          const grantDeadline = new Date(grant.deadline);
+          return grantDeadline <= targetDate;
+        });
+      }
 
-    return c.json({
-      success: true,
-      count: filteredGrants.length,
-      grants: filteredGrants,
-      data_source: DATA_CONFIG.USE_LIVE_DATA ? 'live' : 'mock',
-      timestamp: new Date().toISOString(),
-      // Phase 2 readiness indicator
-      live_data_ready: DATA_CONFIG.USE_LIVE_DATA
-    });
+      return c.json({
+        success: true,
+        count: filteredGrants.length,
+        grants: filteredGrants,
+        data_source: DATA_CONFIG.USE_LIVE_DATA ? 'live' : 'mock',
+        timestamp: new Date().toISOString(),
+        live_data_ready: DATA_CONFIG.USE_LIVE_DATA,
+        search_params: { query, agency, deadline, amount }
+      });
+    } catch (filterError) {
+      console.error('Grant filtering failed:', filterError);
+      return c.json({
+        success: false,
+        error: 'Error processing search results. Please try again.',
+        code: 'SEARCH_PROCESSING_ERROR'
+      }, 500);
+    }
 
   } catch (error) {
+    console.error('Grant search endpoint error:', error);
     return c.json({
       success: false,
-      error: 'Failed to search grants',
-      details: error.message
+      error: 'Grant search service is temporarily unavailable. Please try again later.',
+      code: 'SEARCH_SERVICE_ERROR'
     }, 500);
   }
 });
@@ -499,10 +567,32 @@ app.get('/api/grants/search', async (c) => {
 app.get('/api/grants/:id', async (c) => {
   try {
     const grantId = c.req.param('id');
+    
+    // Validate grant ID format
+    if (!grantId || grantId.trim().length === 0) {
+      return c.json({ 
+        success: false, 
+        error: 'Grant ID is required',
+        code: 'MISSING_GRANT_ID'
+      }, 400);
+    }
+    
+    if (grantId.length > 50) {
+      return c.json({ 
+        success: false, 
+        error: 'Invalid grant ID format',
+        code: 'INVALID_GRANT_ID'
+      }, 400);
+    }
+    
     const grant = MOCK_GRANTS.find(g => g.id === grantId);
     
     if (!grant) {
-      return c.json({ success: false, error: 'Grant not found' }, 404);
+      return c.json({ 
+        success: false, 
+        error: `Grant with ID '${grantId}' was not found. Please check the ID and try again.`,
+        code: 'GRANT_NOT_FOUND'
+      }, 404);
     }
     
     const grantDetails = {
@@ -539,9 +629,11 @@ app.get('/api/grants/:id', async (c) => {
     });
 
   } catch (error) {
+    console.error('Grant details retrieval error:', error);
     return c.json({
       success: false,
-      error: 'Failed to get grant details'
+      error: 'Unable to retrieve grant details. Please try again later.',
+      code: 'GRANT_DETAILS_ERROR'
     }, 500);
   }
 });
@@ -549,12 +641,44 @@ app.get('/api/grants/:id', async (c) => {
 // User registration endpoint
 app.post('/api/users/register', async (c) => {
   try {
-    const { email, company, name } = await c.req.json();
+    let requestData;
+    try {
+      requestData = await c.req.json();
+    } catch (parseError) {
+      return c.json({
+        success: false,
+        error: 'Invalid request format. Please send valid JSON data.',
+        code: 'INVALID_JSON'
+      }, 400);
+    }
     
+    const { email, company, name } = requestData;
+    
+    // Comprehensive input validation
     if (!email || !name) {
       return c.json({
         success: false,
-        error: 'Email and name are required'
+        error: 'Email and name are required fields',
+        code: 'MISSING_REQUIRED_FIELDS'
+      }, 400);
+    }
+    
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return c.json({
+        success: false,
+        error: 'Please provide a valid email address',
+        code: 'INVALID_EMAIL_FORMAT'
+      }, 400);
+    }
+    
+    // Name length validation
+    if (name.trim().length < 2 || name.trim().length > 100) {
+      return c.json({
+        success: false,
+        error: 'Name must be between 2 and 100 characters',
+        code: 'INVALID_NAME_LENGTH'
       }, 400);
     }
     
@@ -595,25 +719,38 @@ app.post('/api/users/register', async (c) => {
         throw new Error(`Database insertion failed: ${result.error || 'Unknown error'}`);
       }
     } catch (dbError) {
-      console.error('Database error during registration:', dbError);
+      console.error('Database error during registration:', {
+        error: dbError.message,
+        email: email,
+        timestamp: new Date().toISOString()
+      });
       
       // Check if it's a constraint violation (duplicate email)
       if (dbError.message && dbError.message.includes('UNIQUE constraint failed')) {
         return c.json({
           success: false,
-          error: 'User already exists',
-          message: 'An account with this email already exists'
+          error: 'An account with this email address already exists',
+          message: 'Please try logging in or use a different email address',
+          code: 'DUPLICATE_EMAIL'
         }, 409);
       }
       
-      // For production, we should not fall back to demo mode
-      // This masks real database issues that need to be addressed
+      // Check for database connection issues
+      if (dbError.message && (dbError.message.includes('network') || dbError.message.includes('timeout'))) {
+        return c.json({
+          success: false,
+          error: 'Registration service is temporarily unavailable due to network issues. Please try again in a few minutes.',
+          code: 'DATABASE_CONNECTION_ERROR'
+        }, 503);
+      }
+      
+      // For production, provide appropriate error handling
       if (c.env.ENVIRONMENT === 'production') {
         return c.json({
           success: false,
-          error: 'Registration failed',
-          message: 'Unable to create account. Please try again later.',
-          details: 'Database service unavailable'
+          error: 'Unable to create account at this time. Please try again later.',
+          message: 'If this problem persists, please contact support',
+          code: 'REGISTRATION_SERVICE_ERROR'
         }, 503);
       }
       
@@ -629,11 +766,12 @@ app.post('/api/users/register', async (c) => {
     }
 
   } catch (error) {
+    console.error('Registration endpoint error:', error);
     return c.json({
       success: false,
-      error: 'Registration failed',
-      details: error.message
-    }, 400);
+      error: 'Registration service encountered an unexpected error. Please try again.',
+      code: 'REGISTRATION_UNEXPECTED_ERROR'
+    }, 500);
   }
 });
 
@@ -641,8 +779,20 @@ app.post('/api/users/register', async (c) => {
 app.get('/api/users/me', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ success: false, error: 'No API key provided' }, 401);
+    if (!authHeader) {
+      return c.json({ 
+        success: false, 
+        error: 'Authentication required. Please provide an API key in the Authorization header.',
+        code: 'MISSING_AUTH_HEADER'
+      }, 401);
+    }
+    
+    if (!authHeader.startsWith('Bearer ')) {
+      return c.json({ 
+        success: false, 
+        error: 'Invalid authentication format. Use: Authorization: Bearer YOUR_API_KEY',
+        code: 'INVALID_AUTH_FORMAT'
+      }, 401);
     }
 
     const apiKey = authHeader.replace('Bearer ', '');
@@ -655,8 +805,15 @@ app.get('/api/users/me', async (c) => {
       `).bind(apiKey).first();
 
       if (!user) {
-        console.warn(`Invalid API key attempted: ${apiKey.substring(0, 8)}...`);
-        return c.json({ success: false, error: 'Invalid API key' }, 401);
+        console.warn(`Invalid API key attempted: ${apiKey.substring(0, 8)}...`, {
+          ip: c.req.header('CF-Connecting-IP') || 'unknown',
+          timestamp: new Date().toISOString()
+        });
+        return c.json({ 
+          success: false, 
+          error: 'Invalid API key. Please check your key and try again.',
+          code: 'INVALID_API_KEY'
+        }, 401);
       }
 
       return c.json({
@@ -670,14 +827,18 @@ app.get('/api/users/me', async (c) => {
         }
       });
     } catch (dbError) {
-      console.error('Database error during authentication:', dbError);
+      console.error('Database error during authentication:', {
+        error: dbError.message,
+        timestamp: new Date().toISOString()
+      });
       
       // For production, return proper error instead of demo mode
       if (c.env.ENVIRONMENT === 'production') {
         return c.json({
           success: false,
-          error: 'Authentication service unavailable',
-          message: 'Please try again later'
+          error: 'Authentication service is temporarily unavailable. Please try again in a few minutes.',
+          message: 'If this problem persists, please contact support',
+          code: 'AUTH_SERVICE_UNAVAILABLE'
         }, 503);
       }
       
@@ -697,9 +858,11 @@ app.get('/api/users/me', async (c) => {
     }
 
   } catch (error) {
+    console.error('Authentication endpoint error:', error);
     return c.json({
       success: false,
-      error: 'Authentication failed'
+      error: 'Authentication service encountered an unexpected error. Please try again.',
+      code: 'AUTH_UNEXPECTED_ERROR'
     }, 500);
   }
 });
@@ -710,7 +873,11 @@ app.post('/api/grants/generate-proposal', async (c) => {
     // Check authentication
     const authHeader = c.req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ success: false, error: 'Authentication required' }, 401);
+      return c.json({ 
+        success: false, 
+        error: 'Authentication required. Please provide an API key to generate proposals.',
+        code: 'AUTH_REQUIRED'
+      }, 401);
     }
 
     const apiKey = authHeader.replace('Bearer ', '');
@@ -724,16 +891,21 @@ app.post('/api/grants/generate-proposal', async (c) => {
       `).bind(apiKey).first();
 
       if (!user) {
-        return c.json({ success: false, error: 'Invalid API key' }, 401);
+        return c.json({ 
+          success: false, 
+          error: 'Invalid API key. Please check your authentication and try again.',
+          code: 'INVALID_API_KEY'
+        }, 401);
       }
 
       // Check usage limits for free users
       if (user.subscription_tier === 'free' && (user.usage_count || 0) >= 1) {
         return c.json({
           success: false,
-          error: 'Free tier limit reached',
+          error: 'You have reached your free tier limit of 1 proposal per account',
           upgrade_required: true,
-          message: 'Upgrade to Pro for unlimited grant applications'
+          message: 'Upgrade to Pro for unlimited grant proposal generation and advanced features',
+          code: 'FREE_TIER_LIMIT_REACHED'
         }, 429);
       }
 
@@ -750,25 +922,52 @@ app.post('/api/grants/generate-proposal', async (c) => {
         }
       }
     } catch (dbError) {
-      console.error('Database error during proposal generation:', dbError);
+      console.error('Database error during proposal generation:', {
+        error: dbError.message,
+        timestamp: new Date().toISOString()
+      });
       
       // For production, we should handle this more gracefully
       if (c.env.ENVIRONMENT === 'production') {
         return c.json({
           success: false,
-          error: 'Service temporarily unavailable',
-          message: 'Please try again later'
+          error: 'Proposal generation service is temporarily unavailable. Please try again in a few minutes.',
+          message: 'If this problem persists, please contact support',
+          code: 'PROPOSAL_SERVICE_UNAVAILABLE'
         }, 503);
       }
       
       console.warn('Continuing in demo mode due to database error');
     }
 
-    const { grant_id, company_info } = await c.req.json();
+    let requestData;
+    try {
+      requestData = await c.req.json();
+    } catch (parseError) {
+      return c.json({
+        success: false,
+        error: 'Invalid request format. Please send valid JSON data.',
+        code: 'INVALID_JSON'
+      }, 400);
+    }
+    
+    const { grant_id, company_info } = requestData;
+    
+    if (!grant_id) {
+      return c.json({
+        success: false,
+        error: 'Grant ID is required for proposal generation',
+        code: 'MISSING_GRANT_ID'
+      }, 400);
+    }
     
     const grant = MOCK_GRANTS.find(g => g.id === grant_id);
     if (!grant) {
-      return c.json({ success: false, error: 'Grant not found' }, 404);
+      return c.json({ 
+        success: false, 
+        error: `Grant with ID '${grant_id}' was not found. Please check the ID and try again.`,
+        code: 'GRANT_NOT_FOUND'
+      }, 404);
     }
 
     // Get full grant details using the existing endpoint logic
@@ -801,9 +1000,11 @@ app.post('/api/grants/generate-proposal', async (c) => {
     });
 
   } catch (error) {
+    console.error('Proposal generation endpoint error:', error);
     return c.json({
       success: false,
-      error: 'Proposal generation failed'
+      error: 'Proposal generation service encountered an unexpected error. Please try again.',
+      code: 'PROPOSAL_GENERATION_ERROR'
     }, 500);
   }
 });
@@ -820,22 +1021,46 @@ app.get('/health', (c) => {
 
 // Stripe Checkout Session Creation
 app.post('/api/stripe/create-checkout', async (c) => {
-  const stripe = new Stripe(c.env.STRIPE_SECRET_KEY);
+  // Standardized environment variable handling with fallback
+  const stripeSecretKey = c.env.STRIPE_SECRET_KEY || c.env.STRIPE_SK;
+  
+  if (!stripeSecretKey) {
+    return c.json({ 
+      success: false,
+      error: 'Payment system is currently unavailable. Please contact support if this issue persists.',
+      code: 'STRIPE_CONFIG_ERROR'
+    }, 503);
+  }
+  
+  const stripe = new Stripe(stripeSecretKey);
   
   try {
     const { email } = await c.req.json();
     
     if (!email) {
-      return c.json({ error: 'User email is required' }, 400);
+      return c.json({ 
+        success: false,
+        error: 'Email address is required for payment processing',
+        code: 'MISSING_EMAIL'
+      }, 400);
+    }
+
+    // Standardized price ID with fallback
+    const priceId = c.env.STRIPE_PRICE_ID || c.env.STRIPE_PRODUCT_PRICE_ID;
+    
+    if (!priceId) {
+      return c.json({
+        success: false,
+        error: 'Payment system configuration error. Please contact support.',
+        code: 'STRIPE_PRICE_CONFIG_ERROR'
+      }, 503);
     }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          // TODO: Replace with your actual Stripe price ID
-          // Get this from your Stripe Dashboard -> Products -> VoidCat Pro -> Pricing
-          price: c.env.STRIPE_PRICE_ID || 'price_1RpOdV3YDbGiItIJSxMyZyzv', // REPLACE WITH ACTUAL PRICE ID
+          price: priceId,
           quantity: 1,
         },
       ],
@@ -848,28 +1073,101 @@ app.post('/api/stripe/create-checkout', async (c) => {
       }
     });
 
-    return c.json({ sessionId: session.id });
-  } catch (e) {
-    return c.json({ error: { message: e.message } }, 500);
+    return c.json({ 
+      success: true,
+      sessionId: session.id 
+    });
+  } catch (error) {
+    console.error('Stripe checkout creation failed:', error);
+    
+    // Provide specific, actionable error messages
+    if (error.type === 'StripeInvalidRequestError') {
+      return c.json({
+        success: false,
+        error: 'Payment configuration error. Please contact support if this issue persists.',
+        code: 'STRIPE_INVALID_REQUEST'
+      }, 400);
+    }
+    
+    if (error.type === 'StripeAPIError') {
+      return c.json({
+        success: false,
+        error: 'Payment service temporarily unavailable. Please try again in a few minutes.',
+        code: 'STRIPE_API_ERROR'
+      }, 503);
+    }
+    
+    return c.json({
+      success: false,
+      error: 'Payment processing failed. Please contact support if this issue persists.',
+      code: 'STRIPE_UNKNOWN_ERROR',
+      details: error.message
+    }, 500);
   }
 });
 
 // Stripe Webhook Handler
 app.post('/api/stripe/webhook', async (c) => {
-  const stripe = new Stripe(c.env.STRIPE_SECRET_KEY);
+  // Standardized environment variable handling
+  const stripeSecretKey = c.env.STRIPE_SECRET_KEY || c.env.STRIPE_SK;
+  const webhookSecret = c.env.STRIPE_WEBHOOK_SECRET || c.env.STRIPE_WH_SECRET;
+  
+  if (!stripeSecretKey) {
+    console.error('Stripe secret key not configured');
+    return c.json({ 
+      success: false,
+      error: 'Webhook configuration error',
+      code: 'STRIPE_CONFIG_ERROR'
+    }, 503);
+  }
+  
+  if (!webhookSecret) {
+    console.error('Stripe webhook secret not configured');
+    return c.json({ 
+      success: false,
+      error: 'Webhook authentication error',
+      code: 'WEBHOOK_CONFIG_ERROR'
+    }, 503);
+  }
+  
+  const stripe = new Stripe(stripeSecretKey);
   const signature = c.req.header('stripe-signature');
-  const body = await c.req.text();
+  
+  if (!signature) {
+    console.error('Missing Stripe signature header');
+    return c.json({ 
+      success: false,
+      error: 'Webhook signature missing',
+      code: 'MISSING_SIGNATURE'
+    }, 400);
+  }
+  
+  let body;
+  try {
+    body = await c.req.text();
+  } catch (error) {
+    console.error('Failed to read webhook body:', error);
+    return c.json({ 
+      success: false,
+      error: 'Invalid webhook payload',
+      code: 'INVALID_PAYLOAD'
+    }, 400);
+  }
 
   let event;
-
   try {
     event = await stripe.webhooks.constructEvent(
       body,
       signature,
-      c.env.STRIPE_WEBHOOK_SECRET
+      webhookSecret
     );
-  } catch (err) {
-    return c.json({ error: `Webhook Error: ${err.message}` }, 400);
+  } catch (error) {
+    console.error('Webhook signature verification failed:', error);
+    return c.json({ 
+      success: false,
+      error: 'Webhook signature verification failed',
+      code: 'SIGNATURE_VERIFICATION_FAILED'
+    }, 400);
   }
 
   // Handle the event
@@ -877,20 +1175,43 @@ app.post('/api/stripe/webhook', async (c) => {
     const session = event.data.object;
     const customerEmail = session.customer_email;
 
+    if (!customerEmail) {
+      console.error('No customer email in checkout session:', session.id);
+      return c.json({ 
+        success: false,
+        error: 'Missing customer email in session',
+        code: 'MISSING_CUSTOMER_EMAIL'
+      }, 400);
+    }
+
     // Update user's subscription tier in database
     try {
       const db = await getDB(c.env);
-      await db.prepare('UPDATE users SET subscription_tier = ?, stripe_customer_id = ?, stripe_subscription_id = ? WHERE email = ?')
-        .bind('pro', session.customer, session.subscription, customerEmail)
-        .run();
-
-      console.log(`Payment successful for ${customerEmail}. Subscription updated to Pro.`);
+      const result = await db.prepare(`
+        UPDATE users 
+        SET subscription_tier = ?, stripe_customer_id = ?, stripe_subscription_id = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE email = ?
+      `).bind('pro', session.customer, session.subscription, customerEmail).run();
+      
+      if (result.success && result.changes > 0) {
+        console.log(`Payment successful for ${customerEmail}. Subscription updated to Pro.`);
+      } else {
+        console.error(`Failed to update subscription for ${customerEmail}:`, result);
+        // Don't fail the webhook - Stripe expects 200 response
+      }
     } catch (dbError) {
-      console.error('Database update failed:', dbError);
+      console.error('Database update failed during webhook processing:', dbError);
+      // Log error but don't fail webhook - Stripe will retry
     }
+  } else {
+    console.log(`Unhandled webhook event type: ${event.type}`);
   }
 
-  return c.json({ received: true });
+  return c.json({ 
+    success: true,
+    received: true,
+    event_type: event.type
+  });
 });
 
 // Root endpoint
