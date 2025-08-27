@@ -1,17 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { HomePage } from './pages/HomePage';
 import { RegistrationModal } from './pages/RegistrationModal';
+import { generateTestUser } from './utils/testDataGenerator';
 
 test.describe('Usage Limiting for Free Tier', () => {
   let homePage: HomePage;
   let registrationModal: RegistrationModal;
   
-  // Test user credentials
-  const testUser = {
-    name: 'Test User',
-    email: `test-${Date.now()}@example.com`,
-    company: 'Test Company'
-  };
+  // Test user credentials with unique identifiers
+  // Using crypto.randomUUID() instead of Date.now() to prevent collisions in parallel test execution
+  const testUser = generateTestUser();
 
   test.beforeEach(async ({ page }) => {
     homePage = new HomePage(page);

@@ -6,6 +6,7 @@ test.slow(); // Extend timeouts for all tests by 3x
 import { HomePage } from './pages/HomePage';
 import { RegistrationModal } from './pages/RegistrationModal';
 import { UpgradeModal } from './pages/UpgradeModal';
+import { generateTestUser } from './utils/testDataGenerator';
 
 test.describe('Upgrade Flow', () => {
   let homePage: HomePage;
@@ -13,12 +14,10 @@ test.describe('Upgrade Flow', () => {
   let upgradeModal: UpgradeModal;
   
   // Test user credentials with unique email for each test run
-  const testUser = {
-    name: 'Test User',
-    email: `test-${Date.now()}@example.com`,
-    company: 'Test Company',
+  // Using crypto.randomUUID() instead of Date.now() to prevent collisions in parallel test execution
+  const testUser = generateTestUser({
     password: 'Test@1234!'
-  };
+  });
 
   test.beforeEach(async ({ page }, testInfo) => {
     // Add a 30-second timeout for setup

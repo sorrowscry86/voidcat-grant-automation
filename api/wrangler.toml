@@ -7,11 +7,21 @@ name = "grant-search-api"
 
 [env.production.vars]
 ENVIRONMENT = "production"
-# Stripe Configuration - Set these via Cloudflare Workers secrets
-# STRIPE_SECRET_KEY = "sk_live_..." # Set via: wrangler secret put STRIPE_SECRET_KEY
-# STRIPE_PUBLISHABLE_KEY = "pk_live_..." # Set via: wrangler secret put STRIPE_PUBLISHABLE_KEY
-# STRIPE_PRICE_ID = "price_..." # Set via: wrangler secret put STRIPE_PRICE_ID
-# STRIPE_WEBHOOK_SECRET = "whsec_..." # Set via: wrangler secret put STRIPE_WEBHOOK_SECRET
+
+# Stripe Configuration - Standardized Environment Variables
+# Set these via Cloudflare Workers secrets (recommended)
+# STRIPE_SECRET_KEY = "sk_live_..." # Primary: Set via: wrangler secret put STRIPE_SECRET_KEY
+# STRIPE_PUBLISHABLE_KEY = "pk_live_..." # Primary: Set via: wrangler secret put STRIPE_PUBLISHABLE_KEY  
+# STRIPE_PRICE_ID = "price_..." # Primary: Set via: wrangler secret put STRIPE_PRICE_ID
+# STRIPE_WEBHOOK_SECRET = "whsec_..." # Primary: Set via: wrangler secret put STRIPE_WEBHOOK_SECRET
+
+# Legacy variable names (supported for backward compatibility):
+# STRIPE_SK = "sk_live_..." # Fallback for STRIPE_SECRET_KEY
+# STRIPE_PUBLIC_KEY = "pk_live_..." # Fallback for STRIPE_PUBLISHABLE_KEY
+# STRIPE_PRODUCT_PRICE_ID = "price_..." # Fallback for STRIPE_PRICE_ID
+# STRIPE_WH_SECRET = "whsec_..." # Fallback for STRIPE_WEBHOOK_SECRET
+
+# See ENVIRONMENT-VARIABLES.md for complete configuration guide
 
 [[env.production.d1_databases]]
 binding = "VOIDCAT_DB"
