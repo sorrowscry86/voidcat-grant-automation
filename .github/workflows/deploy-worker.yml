@@ -30,6 +30,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate Required Secrets
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "❌ ERROR: CLOUDFLARE_API_TOKEN secret is not set"
+            echo "Please add this secret in GitHub repository settings:"
+            echo "1. Go to Settings → Secrets and variables → Actions"
+            echo "2. Click 'New repository secret'"
+            echo "3. Add CLOUDFLARE_API_TOKEN with your Cloudflare API token"
+            echo "4. Get token from: https://developers.cloudflare.com/fundamentals/api/get-started/create-token/"
+            exit 1
+          fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "❌ ERROR: CLOUDFLARE_ACCOUNT_ID secret is not set"
+            echo "Please add this secret in GitHub repository settings:"
+            echo "1. Go to Settings → Secrets and variables → Actions"
+            echo "2. Click 'New repository secret'"
+            echo "3. Add CLOUDFLARE_ACCOUNT_ID with your Cloudflare Account ID"
+            echo "4. Find Account ID in Cloudflare Dashboard → Right sidebar"
+            exit 1
+          fi
+          echo "✅ Required Cloudflare secrets are properly configured"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -71,3 +93,33 @@ jobs:
         working-directory: ./api
         run: |
           npx wrangler deploy --env production
+
+      - name: Verify Deployment
+        run: |
+          echo "🩺 Waiting for deployment to be ready..."
+          sleep 10
+          
+          # Test API health endpoint
+          max_attempts=5
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt/$max_attempts: Testing API health..."
+            
+            if curl -f -s https://grant-search-api.sorrowscry86.workers.dev/health; then
+              echo ""
+              echo "✅ API deployment successful and healthy!"
+              echo "🌐 Live at: https://grant-search-api.sorrowscry86.workers.dev"
+              break
+            else
+              if [ $attempt -eq $max_attempts ]; then
+                echo ""
+                echo "❌ API deployment failed health check after $max_attempts attempts"
+                echo "Check Cloudflare Dashboard → Workers & Pages for more details"
+                exit 1
+              else
+                echo "   Health check failed, retrying in 10 seconds..."
+                sleep 10
+                attempt=$((attempt + 1))
+              fi
+            fi
+          done
