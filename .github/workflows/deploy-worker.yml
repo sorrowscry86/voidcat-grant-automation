@@ -109,6 +109,10 @@ jobs:
               echo ""
               echo "✅ API deployment successful and healthy!"
               echo "🌐 Live at: https://grant-search-api.sorrowscry86.workers.dev"
+              echo ""
+              echo "📋 Quick Test Commands:"
+              echo "curl https://grant-search-api.sorrowscry86.workers.dev/health"
+              echo 'curl "https://grant-search-api.sorrowscry86.workers.dev/api/grants/search?query=AI"'
               break
             else
               if [ $attempt -eq $max_attempts ]; then
