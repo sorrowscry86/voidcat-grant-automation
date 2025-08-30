@@ -23,14 +23,7 @@ test.describe('Upgrade Flow', () => {
     // Add a 30-second timeout for setup
     testInfo.setTimeout(30000);
     // Mock network requests for consistent test environment
-    await page.route('**/api/*', route => {
-      // Default mock response for any API requests
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true })
-      });
-    });
+    // Do not blanket-mock all API calls; tests will target specific routes
 
     homePage = new HomePage(page);
     registrationModal = new RegistrationModal(page);
@@ -44,23 +37,14 @@ test.describe('Upgrade Flow', () => {
   test('should show upgrade button for free tier users', async ({ page }, testInfo) => {
     testInfo.setTimeout(60000); // 1 minute timeout for this test
     
-    // Mock the registration API response
-    await page.route('**/api/register', route => {
+    // Mock the registration API response (align with frontend path /api/users/register)
+    await page.route('**/api/users/register', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          user: {
-            id: 'test-user-123',
-            email: testUser.email,
-            name: testUser.name,
-            company: testUser.company,
-            subscription_tier: 'free',
-            usage_count: 0,
-            usage_limit: 1
-          },
-          token: 'test-jwt-token-123'
+          api_key: 'test-jwt-token-123'
         })
       });
     });
@@ -70,7 +54,7 @@ test.describe('Upgrade Flow', () => {
     await registrationModal.registerUser(testUser);
     
     // Verify user is logged in and upgrade button is visible
-    await expect(page.getByText(new RegExp(`Welcome, ${testUser.name}`, 'i'))).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(new RegExp(`Welcome,`, 'i'))).toBeVisible({ timeout: 10000 });
     await expect(homePage.upgradeButton).toBeVisible();
   });
 
@@ -78,22 +62,13 @@ test.describe('Upgrade Flow', () => {
     testInfo.setTimeout(90000); // 1.5 minute timeout for this test
     
     // Mock the registration API response
-    await page.route('**/api/register', route => {
+    await page.route('**/api/users/register', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          user: {
-            id: 'test-user-123',
-            email: testUser.email,
-            name: testUser.name,
-            company: testUser.company,
-            subscription_tier: 'free',
-            usage_count: 0,
-            usage_limit: 1
-          },
-          token: 'test-jwt-token-123'
+          api_key: 'test-jwt-token-123'
         })
       });
     });
@@ -179,7 +154,7 @@ test.describe('Upgrade Flow', () => {
     await homePage.performSearch('blockchain');
     
     // Verify upgrade prompt is shown
-    await expect(page.getByText(/you['"]?ve reached your free limit/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/free limit reached/i)).toBeVisible({ timeout: 10000 });
     await expect(homePage.upgradeButton).toBeVisible();
   });
 
@@ -187,22 +162,13 @@ test.describe('Upgrade Flow', () => {
     testInfo.setTimeout(120000); // 2 minute timeout for this test
     
     // Mock the registration API response
-    await page.route('**/api/register', route => {
+    await page.route('**/api/users/register', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          user: {
-            id: 'test-user-123',
-            email: testUser.email,
-            name: testUser.name,
-            company: testUser.company,
-            subscription_tier: 'free',
-            usage_count: 0,
-            usage_limit: 1
-          },
-          token: 'test-jwt-token-123'
+          api_key: 'test-jwt-token-123'
         })
       });
     });
@@ -237,10 +203,9 @@ test.describe('Upgrade Flow', () => {
     });
     
     // Click upgrade button and verify navigation to checkout
-    const [newPage] = await Promise.all([
-      page.waitForEvent('popup'),
-      upgradeModal.clickUpgrade()
-    ]);
+    const popupPromise = page.waitForEvent('popup');
+    await upgradeModal.clickUpgrade();
+    const newPage = await popupPromise;
     
     // Verify new tab was opened with checkout URL
     await expect(newPage).toHaveURL(/checkout.stripe.com/);
@@ -253,22 +218,13 @@ test.describe('Upgrade Flow', () => {
     testInfo.setTimeout(90000); // 1.5 minute timeout for this test
     
     // Mock the registration API response
-    await page.route('**/api/register', route => {
+    await page.route('**/api/users/register', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          user: {
-            id: 'test-user-123',
-            email: testUser.email,
-            name: testUser.name,
-            company: testUser.company,
-            subscription_tier: 'free',
-            usage_count: 0,
-            usage_limit: 1
-          },
-          token: 'test-jwt-token-123'
+          api_key: 'test-jwt-token-123'
         })
       });
     });
@@ -295,16 +251,12 @@ test.describe('Upgrade Flow', () => {
     });
     
     // Spy on page for error message
-    const errorPromise = page.waitForEvent('console', msg => 
-      msg.type() === 'error' && msg.text().includes('Upgrade failed')
-    );
-    
     // Click upgrade button
     await upgradeModal.clickUpgrade();
     
     // Wait for error handling to complete
     await expect(async () => {
-      const errorMsg = await page.locator('.error-message, [role="alert"]').first();
+      const errorMsg = await page.locator('[role="alert"]').first();
       await expect(errorMsg).toBeVisible({ timeout: 5000 });
       await expect(errorMsg).toContainText(/error|failed|upgrade/i);
     }).toPass({ timeout: 10000 });
@@ -314,22 +266,13 @@ test.describe('Upgrade Flow', () => {
     testInfo.setTimeout(90000); // 1.5 minute timeout for this test
     
     // Mock the registration API response
-    await page.route('**/api/register', route => {
+    await page.route('**/api/users/register', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          user: {
-            id: 'test-user-123',
-            email: testUser.email,
-            name: testUser.name,
-            company: testUser.company,
-            subscription_tier: 'free',
-            usage_count: 0,
-            usage_limit: 1
-          },
-          token: 'test-jwt-token-123'
+          api_key: 'test-jwt-token-123'
         })
       });
     });

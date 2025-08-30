@@ -79,6 +79,8 @@ jobs:
           mkdir -p ./deploy-temp
           # Copy frontend files to root of deployment directory
           cp -r ./frontend/* ./deploy-temp/
+          # Remove any README files that might interfere with GitHub Pages
+          rm -f ./deploy-temp/README.md ./deploy-temp/readme.md
           # Create .nojekyll file to bypass Jekyll processing
           touch ./deploy-temp/.nojekyll
           # Validate deployment content

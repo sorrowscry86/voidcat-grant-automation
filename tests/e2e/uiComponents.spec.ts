@@ -12,12 +12,13 @@ test.describe('UI Components', () => {
 
   test('should display hero section with correct content', async ({ page }) => {
     // Verify hero section is visible and has correct content
-    const heroSection = page.locator('section:has(h1:text("Win More Federal Grants with AI"))');
+    const heroSection = page.locator('section').filter({ hasText: 'Win More Federal Grants with AI' }).first();
     await expect(heroSection).toBeVisible();
     await expect(heroSection).toContainText('20% success rate');
     
     // Verify CTA buttons
     await expect(heroSection.getByRole('button', { name: 'Start Free Trial' })).toBeVisible();
+    await expect(heroSection.getByRole('link', { name: 'See Features' })).toBeVisible();
     await expect(heroSection.getByRole('link', { name: 'Watch Demo' })).toBeVisible();
   });
 
@@ -26,7 +27,7 @@ test.describe('UI Components', () => {
     await page.evaluate(() => window.scrollTo(0, 500));
     
     // Verify section heading
-    const socialProofSection = page.locator('section:has(h2:text("Trusted by Innovative Companies"))');
+  const socialProofSection = page.getByRole('heading', { name: 'Trusted by Innovative Companies' }).locator('..').locator('..');
     await expect(socialProofSection).toBeVisible();
     
     // Verify testimonials
@@ -45,8 +46,9 @@ test.describe('UI Components', () => {
     await page.evaluate(() => window.scrollTo(0, 1000));
     
     // Verify section heading
-    const featuresSection = page.locator('section:has(h2:text("Everything You Need to Win Grants"))');
-    await expect(featuresSection).toBeVisible();
+  const featuresHeading = page.getByRole('heading', { name: 'Everything You Need to Win Grants' });
+  await expect(featuresHeading).toBeVisible();
+  const featuresSection = featuresHeading.locator('..');
     
     // Verify feature cards
     const featureCards = featuresSection.locator('.bg-white');
@@ -67,11 +69,11 @@ test.describe('UI Components', () => {
   test('should have working navigation links', async ({ page }) => {
     // Test navigation to features
     await page.click('a[href="#features"]');
-    await expect(page.locator('h2:text("Everything You Need to Win Grants")')).toBeInViewport();
+    await expect(page.getByRole('heading', { name: 'Everything You Need to Win Grants' })).toBeInViewport();
     
     // Test navigation to demo
     await page.click('a[href="#demo"]');
-    await expect(page.locator('h2:text("See It In Action")')).toBeInViewport();
+    await expect(page.getByRole('heading', { name: 'See It In Action' })).toBeInViewport();
   });
 
   test('should be responsive on mobile', async ({ page }) => {
@@ -79,7 +81,7 @@ test.describe('UI Components', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     
     // Verify mobile menu
-    const menuButton = page.locator('button:has(svg[aria-label="Menu"])');
+  const menuButton = page.getByRole('button', { name: 'Menu' });
     await expect(menuButton).toBeVisible();
     
     // Open menu

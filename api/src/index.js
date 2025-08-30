@@ -1065,8 +1065,8 @@ app.post('/api/stripe/create-checkout', async (c) => {
         },
       ],
       mode: 'subscription',
-      success_url: `https://sorrowscry86.github.io/voidcat-grant-automation/frontend/index.html?payment=success`,
-      cancel_url: `https://sorrowscry86.github.io/voidcat-grant-automation/frontend/index.html?payment=cancelled`,
+      success_url: `https://sorrowscry86.github.io/voidcat-grant-automation/?payment=success`,
+      cancel_url: `https://sorrowscry86.github.io/voidcat-grant-automation/?payment=cancelled`,
       customer_email: email,
       metadata: {
         email: email,

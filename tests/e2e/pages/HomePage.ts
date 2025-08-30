@@ -40,14 +40,14 @@ export class HomePage {
     this.emptyStateIcon = page.locator('.text-gray-400.text-6xl.mb-4').getByText('📋');
     this.emptyStateHeading = page.getByRole('heading', { name: 'No grants found' });
     this.emptyStateMessage = page.getByText('Try adjusting your search criteria or browse all opportunities.');
-    this.featuresSection = page.getByRole('heading', { name: '🎯 Why Choose VoidCat RDC?' });
+    this.featuresSection = page.getByRole('heading', { name: 'Everything You Need to Win Grants' });
     this.upgradeButton = page.getByRole('button', { name: 'Upgrade to Pro' });
   }
 
   async goto() {
     await safeAction(
       async () => {
-        await this.page.goto('index.html');
+        await this.page.goto('index.html?e2e_skip_autosearch=1');
         await waitForPageLoad(this.page);
         
         // Wait for Alpine.js to be available with type safety and timeout
@@ -179,8 +179,8 @@ export class HomePage {
 
   async verifyFeaturesVisible() {
     await expect(this.featuresSection).toBeVisible();
-    await expect(this.page.getByRole('heading', { name: 'Smart Matching' })).toBeVisible();
-    await expect(this.page.getByRole('heading', { name: 'Fast Proposals' })).toBeVisible();
-    await expect(this.page.getByRole('heading', { name: 'Success Tracking' })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'AI-Powered Matching' })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'Proposal Generation' })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'Time Savings' })).toBeVisible();
   }
 }

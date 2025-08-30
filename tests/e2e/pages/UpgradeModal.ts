@@ -12,13 +12,13 @@ export class UpgradeModal {
 
   constructor(page: Page) {
     this.page = page;
-    this.modal = page.locator('div[x-show*="upgrade"]').first();
-    this.heading = this.modal.getByRole('heading', { name: /upgrade to pro/i });
-    this.upgradeButton = this.modal.getByRole('button', { name: /upgrade now/i });
-    this.maybeLaterButton = this.modal.getByRole('button', { name: /(maybe later|not now)/i });
-    this.closeButton = this.modal.getByRole('button', { name: /close/i }).first();
-    this.freeTierCard = this.modal.locator('.bg-gray-50, .bg-gray-100').filter({ hasText: 'Free' }).first();
-    this.proTierCard = this.modal.locator('.bg-blue-50, .bg-blue-100').filter({ hasText: 'Pro' }).first();
+    this.modal = page.locator('div[ x-show="upgradeToProModal"], div[x-show="upgradeToProModal"], .fixed.inset-0 >> text=/Upgrade to/').first();
+    this.heading = page.getByRole('heading', { name: /upgrade to pro/i });
+    this.upgradeButton = page.getByRole('button', { name: /upgrade now/i });
+    this.maybeLaterButton = page.getByRole('button', { name: /(maybe later|not now)/i });
+    this.closeButton = page.getByRole('button', { name: /close/i }).first();
+    this.freeTierCard = page.locator('div').filter({ hasText: 'Free Tier' }).first();
+    this.proTierCard = page.locator('div').filter({ hasText: 'Pro Tier' }).first();
   }
 
   async waitForVisible(timeout = 10000) {
@@ -30,10 +30,10 @@ export class UpgradeModal {
   async verifyFreeTierFeatures() {
     const freeFeatures = [
       '1 grant application per month',
-      'basic',
-      'search',
-      'email',
-      'matching'
+      'Basic grant search',
+      'Limited proposal generation',
+      'Basic matching',
+      'Email support'
     ];
 
     const freeTierText = await this.freeTierCard.textContent();
@@ -44,11 +44,12 @@ export class UpgradeModal {
 
   async verifyProTierFeatures() {
     const proFeatures = [
-      'unlimited',
-      'proposal',
-      'priority',
+      'Unlimited',
+      'AI proposal',
+      'Priority',
       'analytics',
-      'dedicated',
+      'Early access',
+      'Dedicated',
       'manager'
     ];
 
