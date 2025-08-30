@@ -38,6 +38,13 @@ if [ $? -eq 0 ]; then
     echo "🌐 Live at: https://grant-search-api.sorrowscry86.workers.dev"
 else
     echo "❌ API deployment failed"
+    echo ""
+    echo "🔧 Common Solutions:"
+    echo "1. Check if you're logged into Wrangler: npx wrangler auth login"
+    echo "2. Verify your account ID in wrangler.toml"
+    echo "3. For GitHub Actions: Check GitHub Secrets are set (see GITHUB-SECRETS-SETUP.md)"
+    echo "4. Run 'npx wrangler whoami' to check authentication"
+    echo ""
     exit 1
 fi
 
