@@ -44,7 +44,8 @@ test.describe('VoidCat RDC Homepage', () => {
   });
 
   test('should hide features section after search is performed', async () => {
-    // Wait for initial search to complete (auto-search on load)
+    // Perform a search to trigger the UI change
+    await homePage.searchFor('science');
     await homePage.waitForSearchResults();
     
     // After search, features section should be hidden
@@ -52,7 +53,8 @@ test.describe('VoidCat RDC Homepage', () => {
   });
 
   test('should handle empty search results gracefully', async () => {
-    // Wait for initial search to complete (auto-search on load)
+    // Perform a search that should yield no results
+    await homePage.searchFor('nonexistentqueryxyz123');
     await homePage.waitForSearchResults();
     
     // Verify empty state is shown

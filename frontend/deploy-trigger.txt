@@ -1,0 +1,2 @@
+Frontend deployment trigger - 2025-08-29
+Updated to trigger GitHub Pages deployment after API fix

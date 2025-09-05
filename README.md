@@ -133,6 +133,8 @@ POST /api/grants/generate-proposal  - AI proposal generation
 
 ## 🔐 GitHub Secrets & Cloudflare Config
 
+> **⚠️ DEPLOYMENT ISSUE FIX:** If your Workers deployment is failing, see the [GitHub Secrets Setup Guide](./GITHUB-SECRETS-SETUP.md) for step-by-step instructions.
+
 Use GitHub Secrets for CI and Cloudflare Secrets for runtime. No secrets should live in code or `.env` files in this repo.
 
 ### Required (for CI deploys)
@@ -140,6 +142,8 @@ Use GitHub Secrets for CI and Cloudflare Secrets for runtime. No secrets should 
 	- Account > Workers Scripts: Edit
 	- Optional if managed in CI: D1 Database: Edit, Workers KV Storage: Edit, R2: Edit
 - `CLOUDFLARE_ACCOUNT_ID` – Your Cloudflare account ID
+
+**Quick Setup:** See [GITHUB-SECRETS-SETUP.md](./GITHUB-SECRETS-SETUP.md) for detailed instructions.
 
 ### Optional (Stripe, syncs to Worker secret store)
 - `STRIPE_SECRET_KEY` – Server-side secret key (sk_live_... or sk_test_...)

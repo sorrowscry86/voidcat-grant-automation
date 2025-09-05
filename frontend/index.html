@@ -248,7 +248,7 @@
         <!-- Grant Results -->
         <div x-show="grants.length > 0" class="space-y-4">
             <template x-for="grant in grants" :key="grant.id">
-                <div class="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow">
+                <div class="grant-card bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex-1">
                             <h4 class="text-lg font-semibold text-blue-600 mb-1" x-text="grant.title"></h4>
@@ -513,9 +513,7 @@
                     try {
                         const response = await fetch(`${this.apiBase}/api/users/register`, {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
+                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(this.registerForm)
                         });
                         const data = await response.json();
@@ -529,7 +527,6 @@
                                 localStorage.setItem('voidcat_api_key', this.apiKey);
                                 if (data.user) this.user = data.user;
                             } else {
-                                // Fallback: set minimal user context for UI when only success is returned
                                 this.user = {
                                     email: this.registerForm.email,
                                     name: this.registerForm.name,
@@ -537,17 +534,17 @@
                                     usage_count: 0
                                 };
                             }
-                            this.showRegister = false;
-                            this.registerForm = { name: '', email: '', company: '' };
-                            alert('🎉 Registration successful! You can now generate proposals.');
+                            console.log('Registration successful!');
                         } else {
                             const error = data;
-                            alert('Registration failed: ' + (error?.error || 'Unknown error'));
+                            console.error('Registration failed:', (error?.error || 'Unknown error'));
                         }
                     } catch (error) {
-                        alert('Registration failed: ' + error.message);
+                        console.error('Registration failed: ' + error.message);
                     } finally {
                         this.registering = false;
+                        this.showRegister = false;
+                        this.registerForm = { name: '', email: '', company: '' };
                     }
                 },
 

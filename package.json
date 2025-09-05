@@ -9,6 +9,7 @@
     "test:debug": "playwright test --debug",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report",
+    "start": "cd api && npx wrangler dev --port 3000",
     "test:install": "playwright install"
   },
   "keywords": [

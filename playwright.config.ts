@@ -7,10 +7,10 @@ import { TIMEOUTS } from './tests/e2e/utils/testUtils';
 export default defineConfig({
   testDir: './tests/e2e',
   /* Global timeout for each test */
-  timeout: TIMEOUTS.VERY_LONG,
+  timeout: 120000,
   /* Expect timeout for assertions */
   expect: {
-    timeout: TIMEOUTS.MEDIUM,
+    timeout: 30000,
     toHaveScreenshot: { maxDiffPixelRatio: 0.01 },
   },
   /* Run tests in files in parallel */
@@ -71,9 +71,9 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://127.0.0.1:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
+  webServer: {
+    command: 'npm run start',
+    url: 'http://127.0.0.1:3000',
+    reuseExistingServer: !process.env.CI,
+  },
 });

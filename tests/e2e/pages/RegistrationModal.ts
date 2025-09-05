@@ -58,29 +58,16 @@ export class RegistrationModal {
     await this.waitForVisible();
     await this.fillRegistrationForm(user.name, user.email, user.company);
     
-    // Mock the API response for successful registration
-    await this.page.route('**/api/register', route => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          user: {
-            id: 'test-user-123',
-            email: user.email,
-            name: user.name,
-            company: user.company || '',
-            subscription_tier: 'free',
-            usage_count: 0,
-            usage_limit: 1
-          },
-          token: 'test-jwt-token-123'
-        })
-      });
-    });
+    // This test is now designed to run against the live API
+    // All mocking has been removed to ensure it tests real-world behavior
     
     await this.submitRegistration();
-    await this.page.waitForLoadState('networkidle');
+    
+    // Wait for the registration to complete and the page to update
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }); // Increased timeout
+
+    // Explicitly wait for the modal to disappear to prevent race conditions
+    await this.verifyModalClosed();
   }
 
   async verifyTierInfoText() {

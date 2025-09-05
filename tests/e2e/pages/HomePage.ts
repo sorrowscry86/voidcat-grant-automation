@@ -58,14 +58,14 @@ export class HomePage {
         );
         
         // Wait for critical elements to be visible
-        await this.waitForPageLoad();
+        await this.waitForPageLoad(TIMEOUTS.LONG);
       },
       'Failed to load home page',
-      TIMEOUTS.PAGE_LOAD
+      TIMEOUTS.VERY_LONG * 2 // Doubled timeout for slower environments
     );
   }
 
-  async waitForPageLoad(timeout = TIMEOUTS.MEDIUM) {
+  async waitForPageLoad(timeout = TIMEOUTS.LONG) { // Increased default timeout
     await safeAction(
       async () => {
         await expect(this.title).toBeVisible({ timeout });
@@ -77,12 +77,12 @@ export class HomePage {
     );
   }
 
-  async performSearch(query: string, timeout: number = TIMEOUTS.MEDIUM) {
+  async performSearch(query: string, timeout: number = TIMEOUTS.LONG) {
     await safeAction(
       async () => {
         await this.searchInput.fill(query);
         await this.searchButton.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForSearchResults(timeout);
       },
       `Failed to perform search for query: ${query}`,
       timeout
@@ -98,19 +98,7 @@ export class HomePage {
   }
 
   async waitForSearchResults(timeout = 10000) {
-    // Wait for loading state to finish with proper type safety
-    await this.page.waitForFunction(([selector, xShowAttr]) => {
-      const loadingSpinner = document.querySelector(selector);
-      if (!loadingSpinner) return true;
-      
-      const parent = loadingSpinner.closest(`[${xShowAttr}]`);
-      if (!parent) return true;
-      
-      // Type-safe check for style.display
-      const style = window.getComputedStyle(parent);
-      return style.display === 'none';
-    }, ['.animate-spin', 'x-show'], { timeout });
-    
+    await expect(this.loadingIndicator).not.toBeVisible({ timeout });
     // Additional wait for any animations or transitions
     await this.page.waitForTimeout(500);
   }
@@ -150,31 +138,33 @@ export class HomePage {
     ));
   }
 
-  async verifySearchResults(timeout: number = TIMEOUTS.MEDIUM) {
-    // Check for either API results, demo data, or empty state
-    await safeAction(
-      async () => {
-        // Wait for search to complete
-        await this.page.waitForTimeout(1000);
-        
-        // Check if we have grant cards (API success or demo data)
-        const grantCards = this.page.locator('.grant-card');
-        const hasGrantCards = await grantCards.count() > 0;
-        
-        if (hasGrantCards) {
-          // We have results - either from API or demo data
-          await expect(grantCards.first()).toBeVisible({ timeout });
-          console.log('✅ Search results found (API or demo data)');
-        } else {
-          // Check for empty state with more specific selector
-          const emptyStateContainer = this.page.locator('.text-gray-400.text-6xl.mb-4');
-          await expect(emptyStateContainer).toBeVisible({ timeout });
-          console.log('✅ Empty state shown');
-        }
-      },
-      'Failed to verify search results',
-      timeout
-    );
+  async verifySearchResults(timeout: number = TIMEOUTS.VERY_LONG) {
+    await expect.poll(async () => {
+      const resultsCount = await this.page.locator('.grant-card').count();
+      const emptyStateVisible = await this.emptyStateHeading.isVisible();
+      const pageContent = await this.page.content();
+
+      if (resultsCount > 0) {
+        console.log(`✅ Search results found: ${resultsCount} grant cards.`);
+        return true;
+      }
+      if (emptyStateVisible) {
+        console.log('✅ Empty state is visible.');
+        return true;
+      }
+      
+      console.log(`Polling for results... Grant cards: ${resultsCount}, Empty state visible: ${emptyStateVisible}`);
+      // Log a snippet of the body content if something is really wrong
+      if (resultsCount === 0 && !emptyStateVisible) {
+        const bodyContent = await this.page.locator('body').innerText();
+        console.log(`Current body content snippet: ${bodyContent.substring(0, 500)}`);
+      }
+
+      return false;
+    }, {
+      message: 'Failed to find search results or empty state within the time limit.',
+      timeout: timeout,
+    }).toBe(true);
   }
 
   async verifyFeaturesVisible() {

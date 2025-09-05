@@ -95,7 +95,7 @@ test.describe('Upgrade Flow', () => {
     testInfo.setTimeout(120000); // 2 minute timeout for this test
     
     // Mock the registration API response
-    await page.route('**/api/register', route => {
+    await page.route('**/api/users/register', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
