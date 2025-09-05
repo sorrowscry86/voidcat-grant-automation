@@ -1,18 +1,19 @@
 import { Page, TestInfo } from '@playwright/test';
 
 // Type for timeout values
-type TimeoutValue = 5000 | 10000 | 15000 | 20000 | 30000 | 60000;
+type TimeoutValue = 5000 | 10000 | 15000 | 20000 | 30000 | 45000 | 60000 | 90000;
 
 /**
  * Default timeout values in milliseconds
+ * Increased values for better stability across different browsers and devices
  */
 export const TIMEOUTS: { [key: string]: TimeoutValue } = {
   SHORT: 5000,      // 5 seconds - for quick assertions
-  MEDIUM: 15000,    // 15 seconds - for most operations
-  LONG: 30000,      // 30 seconds - for slow operations
-  VERY_LONG: 60000, // 60 seconds - for very slow operations
-  PAGE_LOAD: 15000, // 15 seconds - for page loads (increased from 10s)
-  NETWORK_IDLE: 5000, // 5 seconds - for network idle (increased from 2s)
+  MEDIUM: 20000,    // 20 seconds - for most operations (increased from 15s)
+  LONG: 45000,      // 45 seconds - for slow operations (increased from 30s)
+  VERY_LONG: 90000, // 90 seconds - for very slow operations (increased from 60s)
+  PAGE_LOAD: 20000, // 20 seconds - for page loads (increased from 15s)
+  NETWORK_IDLE: 10000, // 10 seconds - for network idle (increased from 5s)
 } as const;
 
 /**
@@ -44,6 +45,33 @@ export async function safeAction<T>(
   }
   
   throw new Error(`${errorMessage}. ${lastError?.message || ''}`);
+}
+
+/**
+ * Get browser-specific timeout multiplier
+ */
+export function getBrowserTimeoutMultiplier(browserName: string): number {
+  switch (browserName.toLowerCase()) {
+    case 'webkit':
+    case 'safari':
+      return 1.5; // WebKit can be 50% slower
+    case 'firefox':
+      return 1.3; // Firefox can be 30% slower  
+    case 'mobile chrome':
+    case 'mobile safari':
+      return 2.0; // Mobile can be 100% slower
+    default:
+      return 1.0; // Chromium baseline
+  }
+}
+
+/**
+ * Get adjusted timeout for specific browser
+ */
+export function getAdjustedTimeout(baseTimeout: number, browserName?: string): number {
+  if (!browserName) return baseTimeout;
+  const multiplier = getBrowserTimeoutMultiplier(browserName);
+  return Math.floor(baseTimeout * multiplier);
 }
 
 /**

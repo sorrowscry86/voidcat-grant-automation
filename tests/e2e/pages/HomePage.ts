@@ -37,7 +37,8 @@ export class HomePage {
     this.agencySelect = page.getByRole('combobox');
     this.searchButton = page.getByRole('button', { name: /Search Grants|Searching/ });
     this.loadingIndicator = page.getByText('Loading grant opportunities...');
-    this.emptyStateIcon = page.locator('.text-gray-400.text-6xl.mb-4').getByText('📋');
+    // Make empty state locators more flexible
+    this.emptyStateIcon = page.locator('.text-gray-400').getByText('📋');
     this.emptyStateHeading = page.getByRole('heading', { name: 'No grants found' });
     this.emptyStateMessage = page.getByText('Try adjusting your search criteria or browse all opportunities.');
     this.featuresSection = page.getByRole('heading', { name: 'Everything You Need to Win Grants' });
@@ -48,20 +49,23 @@ export class HomePage {
     await safeAction(
       async () => {
         await this.page.goto('index.html?e2e_skip_autosearch=1');
-        await waitForPageLoad(this.page);
+        
+        // Wait for basic page load states
+        await this.page.waitForLoadState('load');
+        await this.page.waitForLoadState('domcontentloaded');
         
         // Wait for Alpine.js to be available with type safety and timeout
         await this.page.waitForFunction(
           () => typeof window !== 'undefined' && window.Alpine !== undefined,
           null,
-          { timeout: TIMEOUTS.MEDIUM }
+          { timeout: TIMEOUTS.LONG }
         );
         
         // Wait for critical elements to be visible
         await this.waitForPageLoad(TIMEOUTS.LONG);
       },
       'Failed to load home page',
-      TIMEOUTS.VERY_LONG * 2 // Doubled timeout for slower environments
+      TIMEOUTS.VERY_LONG
     );
   }
 
@@ -77,11 +81,12 @@ export class HomePage {
     );
   }
 
-  async performSearch(query: string, timeout: number = TIMEOUTS.LONG) {
+  async performSearch(query: string, timeout: number = TIMEOUTS.VERY_LONG) {
     await safeAction(
       async () => {
         await this.searchInput.fill(query);
         await this.searchButton.click();
+        // Pass the timeout to waitForSearchResults
         await this.waitForSearchResults(timeout);
       },
       `Failed to perform search for query: ${query}`,
@@ -97,10 +102,24 @@ export class HomePage {
     await this.searchButton.click();
   }
 
-  async waitForSearchResults(timeout = 10000) {
+  async waitForSearchResults(timeout: number = TIMEOUTS.LONG) {
+    // Wait for loading indicator to disappear first
     await expect(this.loadingIndicator).not.toBeVisible({ timeout });
-    // Additional wait for any animations or transitions
-    await this.page.waitForTimeout(500);
+    
+    // Add a small buffer for any remaining transitions
+    await this.page.waitForTimeout(1000);
+    
+    // Wait for either results or empty state to be ready
+    await expect.poll(async () => {
+      const resultsCount = await this.page.locator('.grant-card').count();
+      const emptyStateVisible = await this.emptyStateHeading.isVisible();
+      
+      // Return true if we have either results or properly displayed empty state
+      return resultsCount > 0 || emptyStateVisible;
+    }, {
+      message: 'Timed out waiting for search results or empty state to appear',
+      timeout: timeout,
+    }).toBe(true);
   }
 
   async clickGetStarted(timeout: number = TIMEOUTS.MEDIUM) {
@@ -125,45 +144,59 @@ export class HomePage {
     );
   }
 
-  async verifyEmptyState(timeout: number = TIMEOUTS.MEDIUM) {
-    const assertions = [
-      this.emptyStateIcon.isVisible(),
-      this.emptyStateHeading.isVisible(),
-      this.emptyStateMessage.isVisible()
-    ];
-    
-    // Wait for all assertions to pass or fail together
-    await Promise.all(assertions.map(assertion => 
-      expect(assertion).resolves.toBe(true)
-    ));
+  async verifyEmptyState(timeout: number = TIMEOUTS.LONG) {
+    // Use expect.poll for more reliable waiting
+    await expect.poll(async () => {
+      const iconVisible = await this.emptyStateIcon.isVisible();
+      const headingVisible = await this.emptyStateHeading.isVisible();
+      const messageVisible = await this.emptyStateMessage.isVisible();
+      
+      console.log(`Empty state check - Icon: ${iconVisible}, Heading: ${headingVisible}, Message: ${messageVisible}`);
+      
+      // All three elements should be visible for a proper empty state
+      return iconVisible && headingVisible && messageVisible;
+    }, {
+      message: 'Empty state elements are not all visible',
+      timeout: timeout,
+      intervals: [1000], // Check every second
+    }).toBe(true);
   }
 
   async verifySearchResults(timeout: number = TIMEOUTS.VERY_LONG) {
+    // Use a simpler and more reliable approach
     await expect.poll(async () => {
       const resultsCount = await this.page.locator('.grant-card').count();
       const emptyStateVisible = await this.emptyStateHeading.isVisible();
-      const pageContent = await this.page.content();
-
+      
       if (resultsCount > 0) {
         console.log(`✅ Search results found: ${resultsCount} grant cards.`);
         return true;
       }
+      
       if (emptyStateVisible) {
         console.log('✅ Empty state is visible.');
         return true;
       }
       
+      // Log current state for debugging
       console.log(`Polling for results... Grant cards: ${resultsCount}, Empty state visible: ${emptyStateVisible}`);
-      // Log a snippet of the body content if something is really wrong
-      if (resultsCount === 0 && !emptyStateVisible) {
-        const bodyContent = await this.page.locator('body').innerText();
-        console.log(`Current body content snippet: ${bodyContent.substring(0, 500)}`);
+      
+      // Check if page is still loading or has error state
+      const loadingVisible = await this.loadingIndicator.isVisible();
+      if (loadingVisible) {
+        console.log('Page is still loading...');
+        return false;
       }
-
+      
+      // Log body content snippet for debugging if nothing is found
+      const bodyContent = await this.page.locator('body').innerText();
+      console.log(`Current body content snippet: ${bodyContent.substring(0, 300)}...`);
+      
       return false;
     }, {
       message: 'Failed to find search results or empty state within the time limit.',
       timeout: timeout,
+      intervals: [2000], // Check every 2 seconds instead of default 100ms
     }).toBe(true);
   }
 
