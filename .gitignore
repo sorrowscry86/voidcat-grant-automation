@@ -38,6 +38,11 @@ playwright-report/
 test-frontend.html
 verify-production.js
 
+# E2E test validation tools (temporary)
+test-validation.js
+test-fixes-demo.js
+debug-frontend.js
+
 # OS specific files
 .DS_Store
 .DS_Store?
