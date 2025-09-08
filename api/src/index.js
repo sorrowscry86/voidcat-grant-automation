@@ -712,12 +712,7 @@ app.post('/api/users/register', async (c) => {
           success: true,
           message: 'User registered successfully',
           api_key: apiKey,
-          user: {
-            email: email,
-            name: name,
-            subscription_tier: 'free',
-            usage_count: 0
-          }
+          subscription_tier: 'free'
         });
       } else {
         console.error('Database insertion failed:', result);

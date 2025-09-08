@@ -513,7 +513,9 @@
                     try {
                         const response = await fetch(`${this.apiBase}/api/users/register`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
                             body: JSON.stringify(this.registerForm)
                         });
                         const data = await response.json();
@@ -527,6 +529,7 @@
                                 localStorage.setItem('voidcat_api_key', this.apiKey);
                                 if (data.user) this.user = data.user;
                             } else {
+                                // Fallback: set minimal user context for UI when only success is returned
                                 this.user = {
                                     email: this.registerForm.email,
                                     name: this.registerForm.name,
@@ -534,7 +537,9 @@
                                     usage_count: 0
                                 };
                             }
-                            console.log('Registration successful!');
+                            this.showRegister = false;
+                            this.registerForm = { name: '', email: '', company: '' };
+                            // alert('🎉 Registration successful! You can now generate proposals.');
                         } else {
                             const error = data;
                             console.error('Registration failed:', (error?.error || 'Unknown error'));
@@ -543,8 +548,6 @@
                         console.error('Registration failed: ' + error.message);
                     } finally {
                         this.registering = false;
-                        this.showRegister = false;
-                        this.registerForm = { name: '', email: '', company: '' };
                     }
                 },
 

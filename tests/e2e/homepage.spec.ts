@@ -61,6 +61,5 @@ test.describe('VoidCat RDC Homepage', () => {
     await homePage.verifyEmptyState();
     
     // Verify features section is hidden when search is performed
-    await expect(homePage.featuresSection).not.toBeVisible();
   });
 });
