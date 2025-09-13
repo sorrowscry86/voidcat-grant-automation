@@ -805,7 +805,7 @@ app.get('/api/users/me', async (c) => {
       `).bind(apiKey).first();
 
       if (!user) {
-        console.warn(`Invalid API key attempted: ${apiKey.substring(0, 8)}...`, {
+        console.warn('Invalid API key attempted', {
           ip: c.req.header('CF-Connecting-IP') || 'unknown',
           timestamp: new Date().toISOString()
         });
