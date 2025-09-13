@@ -393,12 +393,100 @@
     </div>
 
     <script>
+        // --- Crypto utilities for securing API key in localStorage ---
+        // Uses AES-GCM and key derived from user's email as passphrase.
+        async function getKeyMaterial(passphrase) {
+            let enc = new TextEncoder();
+            return await window.crypto.subtle.importKey(
+                "raw",
+                enc.encode(passphrase),
+                "PBKDF2",
+                false,
+                ["deriveKey"]
+            );
+        }
+
+        async function deriveKey(passphrase, salt) {
+            const keyMaterial = await getKeyMaterial(passphrase);
+            return await window.crypto.subtle.deriveKey(
+                {
+                    "name": "PBKDF2",
+                    salt: salt,
+                    "iterations": 100000,
+                    "hash": "SHA-256"
+                },
+                keyMaterial,
+                { "name": "AES-GCM", "length": 256},
+                false,
+                ["encrypt", "decrypt"]
+            );
+        }
+
+        async function encryptString(text, passphrase) {
+            let enc = new TextEncoder();
+            // Generate random salt and IV
+            let salt = window.crypto.getRandomValues(new Uint8Array(16));
+            let iv = window.crypto.getRandomValues(new Uint8Array(12));
+            let key = await deriveKey(passphrase, salt);
+            let ciphertext = await window.crypto.subtle.encrypt(
+                {
+                    name: "AES-GCM",
+                    iv: iv
+                },
+                key,
+                enc.encode(text)
+            );
+            // Encode salt, iv, and ciphertext as base64
+            let b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+            return [
+                b64(salt),
+                b64(iv),
+                b64(ciphertext)
+            ].join(':');
+        }
+
+        async function decryptString(data, passphrase) {
+            let [saltB64, ivB64, ciphertextB64] = data.split(':');
+            if (!saltB64 || !ivB64 || !ciphertextB64) return null;
+            let b64ToArr = (b64) => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+            let salt = b64ToArr(saltB64);
+            let iv = b64ToArr(ivB64);
+            let ciphertext = b64ToArr(ciphertextB64);
+            let key = await deriveKey(passphrase, salt);
+            let dec = await window.crypto.subtle.decrypt(
+                {
+                    name: "AES-GCM",
+                    iv: iv
+                },
+                key,
+                ciphertext
+            );
+            return new TextDecoder().decode(dec);
+        }
+
+        // ... (crypto helpers above) ...
+
         function grantApp() {
             return {
                 // State
                 user: null,
-                apiKey: localStorage.getItem('voidcat_api_key'),
+                apiKey: null, // will be initialized async in init()
                 grants: [],
+                // Async initialization (called automatically by Alpine.js)
+                async init() {
+                    // If user has provided email before, use as passphrase. Otherwise, static for demo.
+                    let stored = localStorage.getItem('voidcat_api_key');
+                    if (stored) {
+                        try {
+                            // We need a passphrase; try using the registerForm email or ask the user
+                            let passphrase = this.registerForm?.email || (this.user?.email) || window.prompt("Enter your email to unlock stored credentials:");
+                            if (!passphrase) return;
+                            this.apiKey = await decryptString(stored, passphrase);
+                        } catch (e) {
+                            console.error("Error decrypting API key from storage", e);
+                        }
+                    }
+                },
                 loading: false,
                 registering: false,
                 searchPerformed: false,
@@ -522,11 +610,24 @@
                         if (response.ok && (data.api_key || data.token || data.success)) {
                             if (data.api_key) {
                                 this.apiKey = data.api_key;
-                                localStorage.setItem('voidcat_api_key', this.apiKey);
+                                {
+                                    // Use email as passphrase for encryption
+                                    let passphrase = this.registerForm?.email || (this.user?.email);
+                                    if (!passphrase) passphrase = window.prompt("Enter an email to protect your API key:");
+                                    encryptString(this.apiKey, passphrase).then(enc => {
+                                        localStorage.setItem('voidcat_api_key', enc);
+                                    });
+                                }
                                 await this.checkAuth();
                             } else if (data.token) {
                                 this.apiKey = data.token;
-                                localStorage.setItem('voidcat_api_key', this.apiKey);
+                                {
+                                    let passphrase = this.registerForm?.email || (this.user?.email);
+                                    if (!passphrase) passphrase = window.prompt("Enter an email to protect your token:");
+                                    encryptString(this.apiKey, passphrase).then(enc => {
+                                        localStorage.setItem('voidcat_api_key', enc);
+                                    });
+                                }
                                 if (data.user) this.user = data.user;
                             } else {
                                 // Fallback: set minimal user context for UI when only success is returned
