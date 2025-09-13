@@ -208,7 +208,7 @@ test.describe('Upgrade Flow', () => {
     const newPage = await popupPromise;
     
     // Verify new tab was opened with checkout URL
-    await expect(newPage).toHaveURL(/checkout.stripe.com/);
+    await expect(newPage).toHaveURL(/checkout\.stripe\.com/);
     
     // Close the checkout page
     await newPage.close();
