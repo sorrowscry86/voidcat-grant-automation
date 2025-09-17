@@ -67,6 +67,11 @@ jobs:
         run: |
           npx wrangler --version
 
+      - name: Deploy Worker (production)
+        working-directory: ./api
+        run: |
+          npx wrangler deploy --env production
+
       - name: Sync Stripe secrets to Cloudflare (optional)
         if: env.STRIPE_SECRET_KEY || env.STRIPE_PUBLISHABLE_KEY || env.STRIPE_PRICE_ID || env.STRIPE_WEBHOOK_SECRET
         working-directory: ./api
@@ -88,11 +93,6 @@ jobs:
             echo "Setting STRIPE_WEBHOOK_SECRET..."
             echo "$STRIPE_WEBHOOK_SECRET" | npx wrangler secret put STRIPE_WEBHOOK_SECRET --env production
           fi
-
-      - name: Deploy Worker (production)
-        working-directory: ./api
-        run: |
-          npx wrangler deploy --env production
 
       - name: Verify Deployment
         run: |
