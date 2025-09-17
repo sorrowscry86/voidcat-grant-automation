@@ -50,6 +50,11 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
+        // Use system Chrome browser to avoid download issues
+        launchOptions: {
+          executablePath: '/usr/bin/google-chrome',
+          args: ['--no-sandbox', '--disable-dev-shm-usage']
+        }
       },
     },
 
@@ -98,7 +103,7 @@ export default defineConfig({
     command: 'python3 -m http.server 3000',
     cwd: './frontend',
     port: 3000,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true, // Allow reusing existing server
     timeout: 120 * 1000, // 2 minutes
   } : undefined,
 });
