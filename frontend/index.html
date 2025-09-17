@@ -557,8 +557,25 @@
                     company: ''
                 },
 
-                // API Configuration - Updated for GitHub Pages deployment
-                apiBase: 'https://grant-search-api.sorrowscry86.workers.dev',
+                // API Configuration - Environment-aware for testing and production
+                apiBase: (() => {
+                    // Check for test environment flag
+                    const params = new URLSearchParams(window.location.search);
+                    const isTestMode = params.has('test_api') || params.get('api_mode') === 'local';
+                    
+                    // Check if running locally (localhost or file://)
+                    const isLocalhost = window.location.hostname === 'localhost' || 
+                                       window.location.hostname === '127.0.0.1' ||
+                                       window.location.protocol === 'file:';
+                    
+                    // Use local API for testing or when explicitly requested
+                    if (isTestMode || (isLocalhost && !params.has('use_production_api'))) {
+                        return 'http://localhost:8787';
+                    }
+                    
+                    // Default to production API
+                    return 'https://grant-search-api.sorrowscry86.workers.dev';
+                })(),
 
                 // Initialize
                 async init() {
