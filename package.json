@@ -10,7 +10,11 @@
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report",
     "start": "cd api && npx wrangler dev --port 3000",
-    "test:install": "playwright install"
+    "test:install": "playwright install",
+    "test:payment-stress": "playwright test paymentStressTesting.spec.ts",
+    "test:api-endpoints": "node test-api-endpoints.js",
+    "test:live-payment": "./run-live-payment-tests.sh",
+    "test:comprehensive": "./comprehensive-live-testing.sh"
   },
   "keywords": [
     "grants",
