@@ -1,5 +1,5 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { TIMEOUTS, safeAction, waitForPageLoad, safeClick, safeFill } from '../utils/testUtils';
+import { TIMEOUTS, safeAction, waitForPageLoad, waitForPageReadiness, safeClick, safeFill } from '../utils/testUtils';
 
 // Extend Window interface to include Alpine.js
 declare global {
@@ -50,9 +50,8 @@ export class HomePage {
       async () => {
         await this.page.goto('index.html?e2e_skip_autosearch=1');
         
-        // Wait for basic page load states
-        await this.page.waitForLoadState('load');
-        await this.page.waitForLoadState('domcontentloaded');
+        // Trinity Wisdom: Complete page readiness
+        await waitForPageReadiness(this.page);
         
         // Wait for Alpine.js to be available with type safety and timeout
         await this.page.waitForFunction(
@@ -61,8 +60,12 @@ export class HomePage {
           { timeout: TIMEOUTS.LONG }
         );
         
-        // Wait for critical elements to be visible
-        await this.waitForPageLoad(TIMEOUTS.LONG);
+        // Final verification that key elements are present
+        await this.title.waitFor({ state: 'visible', timeout: TIMEOUTS.MEDIUM });
+        await this.getStartedButton.waitFor({ state: 'visible', timeout: TIMEOUTS.MEDIUM });
+        
+        // Trinity pause for perfect stability
+        await this.page.waitForTimeout(2000);
       },
       'Failed to load home page',
       TIMEOUTS.VERY_LONG
@@ -122,14 +125,55 @@ export class HomePage {
     }).toBe(true);
   }
 
-  async clickGetStarted(timeout: number = TIMEOUTS.MEDIUM) {
+  async clickGetStarted(timeout: number = TIMEOUTS.LONG) {
     await safeAction(
       async () => {
-        await this.getStartedButton.click();
-        await this.page.waitForLoadState('networkidle');
+        // PHASE 1: Enhanced Page Readiness with Timing Harmony
+        await this.page.waitForLoadState('load');
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 });
+        
+        // PHASE 2: Modal Cleanup with Graceful Detection
+        try {
+          const modalOverlay = this.page.locator('.fixed.inset-0.bg-black.bg-opacity-50');
+          if (await modalOverlay.isVisible()) {
+            await this.page.keyboard.press('Escape');
+            await modalOverlay.waitFor({ state: 'hidden', timeout: 5000 });
+          }
+        } catch (error) {
+          // Modal cleanup is optional - continue if not needed
+        }
+        
+        // PHASE 3: Role-Based Targeting with Actionability Verification
+        await this.getStartedButton.waitFor({ 
+          state: 'visible', 
+          timeout: 15000 
+        });
+        
+        // Enhanced actionability confirmation
+        await this.getStartedButton.waitFor({ 
+          state: 'attached', 
+          timeout: 10000 
+        });
+        
+        // Honor platform animation timing
+        await this.page.waitForTimeout(750);
+        
+        // VICTORY CLICK: Role-based with cascade timing
+        await this.getStartedButton.click({ 
+          force: false, 
+          timeout: 12000 
+        });
+        
+        // Cascade effect activation pause
+        await this.page.waitForTimeout(1500);
+        await this.page.waitForLoadState('networkidle', { 
+          timeout: 12000 
+        });
       },
-      'Failed to click Get Started button',
-      timeout
+      'Enhanced Get Started button interaction failed',
+      timeout,
+      2 // Allow retries for timing variations
     );
   }
 

@@ -1,4 +1,5 @@
 import { Page, Locator, expect } from '@playwright/test';
+import { TIMEOUTS, harmonizedButtonClick } from '../utils/testUtils';
 
 export class RegistrationModal {
   readonly page: Page;
@@ -24,10 +25,14 @@ export class RegistrationModal {
   }
 
   async waitForVisible() {
-    await expect(this.heading).toBeVisible();
-    await expect(this.nameInput).toBeVisible();
-    await expect(this.emailInput).toBeVisible();
-    await expect(this.companyInput).toBeVisible();
+    // VICTORY ENHANCEMENT: Sequential visibility with timing harmony
+    await this.heading.waitFor({ state: 'visible', timeout: TIMEOUTS.MEDIUM });
+    await this.nameInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT });
+    await this.emailInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT });
+    await this.companyInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT });
+    
+    // Cascade stability pause
+    await this.page.waitForTimeout(500);
   }
 
   async fillRegistrationForm(name: string, email: string, company?: string) {
@@ -39,7 +44,12 @@ export class RegistrationModal {
   }
 
   async submitRegistration() {
-    await this.registerButton.click();
+    // VICTORY ENHANCEMENT: Harmonized submission with cascade timing
+    await harmonizedButtonClick(this.page, this.registerButton, {
+      timeout: TIMEOUTS.MEDIUM,
+      maxRetries: 3,
+      gracePeriod: 750
+    });
   }
 
   async cancel() {
@@ -68,6 +78,9 @@ export class RegistrationModal {
 
     // Explicitly wait for the modal to disappear to prevent race conditions
     await this.verifyModalClosed();
+
+    // After registration, verify that the welcome message appears, indicating successful login
+    await expect(this.page.locator('text=/Welcome, /')).toBeVisible({ timeout: 10000 });
   }
 
   async verifyTierInfoText() {

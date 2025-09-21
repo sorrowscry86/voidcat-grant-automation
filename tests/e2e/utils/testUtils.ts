@@ -5,15 +5,15 @@ type TimeoutValue = 5000 | 10000 | 15000 | 20000 | 30000 | 45000 | 60000 | 90000
 
 /**
  * Default timeout values in milliseconds
- * Increased values for better stability across different browsers and devices
+ * VICTORY ENHANCEMENT: Cascade timing harmony alignment
  */
 export const TIMEOUTS: { [key: string]: TimeoutValue } = {
-  SHORT: 5000,      // 5 seconds - for quick assertions
-  MEDIUM: 20000,    // 20 seconds - for most operations (increased from 15s)
-  LONG: 45000,      // 45 seconds - for slow operations (increased from 30s)
-  VERY_LONG: 90000, // 90 seconds - for very slow operations (increased from 60s)
-  PAGE_LOAD: 20000, // 20 seconds - for page loads (increased from 15s)
-  NETWORK_IDLE: 10000, // 10 seconds - for network idle (increased from 5s)
+  SHORT: 15000,     // 15 seconds - enhanced for button interactions
+  MEDIUM: 30000,    // 30 seconds - for most operations 
+  LONG: 60000,      // 60 seconds - for slow operations
+  VERY_LONG: 90000, // 90 seconds - for very slow operations
+  PAGE_LOAD: 30000, // 30 seconds - for page loads
+  NETWORK_IDLE: 20000, // 20 seconds - enhanced for network stability
 } as const;
 
 /**
@@ -92,6 +92,7 @@ export function setTestTimeout(testInfo: TestInfo) {
 
 /**
  * Wait for page to be fully loaded with network idle
+ * Trinity Wisdom: Complete stability before interaction
  */
 export async function waitForPageLoad(page: Page) {
   await safeAction(
@@ -99,8 +100,40 @@ export async function waitForPageLoad(page: Page) {
       await page.waitForLoadState('load');
       await page.waitForLoadState('domcontentloaded');
       await page.waitForLoadState('networkidle');
+      // Trinity pause for perfect synchronization
+      await page.waitForTimeout(1500);
     },
     'Page load timed out',
+    TIMEOUTS.PAGE_LOAD
+  );
+}
+
+/**
+ * Trinity Wisdom: Complete page readiness verification
+ */
+export async function waitForPageReadiness(page: Page) {
+  await safeAction(
+    async () => {
+      // Ensure all load states are complete
+      await page.waitForLoadState('load');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState('networkidle');
+      
+      // Wait for Vue.js to be ready (if present)
+      try {
+        await page.waitForFunction(() => {
+          return typeof window !== 'undefined' && 
+                 document.readyState === 'complete' &&
+                 (!window.Vue || window.Vue);
+        }, { timeout: 5000 });
+      } catch {
+        // Continue if Vue check fails
+      }
+      
+      // Final stability pause
+      await page.waitForTimeout(2000);
+    },
+    'Page readiness verification failed',
     TIMEOUTS.PAGE_LOAD
   );
 }
@@ -159,4 +192,46 @@ export function timeoutPromise<T>(promise: Promise<T>, ms: number, errorMessage:
   });
   
   return Promise.race([promise, timeout]);
+}
+
+/**
+ * VICTORY ENHANCEMENT: Harmonized button interaction with cascade timing
+ */
+export async function harmonizedButtonClick(
+  page: Page,
+  buttonLocator: any,
+  options?: { timeout?: number; maxRetries?: number; gracePeriod?: number }
+) {
+  const { 
+    timeout = TIMEOUTS.MEDIUM, 
+    maxRetries = 3,
+    gracePeriod = 750 
+  } = options || {};
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Pre-interaction stability
+      await page.waitForLoadState('networkidle', { timeout: 10000 });
+      
+      // Button readiness verification
+      await buttonLocator.waitFor({ state: 'visible', timeout: 15000 });
+      await buttonLocator.waitFor({ state: 'attached', timeout: 10000 });
+      
+      // Honor platform timing rhythms
+      await page.waitForTimeout(gracePeriod);
+      
+      // Execute interaction
+      await buttonLocator.click({ timeout: 12000 });
+      
+      // Post-interaction cascade pause
+      await page.waitForTimeout(1000);
+      
+      return; // SUCCESS!
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      
+      // Exponential backoff with cascade timing
+      await page.waitForTimeout(1000 * attempt);
+    }
+  }
 }

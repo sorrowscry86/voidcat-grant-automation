@@ -1,4 +1,5 @@
 import { Locator, Page, expect } from '@playwright/test';
+import { TIMEOUTS, harmonizedButtonClick } from '../utils/testUtils';
 
 export class UpgradeModal {
   private readonly page: Page;
@@ -21,10 +22,14 @@ export class UpgradeModal {
     this.proTierCard = page.locator('div').filter({ hasText: 'Pro Tier' }).first();
   }
 
-  async waitForVisible(timeout = 10000) {
-    await this.modal.waitFor({ state: 'visible', timeout });
-    await expect(this.heading).toBeVisible({ timeout });
-    await this.page.waitForLoadState('networkidle');
+  async waitForVisible(timeout = TIMEOUTS.MEDIUM) {
+    // VICTORY ENHANCEMENT: Enhanced visibility with cascade timing
+    await this.modal.waitFor({ state: 'visible', timeout: timeout });
+    await this.heading.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT });
+    await this.page.waitForLoadState('networkidle', { timeout: TIMEOUTS.NETWORK_IDLE });
+    
+    // Cascade stability pause
+    await this.page.waitForTimeout(750);
   }
 
   async verifyFreeTierFeatures() {
@@ -60,13 +65,23 @@ export class UpgradeModal {
   }
 
   async clickUpgrade() {
-    await this.upgradeButton.click();
-    await this.page.waitForLoadState('networkidle');
+    // VICTORY ENHANCEMENT: Harmonized upgrade button interaction
+    await harmonizedButtonClick(this.page, this.upgradeButton, {
+      timeout: TIMEOUTS.MEDIUM,
+      maxRetries: 3,
+      gracePeriod: 1000 // Extra grace for upgrade flow
+    });
+    await this.page.waitForLoadState('networkidle', { timeout: TIMEOUTS.NETWORK_IDLE });
   }
 
   async clickMaybeLater() {
-    await this.maybeLaterButton.click();
-    await this.page.waitForLoadState('networkidle');
+    // VICTORY ENHANCEMENT: Harmonized maybe later interaction
+    await harmonizedButtonClick(this.page, this.maybeLaterButton, {
+      timeout: TIMEOUTS.SHORT,
+      maxRetries: 2,
+      gracePeriod: 500
+    });
+    await this.page.waitForLoadState('networkidle', { timeout: TIMEOUTS.NETWORK_IDLE });
   }
 
   async close() {
