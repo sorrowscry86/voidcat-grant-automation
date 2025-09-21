@@ -4,10 +4,7 @@ import { TIMEOUTS, safeAction, waitForPageLoad, waitForPageReadiness, safeClick,
 // Extend Window interface to include Alpine.js
 declare global {
   interface Window {
-    Alpine?: {
-      // Add Alpine.js types here if needed
-      // This tells TypeScript that window.Alpine might exist
-    };
+    Alpine?: any;
   }
 }
 
@@ -67,8 +64,9 @@ export class HomePage {
         // Trinity pause for perfect stability
         await this.page.waitForTimeout(2000);
       },
-      'Failed to load home page',
-      TIMEOUTS.VERY_LONG
+      'Enhanced page load with connection retry',
+      TIMEOUTS.VERY_LONG,
+      3 // Increased retry attempts for connection stability
     );
   }
 

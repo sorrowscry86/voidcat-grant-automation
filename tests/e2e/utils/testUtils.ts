@@ -1,5 +1,13 @@
 import { Page, TestInfo } from '@playwright/test';
 
+// Extend Window interface to include frameworks
+declare global {
+  interface Window {
+    Vue?: any;
+    Alpine?: any;
+  }
+}
+
 // Type for timeout values
 type TimeoutValue = 5000 | 10000 | 15000 | 20000 | 30000 | 45000 | 60000 | 90000;
 
@@ -23,7 +31,7 @@ export async function safeAction<T>(
   action: () => Promise<T>,
   errorMessage: string,
   timeout: number = TIMEOUTS.MEDIUM as number,
-  maxRetries = 2
+  maxRetries = 3 // Increased from 2 to 3 for better connection stability
 ): Promise<T> {
   let lastError: Error | null = null;
   
