@@ -4,10 +4,7 @@ import { TIMEOUTS, safeAction, waitForPageLoad, waitForPageReadiness, safeClick,
 // Extend Window interface to include Alpine.js
 declare global {
   interface Window {
-    Alpine?: {
-      // Add Alpine.js types here if needed
-      // This tells TypeScript that window.Alpine might exist
-    };
+    Alpine?: any;
   }
 }
 
