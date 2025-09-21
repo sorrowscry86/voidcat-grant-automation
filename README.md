@@ -68,6 +68,34 @@ npx wrangler deploy --env production
 - DARPA Opportunities
 - NASA ROSES programs
 
+## 🧪 Testing
+
+### Quick Testing (Recommended)
+```bash
+# Install dependencies
+npm install
+
+# Run comprehensive test suite (no browser download required)
+npm run test:alternative
+
+# Should show: 100% success rate with all 10 tests passing
+```
+
+### Full E2E Testing (When Playwright browsers available)
+```bash
+# Install Playwright browsers (may take 5-10 minutes)
+npm run test:install
+
+# Run full E2E test suite (230+ tests across browsers)
+npm test
+```
+
+### Testing Options
+- `npm run test:alternative` - Fast comprehensive testing (3 seconds)
+- `npm run test:quick` - Same as above, quick validation
+- `npm test` - Full Playwright E2E suite (10-15 minutes)
+- `npm run test:ui` - Interactive test runner
+
 ## 🔧 API Endpoints
 
 ```

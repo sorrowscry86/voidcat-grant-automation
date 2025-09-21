@@ -14,7 +14,10 @@
     "test:payment-stress": "playwright test paymentStressTesting.spec.ts",
     "test:api-endpoints": "node test-api-endpoints.js",
     "test:live-payment": "./run-live-payment-tests.sh",
-    "test:comprehensive": "./comprehensive-live-testing.sh"
+    "test:comprehensive": "./comprehensive-live-testing.sh",
+    "test:alternative": "node alternative-testing.js",
+    "test:quick": "node alternative-testing.js",
+    "test:fallback": "node alternative-testing.js"
   },
   "keywords": [
     "grants",
@@ -26,7 +29,7 @@
   "author": "VoidCat RDC",
   "license": "MIT",
   "devDependencies": {
-    "@playwright/test": "^1.54.2",
+    "@playwright/test": "^1.46.0",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0",
     "wrangler": "^4.28.1"
