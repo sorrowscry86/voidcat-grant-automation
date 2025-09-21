@@ -26,7 +26,9 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.GITHUB_PAGES_URL || 'file://' + process.cwd() + '/frontend/',
+    baseURL: process.env.TEST_API_MODE === 'local' 
+      ? 'http://localhost:3000/?test_api=true' 
+      : (process.env.GITHUB_PAGES_URL || 'file://' + process.cwd() + '/frontend/'),
     
     /* Timeout for each action - increased for more reliable tests */
     actionTimeout: TIMEOUTS.LONG,
@@ -48,6 +50,11 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
+        // Use system Chrome browser to avoid download issues
+        launchOptions: {
+          executablePath: '/usr/bin/google-chrome',
+          args: ['--no-sandbox', '--disable-dev-shm-usage']
+        }
       },
     },
 
@@ -91,11 +98,12 @@ export default defineConfig({
     */
   ],
 
-  /* Comment out webServer since we're testing static files
-  webServer: {
-    command: 'npm run start',
-    url: 'http://127.0.0.1:3000',
-    reuseExistingServer: !process.env.CI,
-  },
-  */
+  /* Web server for local API testing */
+  webServer: process.env.TEST_API_MODE === 'local' ? {
+    command: 'python3 -m http.server 3000',
+    cwd: './frontend',
+    port: 3000,
+    reuseExistingServer: true, // Allow reusing existing server
+    timeout: 120 * 1000, // 2 minutes
+  } : undefined,
 });
