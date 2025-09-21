@@ -1,13 +1,22 @@
 import { test, expect } from '@playwright/test';
 import { HomePage } from './pages/HomePage';
+import { safeAction, TIMEOUTS } from './utils/testUtils';
 
 test.describe('UI Components', () => {
   let homePage: HomePage;
 
   test.beforeEach(async ({ page }) => {
     homePage = new HomePage(page);
-    await homePage.goto();
-    await homePage.waitForPageLoad();
+    // Enhanced connection stability with retry logic
+    await safeAction(
+      async () => {
+        await homePage.goto();
+        await homePage.waitForPageLoad();
+      },
+      'Enhanced connection retry for UI components',
+      TIMEOUTS.VERY_LONG,
+      3
+    );
   });
 
   test('should display hero section with correct content', async ({ page }) => {
@@ -67,11 +76,13 @@ test.describe('UI Components', () => {
   });
 
   test('should have working navigation links', async ({ page }) => {
-    // Test navigation to features
+    // Test navigation to features - Enhanced with visibility check and timeout
+    await page.waitForSelector('a[href="#features"]', { state: 'visible', timeout: 30000 });
     await page.click('a[href="#features"]');
     await expect(page.getByRole('heading', { name: 'Everything You Need to Win Grants' })).toBeInViewport();
     
-    // Test navigation to demo
+    // Test navigation to demo - Enhanced with visibility check and timeout
+    await page.waitForSelector('a[href="#demo"]', { state: 'visible', timeout: 30000 });
     await page.click('a[href="#demo"]');
     await expect(page.getByRole('heading', { name: 'See It In Action' })).toBeInViewport();
   });

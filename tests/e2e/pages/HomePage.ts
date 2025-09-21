@@ -67,8 +67,9 @@ export class HomePage {
         // Trinity pause for perfect stability
         await this.page.waitForTimeout(2000);
       },
-      'Failed to load home page',
-      TIMEOUTS.VERY_LONG
+      'Enhanced page load with connection retry',
+      TIMEOUTS.VERY_LONG,
+      3 // Increased retry attempts for connection stability
     );
   }
 

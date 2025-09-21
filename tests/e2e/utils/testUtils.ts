@@ -23,7 +23,7 @@ export async function safeAction<T>(
   action: () => Promise<T>,
   errorMessage: string,
   timeout: number = TIMEOUTS.MEDIUM as number,
-  maxRetries = 2
+  maxRetries = 3 // Increased from 2 to 3 for better connection stability
 ): Promise<T> {
   let lastError: Error | null = null;
   

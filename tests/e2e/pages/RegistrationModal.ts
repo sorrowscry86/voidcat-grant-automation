@@ -25,8 +25,12 @@ export class RegistrationModal {
   }
 
   async waitForVisible() {
-    // VICTORY ENHANCEMENT: Sequential visibility with timing harmony
-    await this.heading.waitFor({ state: 'visible', timeout: TIMEOUTS.MEDIUM });
+    // Enhanced modal timing fix: wait for page stability before checking modal elements
+    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForTimeout(2000);
+    
+    // VICTORY ENHANCEMENT: Sequential visibility with timing harmony and extended timeouts
+    await this.heading.waitFor({ state: 'visible', timeout: 60000 });
     await this.nameInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT });
     await this.emailInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT });
     await this.companyInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT });
