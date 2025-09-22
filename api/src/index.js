@@ -28,6 +28,7 @@ async function getDB(env) {
 // Configuration for data sources
 const DATA_CONFIG = {
   USE_LIVE_DATA: true, // ENABLED: Now using live grant feeds for launch!
+  FALLBACK_TO_MOCK: true, // Allow fallback to mock data when live data fails
   LIVE_DATA_SOURCES: {
     GRANTS_GOV_API: 'https://api.grants.gov/v1/api/search2', // Updated to new 2025 RESTful API
     SBIR_API: 'https://www.sbir.gov/api/opportunities.json',
@@ -139,8 +140,15 @@ const MOCK_GRANTS = [
   }
 ];
 
-// Future live data integration function
+// Live data integration function with proper fallback tracking
 async function fetchLiveGrantData(query, agency) {
+  const result = {
+    grants: [],
+    actualDataSource: 'mock',
+    fallbackOccurred: false,
+    error: null
+  };
+
   if (DATA_CONFIG.USE_LIVE_DATA) {
     try {
       // Implementation for NEW 2025 grants.gov RESTful API
@@ -152,6 +160,8 @@ async function fetchLiveGrantData(query, agency) {
         keyword: query || '',
         ...(agency && { agency: agency })
       };
+      
+      console.log(`🔍 Attempting live data fetch from grants.gov API...`);
       
       const response = await fetch(DATA_CONFIG.LIVE_DATA_SOURCES.GRANTS_GOV_API, {
         method: 'POST',
@@ -186,7 +196,10 @@ async function fetchLiveGrantData(query, agency) {
       }));
       
       console.log(`✅ Live data fetch successful: ${transformedGrants.length} grants from grants.gov API`);
-      return transformedGrants;
+      result.grants = transformedGrants;
+      result.actualDataSource = 'live';
+      result.fallbackOccurred = false;
+      return result;
       
     } catch (error) {
       console.error('Live data fetch failed, falling back to mock data:', {
@@ -195,10 +208,117 @@ async function fetchLiveGrantData(query, agency) {
         agency,
         timestamp: new Date().toISOString()
       });
-      return MOCK_GRANTS;
+      
+      if (DATA_CONFIG.FALLBACK_TO_MOCK) {
+        result.grants = MOCK_GRANTS;
+        result.actualDataSource = 'mock';
+        result.fallbackOccurred = true;
+        result.error = error.message;
+        return result;
+      } else {
+        // Don't fallback - rethrow the error to be handled by caller
+        throw new Error(`Live data fetch failed: ${error.message}`);
+      }
     }
   }
-  return MOCK_GRANTS;
+  
+  if (DATA_CONFIG.FALLBACK_TO_MOCK) {
+    console.log('Using mock data (live data disabled in configuration)');
+    result.grants = MOCK_GRANTS;
+    result.actualDataSource = 'mock';
+    result.fallbackOccurred = false;
+    return result;
+  } else {
+    throw new Error('Live data is disabled and fallback to mock data is not allowed');
+  }
+}
+
+// Fetch specific grant details by ID from live data sources
+async function fetchLiveGrantDetails(grantId) {
+  const result = {
+    grant: null,
+    actualDataSource: 'mock',
+    fallbackOccurred: false,
+    error: null
+  };
+
+  if (DATA_CONFIG.USE_LIVE_DATA) {
+    try {
+      console.log(`🔍 Attempting to fetch grant details for ID: ${grantId} from live API...`);
+      
+      // Try to fetch all grants and find the specific one
+      // In a real implementation, we'd have a specific endpoint for grant details
+      const searchResult = await fetchLiveGrantData('', '');
+      
+      if (searchResult.actualDataSource === 'live' && !searchResult.fallbackOccurred) {
+        const liveGrant = searchResult.grants.find(g => g.id === grantId);
+        if (liveGrant) {
+          console.log(`✅ Found grant details in live data: ${grantId}`);
+          result.grant = {
+            ...liveGrant,
+            // Add additional details that would come from a details API
+            full_description: `${liveGrant.description} This opportunity represents a significant funding opportunity for organizations developing cutting-edge technologies.`,
+            requirements: [
+              'Must be a U.S. small business (for SBIR) or eligible organization',
+              'Meet size standards for the program',
+              'Principal investigator time commitment as specified',
+              'Compliance with all federal regulations'
+            ],
+            evaluation_criteria: [
+              'Technical merit and innovation',
+              'Potential for commercialization',
+              'Qualifications of research team',
+              'Feasibility of approach',
+              'Relevance to agency mission'
+            ]
+          };
+          result.actualDataSource = 'live';
+          result.fallbackOccurred = false;
+          return result;
+        }
+      }
+      
+      throw new Error(`Grant with ID '${grantId}' not found in live data`);
+      
+    } catch (error) {
+      console.error(`Live grant details fetch failed for ID ${grantId}, falling back to mock data:`, {
+        error: error.message,
+        grantId,
+        timestamp: new Date().toISOString()
+      });
+      
+      result.fallbackOccurred = true;
+      result.error = error.message;
+    }
+  }
+  
+  // Fallback to mock data if allowed
+  if (DATA_CONFIG.FALLBACK_TO_MOCK) {
+    console.log(`Using mock data for grant details: ${grantId}`);
+    const mockGrant = MOCK_GRANTS.find(g => g.id === grantId);
+    if (mockGrant) {
+      result.grant = {
+        ...mockGrant,
+        full_description: `${mockGrant.description} This opportunity represents a significant funding opportunity for organizations developing cutting-edge technologies.`,
+        requirements: [
+          'Must be a U.S. small business (for SBIR) or eligible organization',
+          'Meet size standards for the program',
+          'Principal investigator time commitment as specified',
+          'Compliance with all federal regulations'
+        ],
+        evaluation_criteria: [
+          'Technical merit and innovation',
+          'Potential for commercialization',
+          'Qualifications of research team',
+          'Feasibility of approach',
+          'Relevance to agency mission'
+        ]
+      };
+      result.actualDataSource = 'mock';
+    }
+  }
+  
+  return result;
 }
 
 // Calculate matching score for grants (placeholder algorithm)
@@ -502,8 +622,16 @@ app.get('/api/grants/search', async (c) => {
     
     // Fetch grants from configured data source (mock or live)
     let filteredGrants;
+    let actualDataSource;
+    let fallbackOccurred;
+    let dataSourceError;
+    
     try {
-      filteredGrants = await fetchLiveGrantData(query, agency);
+      const fetchResult = await fetchLiveGrantData(query, agency);
+      filteredGrants = fetchResult.grants;
+      actualDataSource = fetchResult.actualDataSource;
+      fallbackOccurred = fetchResult.fallbackOccurred;
+      dataSourceError = fetchResult.error;
     } catch (dataError) {
       console.error('Grant data fetch failed:', dataError);
       return c.json({
@@ -559,10 +687,12 @@ app.get('/api/grants/search', async (c) => {
         success: true,
         count: filteredGrants.length,
         grants: filteredGrants,
-        data_source: DATA_CONFIG.USE_LIVE_DATA ? 'live' : 'mock',
+        data_source: actualDataSource,
+        fallback_occurred: fallbackOccurred,
         timestamp: new Date().toISOString(),
         live_data_ready: DATA_CONFIG.USE_LIVE_DATA,
-        search_params: { query, agency, deadline, amount }
+        search_params: { query, agency, deadline, amount },
+        ...(fallbackOccurred && dataSourceError && { fallback_reason: dataSourceError })
       });
     } catch (filterError) {
       console.error('Grant filtering failed:', filterError);
@@ -605,9 +735,10 @@ app.get('/api/grants/:id', async (c) => {
       }, 400);
     }
     
-    const grant = MOCK_GRANTS.find(g => g.id === grantId);
+    // Fetch grant details from live data sources with fallback
+    const detailsResult = await fetchLiveGrantDetails(grantId);
     
-    if (!grant) {
+    if (!detailsResult.grant) {
       return c.json({ 
         success: false, 
         error: `Grant with ID '${grantId}' was not found. Please check the ID and try again.`,
@@ -615,37 +746,14 @@ app.get('/api/grants/:id', async (c) => {
       }, 404);
     }
     
-    const grantDetails = {
-      ...grant,
-      full_description: `${grant.description} This opportunity represents a significant funding opportunity for organizations developing cutting-edge AI technologies.`,
-      requirements: [
-        'Must be a U.S. small business (for SBIR) or eligible organization',
-        'Meet size standards for the program',
-        'Principal investigator time commitment as specified',
-        'Compliance with all federal regulations'
-      ],
-      evaluation_criteria: [
-        'Technical merit and innovation (40%)',
-        'Commercial potential and impact (30%)', 
-        'Company/team capability (20%)',
-        'Budget reasonableness (10%)'
-      ],
-      submission_requirements: [
-        'Technical proposal (page limits vary)',
-        'Budget and budget justification',
-        'Required registration documents',
-        'Biographical sketches of key personnel'
-      ],
-      contact: {
-        name: 'Program Officer',
-        email: 'contact@agency.gov',
-        phone: '(202) 555-0123'
-      }
-    };
+    const grantDetails = detailsResult.grant;
 
     return c.json({
       success: true,
-      grant: grantDetails
+      grant: grantDetails,
+      data_source: detailsResult.actualDataSource,
+      fallback_occurred: detailsResult.fallbackOccurred,
+      ...(detailsResult.fallbackOccurred && detailsResult.error && { fallback_reason: detailsResult.error })
     });
 
   } catch (error) {
@@ -981,8 +1089,10 @@ app.post('/api/grants/generate-proposal', async (c) => {
       }, 400);
     }
     
-    const grant = MOCK_GRANTS.find(g => g.id === grant_id);
-    if (!grant) {
+    // Fetch grant details from live data sources with fallback for proposal generation
+    const detailsResult = await fetchLiveGrantDetails(grant_id);
+    
+    if (!detailsResult.grant) {
       return c.json({ 
         success: false, 
         error: `Grant with ID '${grant_id}' was not found. Please check the ID and try again.`,
@@ -990,24 +1100,8 @@ app.post('/api/grants/generate-proposal', async (c) => {
       }, 404);
     }
 
-    // Get full grant details using the existing endpoint logic
-    const grantDetails = {
-      ...grant,
-      full_description: `${grant.description} This opportunity represents a significant funding opportunity for organizations developing cutting-edge technologies.`,
-      requirements: [
-        'Must be a U.S. small business (for SBIR) or eligible organization',
-        'Meet size standards for the program',
-        'Principal investigator time commitment as specified',
-        'Compliance with all federal regulations'
-      ],
-      evaluation_criteria: [
-        'Technical merit and innovation',
-        'Potential for commercialization',
-        'Qualifications of research team',
-        'Feasibility of approach',
-        'Relevance to agency mission'
-      ]
-    };
+    // Use the fetched grant details
+    const grantDetails = detailsResult.grant;
     
     // Generate MCP-compliant proposal using advanced AI prompting
     const generatedProposal = await generateMCPProposal(grantDetails, company_info);
@@ -1016,7 +1110,10 @@ app.post('/api/grants/generate-proposal', async (c) => {
       success: true,
       proposal: generatedProposal,
       grant_id: grant_id,
-      generated_at: new Date().toISOString()
+      generated_at: new Date().toISOString(),
+      data_source: detailsResult.actualDataSource,
+      fallback_occurred: detailsResult.fallbackOccurred,
+      ...(detailsResult.fallbackOccurred && detailsResult.error && { fallback_reason: detailsResult.error })
     });
 
   } catch (error) {
