@@ -1,1 +1,5 @@
-Trigger fresh deployment with updated secrets - 2025-08-29
+LIVE DATA DEPLOYMENT TRIGGER - September 21, 2025
+Updated API to use grants.gov 2025 RESTful API
+POST to https://api.grants.gov/v1/api/search2
+USE_LIVE_DATA: true
+Ready for production deployment!

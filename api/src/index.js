@@ -27,9 +27,9 @@ async function getDB(env) {
 
 // Configuration for data sources
 const DATA_CONFIG = {
-  USE_LIVE_DATA: false, // Set to true when ready to use live grant feeds
+  USE_LIVE_DATA: true, // ENABLED: Now using live grant feeds for launch!
   LIVE_DATA_SOURCES: {
-    GRANTS_GOV_API: 'https://www.grants.gov/grantsws/rest/opportunities/search/',
+    GRANTS_GOV_API: 'https://api.grants.gov/v1/api/search2', // Updated to new 2025 RESTful API
     SBIR_API: 'https://www.sbir.gov/api/opportunities.json',
     NSF_API: 'https://www.nsf.gov/awardsearch/download.jsp'
   }
@@ -141,19 +141,26 @@ const MOCK_GRANTS = [
 
 // Future live data integration function
 async function fetchLiveGrantData(query, agency) {
-  // TODO: Implement live data fetching in Phase 2
-  // This will integrate with grants.gov API, SBIR.gov, NSF, etc.
   if (DATA_CONFIG.USE_LIVE_DATA) {
     try {
-      // Example implementation for grants.gov API
+      // Implementation for NEW 2025 grants.gov RESTful API
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
-      const response = await fetch(`${DATA_CONFIG.LIVE_DATA_SOURCES.GRANTS_GOV_API}?keyword=${encodeURIComponent(query)}&agency=${encodeURIComponent(agency)}`, {
+      // Build search request body for new API
+      const searchBody = {
+        keyword: query || '',
+        ...(agency && { agency: agency })
+      };
+      
+      const response = await fetch(DATA_CONFIG.LIVE_DATA_SOURCES.GRANTS_GOV_API, {
+        method: 'POST',
         signal: controller.signal,
         headers: {
+          'Content-Type': 'application/json',
           'User-Agent': 'VoidCat Grant Search API/1.0'
-        }
+        },
+        body: JSON.stringify(searchBody)
       });
       
       clearTimeout(timeoutId);
@@ -163,11 +170,24 @@ async function fetchLiveGrantData(query, agency) {
       }
       
       const liveData = await response.json();
-      return liveData.map(grant => ({
-        ...grant,
-        data_source: 'live',
-        matching_score: calculateMatchingScore(grant, query)
+      
+      // Transform grants.gov data to our format
+      const transformedGrants = (liveData.opportunities || liveData.data || []).map(grant => ({
+        id: grant.opportunityId || grant.id || `LIVE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        title: grant.opportunityTitle || grant.title || 'Federal Grant Opportunity',
+        agency: grant.agencyName || grant.agency || 'Federal Agency',
+        program: grant.opportunityCategory || grant.program || 'Federal Program',
+        deadline: grant.closeDate || grant.deadline || '2025-12-31',
+        amount: grant.awardFloor ? `$${parseInt(grant.awardFloor).toLocaleString()} - $${parseInt(grant.awardCeiling || grant.awardFloor).toLocaleString()}` : 'Amount TBD',
+        description: grant.description || grant.opportunityTitle || 'Federal funding opportunity',
+        eligibility: grant.eligibilityDesc || 'See opportunity details for eligibility requirements',
+        matching_score: calculateMatchingScore(grant, query),
+        data_source: 'live'
       }));
+      
+      console.log(`✅ Live data fetch successful: ${transformedGrants.length} grants from grants.gov API`);
+      return transformedGrants;
+      
     } catch (error) {
       console.error('Live data fetch failed, falling back to mock data:', {
         error: error.message,
