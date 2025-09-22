@@ -1,5 +1,8 @@
 name: Live API and Payment Tests
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [ master ]
