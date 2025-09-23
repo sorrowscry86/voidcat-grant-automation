@@ -244,7 +244,7 @@ async function fetchLiveGrantDetails(grantId) {
     error: null
   };
 
-  if (DATA_CONFIG.USE_LIVE_DATA) {
+  if (false /* live data not supported for individual grant details */) {
     try {
       console.log(`🔍 Attempting to fetch grant details for ID: ${grantId} from live API...`);
       
