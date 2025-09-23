@@ -1,5 +1,6 @@
 #!/bin/bash
-
+set -euo pipefail
+trap 'echo "Error: API call or JSON parsing failed."; exit 1' ERR
 # Live Data Integration Fixes - Manual Test Script
 # This script demonstrates that all the issues from the problem statement have been fixed
 
