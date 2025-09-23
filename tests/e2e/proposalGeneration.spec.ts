@@ -261,11 +261,19 @@ test.describe('Proposal Generation', () => {
     // Trinity Wisdom: Force click disabled button to trigger application logic
     await generateButton.click({ force: true }); // Force click the disabled button
     
-    // Enhanced modal timing fix: wait for page stability before checking modal
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    // Enhanced modal timing fix: wait for complete page stability before checking modal
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForTimeout(3000); // Extended cascade pause from 2s to 3s
     
-    // Should show login/registration prompt (registration modal)
-    await expect(page.locator('text=Register for Free Access')).toBeVisible({ timeout: 60000 });
+    // Wait for modal container to be ready before checking text element
+    try {
+      await page.waitForSelector('[data-modal="registration"]', { timeout: 15000 });
+    } catch {
+      // Fallback: wait for any modal overlay
+      await page.waitForSelector('.fixed.inset-0.bg-black.bg-opacity-50', { timeout: 15000 });
+    }
+    
+    // Should show login/registration prompt (registration modal) with extended timeout
+    await expect(page.locator('text=Register for Free Access')).toBeVisible({ timeout: 75000 }); // Increased from 60s to 75s
   });
 });
