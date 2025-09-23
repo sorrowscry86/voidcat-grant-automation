@@ -217,7 +217,8 @@ async function fetchLiveGrantData(query, agency) {
         return result;
       } else {
         // Don't fallback - rethrow the error to be handled by caller
-        throw new Error(`Live data fetch failed: ${error.message}`);
+        result.error = error.message;
+        return result;
       }
     }
   }
