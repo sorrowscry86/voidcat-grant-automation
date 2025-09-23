@@ -29,7 +29,7 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Run Comprehensive Live Tests
-        run: ./comprehensive-live-testing.sh
+        run: ./.github/workflows/comprehensive-live-testing.sh
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           # Add any other secrets your tests might need here
