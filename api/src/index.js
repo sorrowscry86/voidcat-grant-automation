@@ -229,7 +229,8 @@ async function fetchLiveGrantData(query, agency) {
     result.fallbackOccurred = false;
     return result;
   } else {
-    throw new Error('Live data is disabled and fallback to mock data is not allowed');
+    result.error = 'Live data is disabled and fallback to mock data is not allowed';
+    return result;
   }
 }
 
