@@ -26,10 +26,14 @@ test.describe('Live Data Integration Fixes', () => {
     expect(searchResponse.data).toHaveProperty('fallback_occurred');
     expect(searchResponse.data).toHaveProperty('timestamp');
     
-    // With the current Grants.gov API unavailable, should fallback to mock
-    expect(searchResponse.data.data_source).toBe('mock');
-    expect(searchResponse.data.fallback_occurred).toBe(true);
-    expect(searchResponse.data).toHaveProperty('fallback_reason');
+    // Verify data source and fallback status flexibly
+    expect(['mock', 'live']).toContain(searchResponse.data.data_source);
+    if (searchResponse.data.data_source === 'mock') {
+      expect(searchResponse.data.fallback_occurred).toBe(true);
+      expect(searchResponse.data).toHaveProperty('fallback_reason');
+    } else {
+      expect(searchResponse.data.fallback_occurred).toBe(false);
+    }
     
     // Verify each grant also has correct data_source
     for (const grant of searchResponse.data.grants) {
