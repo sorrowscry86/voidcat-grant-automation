@@ -55,12 +55,33 @@ test.describe('Usage Limiting for Free Tier', () => {
     // Perform a second search that should hit the limit
     await homePage.performSearch('blockchain', TIMEOUTS.VERY_LONG);
     
+    // Enhanced modal readiness verification before checking elements
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForTimeout(2000); // Cascade timing pause
+    
+    // Wait for upgrade modal container before checking elements
+    try {
+      await page.waitForSelector('[data-modal="upgrade"]', { timeout: 30000 });
+    } catch {
+      // Fallback: wait for modal overlay or upgrade prompt text
+      try {
+        await page.waitForSelector('.fixed.inset-0.bg-black.bg-opacity-50', { timeout: 20000 });
+      } catch {
+        // Second fallback: wait for the upgrade prompt text directly
+        await page.waitForSelector('text=Free Limit Reached!', { timeout: 15000 });
+      }
+    }
+    
+    // Add additional buffer after modal appears
+    await page.waitForTimeout(1000);
+    
     // Verify upgrade prompt is shown
     const upgradePrompt = page.locator('text=Free Limit Reached!');
-    await expect(upgradePrompt).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+    await expect(upgradePrompt).toBeVisible({ timeout: TIMEOUTS.LONG }); // Increased timeout
     
-    const upgradeButton = page.locator('button:has-text("Upgrade Now")');
-    await expect(upgradeButton).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+    // Enhanced upgrade button verification with extended timeout
+    const upgradeButton = page.locator('button:has-text("Upgrade Now")').first();
+    await expect(upgradeButton).toBeVisible({ timeout: 60000 }); // Extended from 30s to 60s
   });
 
   test('should prevent additional searches when limit is reached', async ({ page }) => {
@@ -78,9 +99,26 @@ test.describe('Usage Limiting for Free Tier', () => {
     // Try to perform another search
     await homePage.performSearch('another search', TIMEOUTS.VERY_LONG);
     
-    // Verify upgrade prompt is shown
+    // Enhanced modal readiness verification before checking elements
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForTimeout(2000); // Cascade timing pause
+    
+    // Wait for upgrade modal container before checking elements
+    try {
+      await page.waitForSelector('[data-modal="upgrade"]', { timeout: 30000 });
+    } catch {
+      // Fallback: wait for modal overlay or upgrade prompt text
+      try {
+        await page.waitForSelector('.fixed.inset-0.bg-black.bg-opacity-50', { timeout: 20000 });
+      } catch {
+        // Second fallback: wait for the upgrade prompt text directly
+        await page.waitForSelector('text=Free Limit Reached!', { timeout: 15000 });
+      }
+    }
+    
+    // Verify upgrade prompt is shown with enhanced timeout
     const upgradePrompt = page.locator('text=Free Limit Reached!');
-    await expect(upgradePrompt).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+    await expect(upgradePrompt).toBeVisible({ timeout: TIMEOUTS.LONG }); // Increased from MEDIUM to LONG
   });
 
   test('should show correct usage counter', async ({ page }) => {

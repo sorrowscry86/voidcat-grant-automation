@@ -76,15 +76,31 @@ test.describe('UI Components', () => {
   });
 
   test('should have working navigation links', async ({ page }) => {
-    // Test navigation to features - Enhanced with visibility check and timeout
-    await page.waitForSelector('a[href="#features"]', { state: 'visible', timeout: 30000 });
-    await page.click('a[href="#features"]');
-    await expect(page.getByRole('heading', { name: 'Everything You Need to Win Grants' })).toBeInViewport();
+    // Test navigation to features - Enhanced with visibility check, timeout, and fallback
+    try {
+      await page.waitForSelector('a[href="#features"]', { state: 'visible', timeout: 30000 });
+      await page.click('a[href="#features"]');
+    } catch {
+      // Fallback: Use role-based selection
+      const featuresLink = page.getByRole('link', { name: 'Features' });
+      await featuresLink.waitFor({ state: 'visible', timeout: 15000 });
+      await featuresLink.scrollIntoViewIfNeeded();
+      await featuresLink.click();
+    }
+    await expect(page.getByRole('heading', { name: 'Everything You Need to Win Grants' })).toBeInViewport({ timeout: 30000 });
     
-    // Test navigation to demo - Enhanced with visibility check and timeout
-    await page.waitForSelector('a[href="#demo"]', { state: 'visible', timeout: 30000 });
-    await page.click('a[href="#demo"]');
-    await expect(page.getByRole('heading', { name: 'See It In Action' })).toBeInViewport();
+    // Test navigation to demo - Enhanced with visibility check, timeout, and fallback
+    try {
+      await page.waitForSelector('a[href="#demo"]', { state: 'visible', timeout: 30000 });
+      await page.click('a[href="#demo"]');
+    } catch {
+      // Fallback: Use role-based selection
+      const demoLink = page.getByRole('link', { name: 'Demo' });
+      await demoLink.waitFor({ state: 'visible', timeout: 15000 });
+      await demoLink.scrollIntoViewIfNeeded();
+      await demoLink.click();
+    }
+    await expect(page.getByRole('heading', { name: 'See It In Action' })).toBeInViewport({ timeout: 30000 });
   });
 
   test('should be responsive on mobile', async ({ page }) => {

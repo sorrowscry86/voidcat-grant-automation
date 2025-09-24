@@ -50,11 +50,12 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        // Use system Chrome browser to avoid download issues
-        launchOptions: {
-          executablePath: '/usr/bin/google-chrome',
-          args: ['--no-sandbox', '--disable-dev-shm-usage']
-        }
+        // CI environment configuration
+        ...(process.env.CI && {
+          launchOptions: {
+            args: ['--no-sandbox', '--disable-dev-shm-usage']
+          }
+        })
       },
     },
 

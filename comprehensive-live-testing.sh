@@ -82,7 +82,8 @@ log() {
         "SECTION") echo -e "${PURPLE}[${timestamp}] [SECTION]${NC} $message" ;;
     esac
     
-    # Also log to file
+    # Also log to file - ensure directory exists first
+    mkdir -p "$(dirname "$LOG_FILE")"
     echo "[${timestamp}] [$level] $message" >> "$LOG_FILE"
 }
 
