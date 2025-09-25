@@ -273,9 +273,8 @@ export class ABTestService {
     const variantRate = variant.conversions / variant.users;
     const improvement = ((variantRate - controlRate) / controlRate) * 100;
 
-    // Mock confidence calculation (in production, calculate proper p-values)
-    const totalUsers = control.users + variant.users;
-    const confidence = Math.min(95, Math.max(50, 60 + (totalUsers / 20)));
+    // This is a placeholder. In production, a proper statistical test (e.g., Chi-squared or Z-test) is required.
+    const confidence = 0; // Placeholder value to indicate it's not a real calculation
 
     return {
       significant: confidence > 90 && Math.abs(improvement) > 5,
