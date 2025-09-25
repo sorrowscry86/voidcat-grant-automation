@@ -212,7 +212,7 @@ async function fetchLiveGrantData(query, agency) {
         data_source: 'live'
       }));
       
-  console.log(`✅ Live data fetch successful: ${transformedGrants.length} grants (raw length: ${opportunitiesRaw.length})`);
+      console.log(`✅ Live data fetch successful: ${transformedGrants.length} grants (raw length: ${opportunitiesRaw.length})`);
       result.grants = transformedGrants;
       result.actualDataSource = 'live';
       result.fallbackOccurred = false;
