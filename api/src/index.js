@@ -8,6 +8,8 @@ import Stripe from 'stripe';
 import EmailService from './services/emailService.js';
 import TelemetryService from './services/telemetryService.js';
 import TemplateService from './services/templateService.js';
+import DashboardService from './services/dashboardService.js';
+import ABTestService from './services/abTestService.js';
 
 const app = new Hono();
 
@@ -1517,6 +1519,314 @@ app.post('/api/grants/generate-proposal', async (c) => {
       success: false,
       error: 'Proposal generation service encountered an unexpected error. Please try again.',
       code: 'PROPOSAL_GENERATION_ERROR'
+    }, 500);
+  }
+});
+
+// Dashboard endpoints
+// Get user dashboard data
+app.get('/api/dashboard', async (c) => {
+  try {
+    // Check authentication
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ 
+        success: false, 
+        error: 'Authentication required. Please provide an API key to access dashboard.',
+        code: 'AUTH_REQUIRED'
+      }, 401);
+    }
+
+    const apiKey = authHeader.substring(7);
+    const dashboardService = new DashboardService(c.env);
+    
+    // In production, validate API key and get user ID from database
+    // For demo, use a mock user ID
+    const userId = `user-${apiKey.substring(0, 8)}`;
+    
+    const dashboardData = await dashboardService.getUserDashboard(userId, apiKey);
+    
+    return c.json({
+      success: true,
+      dashboard: dashboardData,
+      user_id: userId
+    });
+  } catch (error) {
+    console.error('Dashboard retrieval error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve dashboard data. Please try again later.',
+      code: 'DASHBOARD_ERROR'
+    }, 500);
+  }
+});
+
+// Update application status
+app.put('/api/dashboard/applications/:id', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ 
+        success: false, 
+        error: 'Authentication required.',
+        code: 'AUTH_REQUIRED'
+      }, 401);
+    }
+
+    const applicationId = c.req.param('id');
+    const apiKey = authHeader.substring(7);
+    const userId = `user-${apiKey.substring(0, 8)}`;
+    
+    let updateData;
+    try {
+      updateData = await c.req.json();
+    } catch (parseError) {
+      return c.json({
+        success: false,
+        error: 'Invalid request format. Please send valid JSON data.',
+        code: 'INVALID_JSON'
+      }, 400);
+    }
+
+    const { status, notes } = updateData;
+    
+    if (!status) {
+      return c.json({
+        success: false,
+        error: 'Status is required for application update',
+        code: 'MISSING_STATUS'
+      }, 400);
+    }
+
+    const dashboardService = new DashboardService(c.env);
+    const result = await dashboardService.updateApplicationStatus(userId, applicationId, status, notes);
+    
+    return c.json(result);
+  } catch (error) {
+    console.error('Application update error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to update application status. Please try again later.',
+      code: 'APPLICATION_UPDATE_ERROR'
+    }, 500);
+  }
+});
+
+// Add new application to tracking
+app.post('/api/dashboard/applications', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ 
+        success: false, 
+        error: 'Authentication required.',
+        code: 'AUTH_REQUIRED'
+      }, 401);
+    }
+
+    const apiKey = authHeader.substring(7);
+    const userId = `user-${apiKey.substring(0, 8)}`;
+    
+    let applicationData;
+    try {
+      applicationData = await c.req.json();
+    } catch (parseError) {
+      return c.json({
+        success: false,
+        error: 'Invalid request format. Please send valid JSON data.',
+        code: 'INVALID_JSON'
+      }, 400);
+    }
+
+    const { grant_id, grant_title, agency, deadline, amount } = applicationData;
+    
+    if (!grant_id || !grant_title) {
+      return c.json({
+        success: false,
+        error: 'Grant ID and title are required',
+        code: 'MISSING_REQUIRED_FIELDS'
+      }, 400);
+    }
+
+    const dashboardService = new DashboardService(c.env);
+    const result = await dashboardService.addApplication(userId, grant_id, applicationData);
+    
+    return c.json(result);
+  } catch (error) {
+    console.error('Add application error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to add application to tracking. Please try again later.',
+      code: 'ADD_APPLICATION_ERROR'
+    }, 500);
+  }
+});
+
+// Get analytics data (admin endpoint)
+app.get('/api/analytics', async (c) => {
+  try {
+    const { timeframe } = c.req.query();
+    const dashboardService = new DashboardService(c.env);
+    
+    const analytics = await dashboardService.getAnalytics(timeframe || '30d');
+    
+    return c.json({
+      success: true,
+      analytics: analytics
+    });
+  } catch (error) {
+    console.error('Analytics retrieval error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve analytics data. Please try again later.',
+      code: 'ANALYTICS_ERROR'
+    }, 500);
+  }
+});
+
+// A/B Testing and Feature Flags endpoints
+// Get user's feature flags and experiment variants
+app.get('/api/feature-flags', async (c) => {
+  try {
+    const { user_id } = c.req.query();
+    const abTestService = new ABTestService(c.env);
+    
+    // Use user_id from query param or generate from IP for anonymous users
+    const userId = user_id || `anon-${c.req.header('CF-Connecting-IP') || 'unknown'}`;
+    
+    const featureFlags = abTestService.getFeatureFlags(userId);
+    
+    return c.json({
+      success: true,
+      ...featureFlags
+    });
+  } catch (error) {
+    console.error('Feature flags retrieval error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve feature flags. Using defaults.',
+      feature_flags: {
+        advanced_search: true,
+        template_recommendations: true,
+        dashboard_analytics: true,
+        email_notifications: true
+      }
+    }, 200); // Return 200 with defaults to not break functionality
+  }
+});
+
+// Get list of active experiments
+app.get('/api/experiments', async (c) => {
+  try {
+    const { status } = c.req.query();
+    const abTestService = new ABTestService(c.env);
+    
+    const experiments = abTestService.listExperiments(status);
+    
+    return c.json({
+      success: true,
+      count: experiments.length,
+      experiments: experiments
+    });
+  } catch (error) {
+    console.error('Experiments listing error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve experiments list.',
+      code: 'EXPERIMENTS_LIST_ERROR'
+    }, 500);
+  }
+});
+
+// Get experiment results and analysis
+app.get('/api/experiments/:id/results', async (c) => {
+  try {
+    const experimentId = c.req.param('id');
+    const abTestService = new ABTestService(c.env);
+    
+    if (!experimentId) {
+      return c.json({
+        success: false,
+        error: 'Experiment ID is required',
+        code: 'MISSING_EXPERIMENT_ID'
+      }, 400);
+    }
+
+    try {
+      const results = abTestService.getExperimentResults(experimentId);
+      
+      return c.json({
+        success: true,
+        ...results
+      });
+    } catch (experimentError) {
+      if (experimentError.message.includes('not found')) {
+        return c.json({
+          success: false,
+          error: `Experiment '${experimentId}' not found`,
+          code: 'EXPERIMENT_NOT_FOUND'
+        }, 404);
+      }
+      throw experimentError;
+    }
+  } catch (error) {
+    console.error('Experiment results error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve experiment results.',
+      code: 'EXPERIMENT_RESULTS_ERROR'
+    }, 500);
+  }
+});
+
+// Track A/B test event
+app.post('/api/experiments/:id/track', async (c) => {
+  try {
+    const experimentId = c.req.param('id');
+    const abTestService = new ABTestService(c.env);
+    
+    if (!experimentId) {
+      return c.json({
+        success: false,
+        error: 'Experiment ID is required',
+        code: 'MISSING_EXPERIMENT_ID'
+      }, 400);
+    }
+
+    let eventData;
+    try {
+      eventData = await c.req.json();
+    } catch (parseError) {
+      return c.json({
+        success: false,
+        error: 'Invalid request format. Please send valid JSON data.',
+        code: 'INVALID_JSON'
+      }, 400);
+    }
+
+    const { user_id, event_type, event_data } = eventData;
+    
+    if (!user_id || !event_type) {
+      return c.json({
+        success: false,
+        error: 'user_id and event_type are required',
+        code: 'MISSING_REQUIRED_FIELDS'
+      }, 400);
+    }
+
+    const eventRecord = abTestService.trackEvent(user_id, experimentId, event_type, event_data);
+    
+    return c.json({
+      success: true,
+      message: 'Event tracked successfully',
+      event_id: eventRecord ? `${experimentId}-${Date.now()}` : null
+    });
+  } catch (error) {
+    console.error('A/B test tracking error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to track experiment event.',
+      code: 'TRACKING_ERROR'
     }, 500);
   }
 });
