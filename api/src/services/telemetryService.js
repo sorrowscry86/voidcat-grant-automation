@@ -269,7 +269,7 @@ export class TelemetryService {
     return {
       service: 'voidcat-grant-api',
       version: '1.0.0',
-      uptime: process.uptime ? process.uptime() : 'unknown',
+      uptime: 'unknown', // process.uptime() is not available in the Cloudflare Workers runtime
       timestamp: new Date().toISOString(),
       telemetry: {
         enabled_features: this.enabledFeatures,
