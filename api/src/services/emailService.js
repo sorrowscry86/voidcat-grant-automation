@@ -190,9 +190,9 @@ export class EmailService {
       .replace(/<\/p>/gi, '\n\n')
       .replace(/<[^>]*>/g, '')
       .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
       .trim();
   }
 
