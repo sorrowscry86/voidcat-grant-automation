@@ -5,7 +5,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import Stripe from 'stripe';
-import { sendRegistrationEmail } from './services/emailService.js';
+import EmailService from './services/emailService.js';
+import TelemetryService from './services/telemetryService.js';
 
 const app = new Hono();
 
@@ -21,6 +22,12 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 }));
+
+// Telemetry middleware for request/response logging and metrics
+app.use('*', async (c, next) => {
+  const telemetryService = new TelemetryService(c.env);
+  await telemetryService.createMiddleware()(c, next);
+});
 
 // Database helper
 async function getDB(env) {
@@ -702,6 +709,12 @@ app.get('/api/grants/search', async (c) => {
         });
       }
 
+      // Track grant search metrics
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.trackGrantSearch(query, agency, filteredGrants.length, actualDataSource, fallbackOccurred);
+      }
+
       return c.json({
         success: true,
         count: filteredGrants.length,
@@ -855,18 +868,45 @@ app.post('/api/users/register', async (c) => {
 
       if (result.success) {
         console.log(`User registered successfully: ${email}`);
-        // Send registration email asynchronously
-        c.executionCtx && c.executionCtx.waitUntil(
-          sendRegistrationEmail({ email, apiKey }, c.env)
-            .then(res => {
-              if (!res.success) {
-                console.warn('Registration email failed:', res.error);
+        
+        // Send welcome email asynchronously (don't block registration response)
+        c.executionCtx.waitUntil((async () => {
+          try {
+            const emailService = new EmailService(c.env);
+            const emailData = emailService.generateRegistrationEmail({
+              name: name,
+              email: email,
+              apiKey: apiKey
+            });
+            
+            const emailResult = await emailService.sendEmail(emailData);
+            const telemetry = c.get('telemetry');
+            
+            if (emailResult.success) {
+              console.log(`Welcome email sent successfully to: ${email}`);
+              if (telemetry) {
+                telemetry.trackEmailDelivery(email, 'registration', true, emailResult.provider);
               }
-            })
-            .catch(e => {
-              console.warn('Registration email error:', e.message);
-            })
-        );
+            } else {
+              console.error(`Failed to send welcome email to ${email}:`, emailResult.error);
+              if (telemetry) {
+                telemetry.trackEmailDelivery(email, 'registration', false, emailResult.provider);
+              }
+            }
+          } catch (emailError) {
+            console.error(`Email service error for ${email}:`, emailError.message);
+            const telemetry = c.get('telemetry');
+            if (telemetry) {
+              telemetry.trackEmailDelivery(email, 'registration', false, 'unknown');
+            }
+          }
+        })());
+        
+        // Track successful registration
+        const telemetry = c.get('telemetry');
+        if (telemetry) {
+          telemetry.trackUserRegistration(email, true, 'free');
+        }
         return c.json({
           success: true,
           message: 'User registered successfully',

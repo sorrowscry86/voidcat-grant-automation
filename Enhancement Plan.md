@@ -1,312 +1,411 @@
-# VoidCat Grant Automation Platform – Enhancement Plan
+# VoidCat Grant Automation Enhancement Plan
 
-> Source Basis: "VoidCat Platform: Prioritized Improvement Plan" (attached) transformed into an actionable engineering battle plan with acceptance criteria, sequencing logic, risk notes, and success metrics.
+## Executive Summary
 
-## Guiding Principles
+This comprehensive enhancement plan outlines the strategic development roadmap for the VoidCat RDC Federal Grant Automation Platform. The plan is structured in three tiers, progressing from core infrastructure improvements to advanced business intelligence features.
 
-- Fix production truth first (real data & trust) before adding features.
-- Ship smallest safe vertical slices; validate after each Tier 1/Tier 2 deployment.
-- Keep frontend static & simple; push logic to API Worker; preserve fast iteration.
-- Add observability + guardrails alongside feature/security work.
-- Avoid premature refactors while critical functionality is broken.
+## Project Context
 
----
-## Tier 1 – Critical Production Fixes (Blockers)
+**Platform**: AI-powered federal grant discovery and proposal automation
+**Architecture**: Cloudflare Workers API + Alpine.js/Tailwind frontend  
+**Current Status**: MVP deployed and operational
+**Target**: Enhance platform capabilities and user experience systematically
 
-### 1. Live Data Not Displaying
+## Enhancement Tiers
 
-**Problem:** API always falls back to mock data due to incorrect structure expectation.
+### Tier 1: Core Infrastructure (Priority: Critical)
 
-**Action:** Patch `fetchLiveGrantData` logic in `api/src/index.js` (or future `services/grants.js`) to accept either raw array or nested container. Provide defensive parsing + telemetry (console.log once).
+#### 1.1 Live Data Parser Enhancement
+**Objective**: Improve grants.gov API integration with robust error handling and transparency
 
-```js
-const liveData = await response.json();
-const opportunities = Array.isArray(liveData)
-  ? liveData
-  : liveData.opportunities || liveData.data || [];
+**Current Issues**:
+- Misleading data source reporting
+- Limited error handling for API failures
+- No fallback transparency for users
+
+**Improvements**:
+- Enhanced error reporting with specific failure reasons
+- Transparent fallback behavior indication
+- Extended live integration to grant details endpoint
+- Comprehensive logging and telemetry
+
+**Acceptance Criteria**:
+- [ ] API responses clearly indicate actual data source (`mock` vs `live`)
+- [ ] Fallback behavior is transparent with `fallback_occurred` flag
+- [ ] Grant details endpoint includes live data integration
+- [ ] Error messages provide actionable information
+- [ ] All data source changes are logged with timestamps
+
+#### 1.2 Email Service Integration
+**Objective**: Implement email notifications for user registration and grant updates
+
+**Components**:
+- MailChannels integration for Cloudflare Workers
+- User registration confirmation emails
+- Grant deadline reminder system
+- Application status notifications
+
+**Implementation**:
+- Create `api/src/services/emailService.js`
+- Integrate with user registration endpoint
+- Add email templates for different notification types
+- Configure environment variables for email provider
+
+**Acceptance Criteria**:
+- [ ] Users receive confirmation emails upon registration
+- [ ] Email service handles failures gracefully
+- [ ] Email templates are professional and branded
+- [ ] Rate limiting prevents spam/abuse
+
+#### 1.3 Basic Telemetry
+**Objective**: Add essential monitoring and logging for platform health
+
+**Metrics**:
+- API request/response times
+- Grant search success/failure rates
+- User registration and conversion metrics
+- Error frequency and types
+
+**Implementation**:
+- Request logging middleware
+- Performance metrics collection
+- Error tracking and categorization
+- Basic health monitoring dashboard
+
+**Acceptance Criteria**:
+- [ ] All API endpoints log request/response metrics
+- [ ] Error rates are tracked and categorized
+- [ ] Performance metrics are collected consistently
+- [ ] Telemetry data is structured and queryable
+
+### Tier 2: User Experience (Priority: High)
+
+#### 2.1 Advanced Search Filters
+**Objective**: Provide granular search capabilities for grant discovery
+
+**Features**:
+- Agency-specific filtering
+- Funding amount range selection
+- Deadline proximity filters
+- Eligibility criteria matching
+
+**UI Enhancements**:
+- Collapsible filter panel
+- Multi-select agency options
+- Date range picker for deadlines
+- Save search preferences
+
+**Acceptance Criteria**:
+- [ ] Users can filter by multiple agencies simultaneously
+- [ ] Amount ranges are clearly defined and functional
+- [ ] Deadline filters show grants within specified timeframes
+- [ ] Filter combinations work correctly together
+- [ ] Search preferences persist across sessions
+
+#### 2.2 Proposal Templates
+**Objective**: Streamline proposal creation with pre-built templates
+
+**Template Types**:
+- SBIR Phase I/II templates
+- STTR program templates
+- Department-specific formats
+- Industry vertical templates
+
+**Features**:
+- Template preview functionality
+- Customizable template sections
+- AI-powered template recommendations
+- Version control for templates
+
+**Acceptance Criteria**:
+- [ ] Multiple template types are available
+- [ ] Templates generate properly formatted proposals
+- [ ] Users can customize template sections
+- [ ] Template recommendations are relevant to user profile
+
+#### 2.3 User Dashboard
+**Objective**: Centralized application tracking and management
+
+**Dashboard Components**:
+- Application status tracking
+- Deadline calendar view
+- Success rate analytics
+- Document management
+
+**Features**:
+- Visual application pipeline
+- Automated deadline reminders
+- Progress tracking per application
+- Success metrics and insights
+
+**Acceptance Criteria**:
+- [ ] Users can track all applications in one view
+- [ ] Application statuses are clearly displayed
+- [ ] Deadline notifications are timely and accurate
+- [ ] Dashboard loads quickly with good UX
+
+### Tier 3: Business Intelligence (Priority: Medium)
+
+#### 3.1 Analytics Dashboard
+**Objective**: Provide business intelligence for platform optimization
+
+**Analytics Features**:
+- Grant success rate analysis
+- Popular grant categories
+- User engagement metrics
+- Revenue optimization insights
+
+**Implementation**:
+- Data aggregation pipeline
+- Visualization components
+- Automated reporting
+- Performance benchmarking
+
+**Acceptance Criteria**:
+- [ ] Success rates are accurately calculated and displayed
+- [ ] Popular grants are identified and highlighted
+- [ ] User engagement patterns are tracked
+- [ ] Revenue metrics are integrated and actionable
+
+#### 3.2 A/B Testing Framework
+**Objective**: Enable data-driven UX optimization
+
+**Testing Capabilities**:
+- UI component variations
+- Proposal generation approaches
+- Pricing strategy experiments
+- User flow optimizations
+
+**Infrastructure**:
+- Feature flag system
+- Experiment tracking
+- Statistical significance testing
+- Results analysis tools
+
+**Acceptance Criteria**:
+- [ ] A/B tests can be configured without code deployment
+- [ ] Statistical significance is properly calculated
+- [ ] Results are clearly presented with actionable insights
+- [ ] Tests can be safely rolled back if needed
+
+#### 3.3 Advanced AI Features
+**Objective**: Implement sophisticated AI capabilities for enhanced user value
+
+**AI Enhancements**:
+- Intelligent grant matching algorithms
+- Proposal quality scoring
+- Success prediction modeling
+- Personalized recommendations
+
+**Technical Implementation**:
+- Machine learning integration
+- Natural language processing
+- Predictive analytics
+- Recommendation engine
+
+**Acceptance Criteria**:
+- [ ] Matching algorithms improve grant discovery relevance
+- [ ] Proposals receive actionable quality feedback  
+- [ ] Success predictions are calibrated and useful
+- [ ] Recommendations drive user engagement
+
+## Implementation Strategy
+
+### Decomposition Strategy Notes
+- **Tier 1** focuses on platform stability and essential functionality
+- **Tier 2** enhances user experience and engagement
+- **Tier 3** adds advanced features for competitive differentiation
+- Each tier builds upon the previous tier's foundations
+- Implementation follows agile principles with iterative releases
+
+### Risk Assessment
+
+**High Risk**:
+- Live data API reliability and rate limits
+- Email deliverability and spam prevention
+- AI integration complexity and costs
+
+**Medium Risk**:
+- User adoption of advanced features
+- Performance impact of new telemetry
+- Template maintenance and updates
+
+**Low Risk**:
+- UI enhancements and filtering
+- Dashboard implementation
+- Basic analytics features
+
+### Success Metrics
+
+**Tier 1 Success Indicators**:
+- 99%+ API uptime
+- <500ms average response time
+- 95%+ email delivery rate
+- Zero critical data source errors
+
+**Tier 2 Success Indicators**:
+- 40%+ improvement in grant discovery success
+- 60%+ user engagement with templates
+- 25%+ increase in application completion rate
+
+**Tier 3 Success Indicators**:
+- 20%+ improvement in grant success predictions
+- 15%+ increase in user retention
+- 30%+ improvement in conversion rates
+
+## Sequenced Execution Checklist
+
+### Sprint 0: Foundation Setup
+1. [ ] **Environment Configuration**
+   - [ ] Set up email service environment variables
+   - [ ] Configure telemetry collection endpoints
+   - [ ] Validate live data API credentials
+
+2. [ ] **Infrastructure Preparation**
+   - [ ] Create services directory structure
+   - [ ] Set up logging framework
+   - [ ] Configure error handling middleware
+
+### Sprint 1: Live Data Enhancement (Week 1)
+3. [ ] **Data Parser Improvements**
+   - [ ] Fix misleading data source reporting
+   - [ ] Add transparency fields to API responses
+   - [ ] Implement comprehensive error handling
+   - [ ] Add configurable fallback behavior
+   - [ ] Test with various API failure scenarios
+
+4. [ ] **Grant Details Enhancement** 
+   - [ ] Extend live integration to details endpoint
+   - [ ] Add structured error responses
+   - [ ] Implement request logging
+   - [ ] Verify endpoint reliability
+
+### Sprint 2: Email Service Implementation (Week 2)
+5. [ ] **Email Service Development**
+   - [ ] Create emailService.js module
+   - [ ] Implement MailChannels integration
+   - [ ] Design email templates
+   - [ ] Add rate limiting protection
+
+6. [ ] **Registration Integration**
+   - [ ] Integrate email service with registration endpoint
+   - [ ] Add email confirmation workflow
+   - [ ] Implement delivery verification
+   - [ ] Test email functionality end-to-end
+
+### Sprint 3: Telemetry Implementation (Week 3)
+7. [ ] **Basic Telemetry Setup**
+   - [ ] Add request/response logging middleware
+   - [ ] Implement performance metrics collection
+   - [ ] Create error categorization system
+   - [ ] Set up basic health monitoring
+
+8. [ ] **Telemetry Integration**
+   - [ ] Integrate telemetry across all endpoints
+   - [ ] Add structured logging format
+   - [ ] Implement metric aggregation
+   - [ ] Verify telemetry data quality
+
+### Sprint 4: Advanced Search Filters (Week 4)
+9. [ ] **Filter Backend Implementation**
+   - [ ] Add agency filtering to search endpoint
+   - [ ] Implement amount range filtering
+   - [ ] Add deadline proximity filters
+   - [ ] Create filter combination logic
+
+10. [ ] **Filter Frontend Development**
+    - [ ] Design collapsible filter panel UI
+    - [ ] Implement multi-select agency options
+    - [ ] Add date range picker component
+    - [ ] Integrate filter state management
+
+### Sprint 5: Proposal Templates (Week 5-6)
+11. [ ] **Template System Backend**
+    - [ ] Create template storage and retrieval
+    - [ ] Implement template versioning
+    - [ ] Add template recommendation logic
+    - [ ] Design template customization API
+
+12. [ ] **Template Frontend Interface**
+    - [ ] Build template preview functionality
+    - [ ] Create template selection UI
+    - [ ] Implement customization interface
+    - [ ] Add template management tools
+
+### Sprint 6: User Dashboard (Week 7-8)
+13. [ ] **Dashboard Backend Services**
+    - [ ] Create application tracking data model
+    - [ ] Implement dashboard data API
+    - [ ] Add calendar integration
+    - [ ] Build analytics aggregation
+
+14. [ ] **Dashboard Frontend Development**
+    - [ ] Design dashboard layout and components
+    - [ ] Implement application status tracking
+    - [ ] Add deadline calendar view
+    - [ ] Create success metrics display
+
+### Sprint 7: Analytics & Intelligence (Week 9-10)
+15. [ ] **Advanced Features Implementation**
+    - [ ] Implement analytics dashboard
+    - [ ] Add A/B testing framework
+    - [ ] Integrate advanced AI features
+    - [ ] Conduct comprehensive testing
+
+## Environment Variables
+
+### Required New Variables
+```bash
+# Email Service Configuration
+MAIL_FROM="noreply@voidcat.org"
+MAIL_PROVIDER="mailchannels"  # or "resend"
+
+# Telemetry Configuration  
+TELEMETRY_ENDPOINT="https://analytics.voidcat.org/collect"
+LOG_LEVEL="INFO"
+
+# Feature Flags
+ENABLE_LIVE_DATA="true"
+ENABLE_EMAIL_NOTIFICATIONS="true"
+ENABLE_ADVANCED_FILTERS="false"
 ```
 
-Transform & return. Maintain existing fallback if empty.
+## Testing Strategy
 
-**Acceptance Criteria:**
+### Unit Tests
+- Email service functionality
+- Filter logic validation
+- Template generation accuracy
+- Telemetry data collection
 
-- Live query to real endpoint yields >= N ( > mock length ) dynamic results.
-- Fallback only triggered when fetch/network/parse fails (logged once per request id).
-- Frontend displays live titles differing from mock set.
+### Integration Tests
+- End-to-end grant search workflows
+- User registration with email confirmation
+- Dashboard data aggregation
+- API error handling scenarios
 
-**Success Metric:** 0% unintended mock usage (sample 50 requests) after deploy.
+### Performance Tests
+- Load testing for enhanced endpoints
+- Email service rate limiting
+- Dashboard rendering performance
+- Live data API integration stress tests
 
-**Risks:** Unexpected future schema variants → mitigate with lenient parsing & length check.
+## Deployment Considerations
 
-### 2. Transactional Email Enablement (Registration)
+### Staging Environment
+- Separate Cloudflare Worker for testing
+- Mock email service for development
+- Test data sets for various scenarios
+- Performance monitoring setup
 
-**Problem:** No outbound emails → users lack delivered API key / onboarding trust.
-
-**Action:** Integrate MailChannels (native for Workers) or SendGrid via REST. Abstract in `emailService.sendRegistration({email, apiKey})` using `c.executionCtx.waitUntil()`.
-
-**Acceptance Criteria:**
-
-- Registration response time unaffected (< 500ms P50 local).
-- Email received (manual test) containing API key & brief onboarding instructions.
-- On failure: registration still succeeds; email task logs structured warning.
-
-**Success Metric:** 95%+ delivery success (measure via provider logs) over first 100 signups.
-
-**Risks:** Provider quota; ensure feature flag + retry/backoff.
-
----
-## Tier 2 – High-Impact Security & UX
-
-### 1. Rate Limiting (Proposal Generation Endpoint)
-
-**Problem:** Unbounded expensive operations → cost & abuse vector.
-
-**Action:** Implement per-user (API key hash) sliding window or fixed window counter in Cloudflare KV. Key pattern: `rl:{apiKey}:{yyyymmddhhmm}` for minute buckets. Limit initial: 12/min (configurable). Return 429 JSON with retry-after.
-
-**Acceptance Criteria:**
-
-- Surpasses allowed threshold → deterministically returns 429.
-- Under threshold unaffected (latency impact < 10ms overhead).
-- Log structured event on throttle (key, count, windowStart, ipHash).
-
-**Success Metric:** 100% enforcement accuracy in load test; no cross-user bleed.
-
-**Risks:** Clock skew minimal; ensure atomic increment (KV eventual consistency) — fallback to durable object in future if abuse persists.
-
-### 2. Proposal Generation & Auth UX Polish
-
-**Action Bundle:**
-
-1. Replace `alert()` with modal component (Alpine.js) rendering structured sections and copy buttons.
-2. Add "Download as Markdown" button (client-side blob export).
-3. Add dedicated login/unlock modal replacing `window.prompt`; store email in `localStorage` with explicit user consent.
-4. Respect accessibility: focus trap + ESC close.
-
-**Acceptance Criteria:**
-
-- Proposal modal open/close without layout shift; copy buttons work (navigator.clipboard).
-- Markdown export downloads with meaningful filename `proposal-<grantId>-<date>.md`.
-- Login modal appears only if session/email not yet set; re-auth path available.
-
-**Success Metric:** Task completion time (user copy & save) reduced by >50% vs legacy flow (qualitative initial test). 0 console errors.
-
-**Risks:** Clipboard API permissions; provide fallback selection highlight.
+### Production Rollout
+- Feature flag controlled deployment
+- Gradual rollout of new features
+- Monitoring and alerting setup
+- Rollback procedures for critical issues
 
 ---
-## Tier 3 – Foundational & Scalability
 
-### 1. Modularize Backend
-
-**Action:** Introduce structure (phased). Phase A occurs after Tier 1 deploy is stable.
-
-```text
-api/src/
-  routes/
-    grants.js
-    users.js
-    proposals.js
-    health.js
-  services/
-    grantFetcher.js
-    proposalGenerator.js
-    emailService.js
-    rateLimiter.js
-  db/
-    usersRepository.js
-  util/
-    logger.js
-    response.js
-  index.js (composition root)
-```
-
-**Acceptance Criteria:**
-
-- All existing endpoints continue functioning (snapshot contract tests pass).
-- No circular deps; each file < 300 lines.
-- Clear separation: routes = HTTP wiring; services = logic; db = persistence.
-
-**Success Metric:** Mean time to locate code for endpoint (< 10s subjective). Lines in `index.js` reduced by >70%.
-
-**Risks:** Merge conflicts; mitigate by doing after quiet period + feature freeze.
-
-### 2. Traditional Password Login (Future Iteration)
-
-**Action:**
-
-- Schema: add `hashed_password` column.
-- Endpoint: `POST /api/users/login` returns signed JWT (HMAC secret in Worker secret). Keep API key issuance separate.
-- Hash: bcrypt via edge-compatible lib or Argon2 wasm (benchmark size).
-
-**Acceptance Criteria:**
-
-- Register path optionally accepts password (feature flag). Login returns 200 with token; invalid creds → 401.
-- JWT validated on protected endpoints when `Authorization: Bearer` header present; fallback to apiKey header preserved.
-
-**Success Metric:** >80% new interactive users choose password auth after rollout (track adoption metric).
-
-**Risks:** Token revocation complexity; postpone refresh tokens until needed.
-
-### 3. Improved Mock Data System
-
-**Action:**
-
-- Move static list to `api/src/data/mock-grants.json`.
-- Add update script `scripts/update-mock-grants.js` fetching snapshot & transforming.
-- (Later) GitHub Action (cron weekly) runs script & commits changes.
-
-**Acceptance Criteria:**
-
-- Fallback uses JSON file; editing file updates served data without code change.
-- Script run produces valid JSON < 1MB; includes timestamp metadata.
-
-**Success Metric:** Mock dataset size within 80–120% of average real live result count.
-
-**Risks:** External API instability; implement retry/backoff in script.
-
----
----
-## Tier 4 – Long-Term & Minor
-
-### 1. Externalize Configuration
-
-**Action:** Replace in-file constants with `c.env.*` reads. Provide defaults in dev. Document required keys in `ENVIRONMENT-VARIABLES.md`.
-
-**Acceptance Criteria:**
-
-- All environment-dependent behavior configurable without code edits.
-- Missing required var → logged error + safe fallback.
-
-**Success Metric:** Zero config diffs needed for environment-specific deploys.
-
-### 2. Edge & Error Test Coverage
-
-**Action:** Expand Playwright & add light API contract tests.
-
-- Cases: empty results, rate-limit 429 handling, network failure banner, malformed auth token, proposal generation error state.
-
-**Acceptance Criteria:**
-
-- New tests isolated (tags) and runnable subset: `npx playwright test --grep @edge`.
-- Failure surfaces meaningful error UI messages (no raw stack traces).
-
-**Success Metric:** Edge-case test count +15 without >5% runtime increase.
-
----
- 
-## Cross-Cutting Additions
-
-- Structured Logging: Introduce `logger.js` with context fields (requestId, userId/apiKeyHash).
-- Request Correlation: Generate UUID per request; attach to all log lines.
-- Basic Metrics (Phase 0): Count proposal generations + rate-limit hits (console/log aggregator baseline).
-- Security Headers: Ensure CORS & add `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` minimal set.
-
----
- 
-## Sequenced Checklist (Execution Order)
-
-1. [x] Patch live data parsing (Tier 1.1) — implemented
-
-    - [ ] Verify live data results exceed mock baseline
-
-2. [ ] Add lightweight telemetry for mock fallback detection
-
-    - Partial: schema and length logs added; fallback flag present
-
-3. [ ] Implement + test email sending (Tier 1.2)
-
-    - [x] Backend email service created and integrated (`waitUntil`)
-    - [ ] Verify delivery via provider logs and manual inbox test
-
-4. [ ] Deploy Tier 1; smoke test health/search/register
-5. [ ] Implement KV rate limiter + tests (Tier 2.1)
-6. [ ] UX overhaul: proposal modal + login modal (Tier 2.2)
-7. [ ] Deploy Tier 2; run full E2E
-8. [ ] Introduce logging & request IDs (Cross-cut) (can parallel step 6)
-9. [ ] Modularize backend (Tier 3.1 Phase A)
-10. [ ] Externalize configuration (Tier 4.1 – earlier if minimal friction)
-11. [ ] Mock data system revamp (Tier 3.3)
-12. [ ] Add edge/error test suite (@edge tag) (Tier 4.2)
-13. [ ] Password auth groundwork (schema + hashing) (Tier 3.2)
-14. [ ] JWT auth endpoints & dual-mode security layer
-15. [ ] Metrics counters & (optional) dashboard stub
-
----
- 
-## Acceptance Review Framework
-
-For each shipped batch:
-
-- Functional Verification: Manual curl + targeted Playwright subset
-- Regression Guard: Full Playwright run after Tier 2 & Tier 3 major refactor
-- Metrics Snapshot: Record baseline counts (proposal requests, rate-limit hits)
-- Rollback Plan: Keep previous Worker version for instant revert (Wrangler supports quick rollback)
-
----
- 
-## Risk Register (Top Five)
-
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Live API schema future change | Data blanking | Lenient parser + alert if < threshold count |
-| Email provider outage | Onboarding trust loss | Queue + retry; log; offer resend endpoint later |
-| Rate limit false positives (KV latency) | User frustration | Conservative threshold + future durable object upgrade |
-| Refactor introduces regressions | Broken prod | Contract tests + phased file moves |
-| Password auth increases attack surface | Security breach | Strong hashing, lockouts later, keep API key path separate |
-
----
- 
-## Metrics & Observability (Initial)
-
-- grant_search_live_ratio = live_results / total_requests
-- proposal_requests_per_user_minute (sampled)
-- rate_limit_block_count
-- email_send_success_rate
-- mock_fallback_incidents
-- avg_proposal_generation_latency_ms
-
-(Collected initially via structured logs; formal metrics pipeline later.)
-
----
- 
-## Documentation Updates Required
-
-- `README.md`: Note live data fix + email requirement.
-- `ENVIRONMENT-VARIABLES.md`: Add mail provider + rate limit vars.
-- `SECURITY.md`: Add rate limiting + password auth roadmap.
-- `PRODUCTION_READINESS.md`: Update with metrics & logging approach.
-
----
- 
-## Fast Reference – New/Planned Env Vars
-
-| Variable | Purpose | Example |
-|----------|---------|---------|
-| `MAIL_FROM` | Sender identity | `noreply@voidcat.org` |
-| `MAIL_PROVIDER` | Switch implementation | `mailchannels` |
-| `RATE_LIMIT_PER_MIN` | Configurable cap | `12` |
-| `JWT_SECRET` | Signing login tokens | (secret) |
-| `USE_LIVE_DATA` | Override for fallback testing | `true` |
-
----
- 
-## Decomposition Strategy Notes
-
-Only begin modularization once Tier 1 & 2 stable. Use thin wrapper exports to avoid massive diff. Maintain route registration order. Introduce unit-test harness incrementally.
-
----
- 
-## Go / No-Go Criteria for Major Steps
-
-- Proceed to Tier 2 only after live data ratio >90% & emails confirmed.
-- Proceed to modularization only after rate limiting + UX deploy with <2 critical bugs reported in 72h.
-
----
- 
-## Next Immediate Actions (Sprint 0)
-
-1. Implement live data parser patch.
-2. Verify in local dev with real endpoint sample.
-3. Begin email service abstraction file (stub).
-
----
-Prepared for VoidCat RDC – Engineered for resilient, incremental evolution.
+*Enhancement Plan Version: 1.0*  
+*Last Updated: 2025-01-09*  
+*Next Review: After Tier 1 completion*
