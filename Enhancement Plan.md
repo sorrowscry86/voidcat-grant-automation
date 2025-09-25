@@ -164,7 +164,7 @@ api/src/
 **Risks:** External API instability; implement retry/backoff in script.
 
 ---
- 
+---
 ## Tier 4 – Long-Term & Minor
 
 ### 1. Externalize Configuration
