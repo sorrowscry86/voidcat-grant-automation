@@ -7,6 +7,7 @@ import { cors } from 'hono/cors';
 import Stripe from 'stripe';
 import EmailService from './services/emailService.js';
 import TelemetryService from './services/telemetryService.js';
+import TemplateService from './services/templateService.js';
 
 const app = new Hono();
 
@@ -635,7 +636,19 @@ function assessTechnicalComplexity(title) {
 // Basic grant search endpoint
 app.get('/api/grants/search', async (c) => {
   try {
-    const { query, agency, deadline, amount } = c.req.query();
+    const { 
+      query, 
+      agency, 
+      agencies,  // Support multiple agencies
+      deadline, 
+      deadline_from, 
+      deadline_to,
+      amount, 
+      amount_min, 
+      amount_max,
+      program_type,
+      eligibility 
+    } = c.req.query();
     
     // Validate input parameters
     if (query && query.length > 200) {
@@ -651,6 +664,7 @@ app.get('/api/grants/search', async (c) => {
     let actualDataSource;
     let fallbackOccurred;
     let dataSourceError;
+    let totalAvailable = 0;
     
     try {
       const fetchResult = await fetchLiveGrantData(query, agency);
@@ -658,6 +672,9 @@ app.get('/api/grants/search', async (c) => {
       actualDataSource = fetchResult.actualDataSource;
       fallbackOccurred = fetchResult.fallbackOccurred;
       dataSourceError = fetchResult.error;
+      
+      // Store initial count for filter info
+      totalAvailable = filteredGrants.length;
     } catch (dataError) {
       console.error('Grant data fetch failed:', dataError);
       return c.json({
@@ -668,51 +685,158 @@ app.get('/api/grants/search', async (c) => {
     }
     
     try {
-      // Apply search filters
+      // Apply text search filters
       if (query) {
         const searchQuery = query.toLowerCase().trim();
         filteredGrants = filteredGrants.filter(grant => 
           grant.title.toLowerCase().includes(searchQuery) ||
           grant.description.toLowerCase().includes(searchQuery) ||
-          grant.program.toLowerCase().includes(searchQuery)
+          grant.program.toLowerCase().includes(searchQuery) ||
+          grant.eligibility.toLowerCase().includes(searchQuery)
         );
       }
       
-      if (agency) {
+      // Apply agency filters (enhanced with multi-agency support)
+      if (agency || agencies) {
         const agencyMap = {
           'defense': 'department of defense',
+          'dod': 'department of defense', 
           'nsf': 'national science foundation',
           'energy': 'department of energy',
+          'doe': 'department of energy',
           'darpa': 'darpa',
-          'nasa': 'nasa'
+          'nasa': 'nasa',
+          'nih': 'national institutes of health',
+          'nist': 'national institute of standards',
+          'epa': 'environmental protection agency',
+          'usda': 'department of agriculture'
         };
-        const searchAgency = agencyMap[agency.toLowerCase()] || agency.toLowerCase();
-        filteredGrants = filteredGrants.filter(grant => 
-          grant.agency.toLowerCase().includes(searchAgency)
-        );
-      }
-      
-      // Apply deadline filter if provided
-      if (deadline) {
-        const targetDate = new Date(deadline);
-        if (isNaN(targetDate.getTime())) {
-          return c.json({
-            success: false,
-            error: 'Invalid deadline format. Please use YYYY-MM-DD format.',
-            code: 'INVALID_DATE_FORMAT'
-          }, 400);
+        
+        let targetAgencies = [];
+        
+        // Handle single agency parameter
+        if (agency) {
+          targetAgencies.push(agency);
         }
         
+        // Handle multiple agencies parameter (comma-separated)
+        if (agencies) {
+          targetAgencies = targetAgencies.concat(agencies.split(',').map(a => a.trim()));
+        }
+        
+        // Filter by agencies
+        filteredGrants = filteredGrants.filter(grant => {
+          const grantAgency = grant.agency.toLowerCase();
+          return targetAgencies.some(targetAgency => {
+            const searchAgency = agencyMap[targetAgency.toLowerCase()] || targetAgency.toLowerCase();
+            return grantAgency.includes(searchAgency);
+          });
+        });
+      }
+      
+      // Apply deadline filters (enhanced with date range support)
+      if (deadline || deadline_from || deadline_to) {
         filteredGrants = filteredGrants.filter(grant => {
           const grantDeadline = new Date(grant.deadline);
-          return grantDeadline <= targetDate;
+          if (isNaN(grantDeadline.getTime())) return false;
+          
+          // Single deadline filter (grants closing before this date)
+          if (deadline) {
+            const targetDate = new Date(deadline);
+            if (isNaN(targetDate.getTime())) return false;
+            return grantDeadline <= targetDate;
+          }
+          
+          // Date range filtering
+          let withinRange = true;
+          
+          if (deadline_from) {
+            const fromDate = new Date(deadline_from);
+            if (!isNaN(fromDate.getTime())) {
+              withinRange = withinRange && grantDeadline >= fromDate;
+            }
+          }
+          
+          if (deadline_to) {
+            const toDate = new Date(deadline_to);
+            if (!isNaN(toDate.getTime())) {
+              withinRange = withinRange && grantDeadline <= toDate;
+            }
+          }
+          
+          return withinRange;
+        });
+      }
+      
+      // Apply amount filters (enhanced with range support)
+      if (amount || amount_min || amount_max) {
+        filteredGrants = filteredGrants.filter(grant => {
+          // Extract numeric values from amount string (e.g., "$250,000" or "$100,000 - $500,000")
+          const amountStr = grant.amount.toLowerCase();
+          const amounts = amountStr.match(/\$?([\d,]+)/g) || [];
+          const numericAmounts = amounts.map(a => parseInt(a.replace(/[$,]/g, '')));
+          
+          if (numericAmounts.length === 0) return true; // Keep grants with unclear amounts
+          
+          const minGrantAmount = Math.min(...numericAmounts);
+          const maxGrantAmount = Math.max(...numericAmounts);
+          
+          // Single amount filter (exact match or within range)
+          if (amount) {
+            const targetAmount = parseInt(amount);
+            if (isNaN(targetAmount)) return true;
+            return targetAmount >= minGrantAmount && targetAmount <= maxGrantAmount;
+          }
+          
+          // Amount range filtering
+          let withinRange = true;
+          
+          if (amount_min) {
+            const minAmount = parseInt(amount_min);
+            if (!isNaN(minAmount)) {
+              withinRange = withinRange && maxGrantAmount >= minAmount;
+            }
+          }
+          
+          if (amount_max) {
+            const maxAmount = parseInt(amount_max);
+            if (!isNaN(maxAmount)) {
+              withinRange = withinRange && minGrantAmount <= maxAmount;
+            }
+          }
+          
+          return withinRange;
+        });
+      }
+      
+      // Apply program type filter
+      if (program_type) {
+        const programTypes = program_type.split(',').map(p => p.trim().toLowerCase());
+        filteredGrants = filteredGrants.filter(grant => {
+          const grantProgram = grant.program.toLowerCase();
+          return programTypes.some(type => grantProgram.includes(type));
+        });
+      }
+      
+      // Apply eligibility filter
+      if (eligibility) {
+        const eligibilityTypes = eligibility.split(',').map(e => e.trim().toLowerCase());
+        filteredGrants = filteredGrants.filter(grant => {
+          const grantEligibility = grant.eligibility.toLowerCase();
+          return eligibilityTypes.some(type => grantEligibility.includes(type));
         });
       }
 
-      // Track grant search metrics
+      // Track grant search metrics with enhanced parameters
       const telemetry = c.get('telemetry');
       if (telemetry) {
-        telemetry.trackGrantSearch(query, agency, filteredGrants.length, actualDataSource, fallbackOccurred);
+        telemetry.trackGrantSearch(
+          query, 
+          agency || agencies, 
+          filteredGrants.length, 
+          actualDataSource, 
+          fallbackOccurred
+        );
       }
 
       return c.json({
@@ -723,7 +847,31 @@ app.get('/api/grants/search', async (c) => {
         fallback_occurred: fallbackOccurred,
         timestamp: new Date().toISOString(),
         live_data_ready: DATA_CONFIG.USE_LIVE_DATA,
-        search_params: { query, agency, deadline, amount },
+        search_params: { 
+          query, 
+          agency, 
+          agencies,
+          deadline, 
+          deadline_from, 
+          deadline_to,
+          amount, 
+          amount_min, 
+          amount_max,
+          program_type,
+          eligibility 
+        },
+        filter_info: {
+          total_available: totalAvailable,
+          filtered_count: filteredGrants.length,
+          filters_applied: [
+            query && 'text_search',
+            (agency || agencies) && 'agency_filter', 
+            (deadline || deadline_from || deadline_to) && 'deadline_filter',
+            (amount || amount_min || amount_max) && 'amount_filter',
+            program_type && 'program_type_filter',
+            eligibility && 'eligibility_filter'
+          ].filter(Boolean)
+        },
         ...(fallbackOccurred && dataSourceError && { fallback_reason: dataSourceError })
       });
     } catch (filterError) {
@@ -794,6 +942,182 @@ app.get('/api/grants/:id', async (c) => {
       success: false,
       error: 'Unable to retrieve grant details. Please try again later.',
       code: 'GRANT_DETAILS_ERROR'
+    }, 500);
+  }
+});
+
+// Template endpoints
+// List available proposal templates
+app.get('/api/templates', async (c) => {
+  try {
+    const templateService = new TemplateService();
+    const { category, agency } = c.req.query();
+    
+    const filters = {};
+    if (category) filters.category = category;
+    if (agency) filters.agency = agency;
+    
+    const templates = templateService.getTemplates(filters);
+    
+    return c.json({
+      success: true,
+      count: templates.length,
+      templates: templates,
+      filters_applied: filters,
+      available_categories: ['sbir', 'sttr', 'research'],
+      available_agencies: ['defense', 'nasa', 'nsf', 'energy', 'nih']
+    });
+  } catch (error) {
+    console.error('Template listing error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve templates. Please try again later.',
+      code: 'TEMPLATE_LIST_ERROR'
+    }, 500);
+  }
+});
+
+// Get specific template details
+app.get('/api/templates/:id', async (c) => {
+  try {
+    const templateId = c.req.param('id');
+    const templateService = new TemplateService();
+    
+    if (!templateId || templateId.trim().length === 0) {
+      return c.json({
+        success: false,
+        error: 'Template ID is required',
+        code: 'MISSING_TEMPLATE_ID'
+      }, 400);
+    }
+    
+    try {
+      const template = templateService.getTemplate(templateId);
+      
+      return c.json({
+        success: true,
+        template: template
+      });
+    } catch (templateError) {
+      if (templateError.message.includes('not found')) {
+        return c.json({
+          success: false,
+          error: `Template with ID '${templateId}' was not found`,
+          code: 'TEMPLATE_NOT_FOUND'
+        }, 404);
+      }
+      throw templateError;
+    }
+  } catch (error) {
+    console.error('Template retrieval error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve template details. Please try again later.',
+      code: 'TEMPLATE_RETRIEVAL_ERROR'
+    }, 500);
+  }
+});
+
+// Generate proposal from template
+app.post('/api/templates/:id/generate', async (c) => {
+  try {
+    const templateId = c.req.param('id');
+    const templateService = new TemplateService();
+    
+    if (!templateId || templateId.trim().length === 0) {
+      return c.json({
+        success: false,
+        error: 'Template ID is required',
+        code: 'MISSING_TEMPLATE_ID'
+      }, 400);
+    }
+    
+    let customizations = {};
+    try {
+      customizations = await c.req.json();
+    } catch (parseError) {
+      // Use empty customizations if no body provided
+    }
+    
+    try {
+      const proposal = templateService.generateProposal(templateId, customizations);
+      
+      // Track proposal generation
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.trackProposalGeneration(
+          templateId, 
+          customizations.user_id || null, 
+          true, 
+          Date.now() - Date.now()
+        );
+      }
+      
+      return c.json({
+        success: true,
+        proposal: proposal,
+        template_id: templateId,
+        customizations_applied: Object.keys(customizations).length > 0
+      });
+    } catch (templateError) {
+      if (templateError.message.includes('not found')) {
+        return c.json({
+          success: false,
+          error: `Template with ID '${templateId}' was not found`,
+          code: 'TEMPLATE_NOT_FOUND'
+        }, 404);
+      }
+      throw templateError;
+    }
+  } catch (error) {
+    console.error('Proposal generation error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to generate proposal. Please try again later.',
+      code: 'PROPOSAL_GENERATION_ERROR'
+    }, 500);
+  }
+});
+
+// Get template recommendations for a grant
+app.get('/api/grants/:id/template-recommendations', async (c) => {
+  try {
+    const grantId = c.req.param('id');
+    const templateService = new TemplateService();
+    
+    if (!grantId || grantId.trim().length === 0) {
+      return c.json({
+        success: false,
+        error: 'Grant ID is required',
+        code: 'MISSING_GRANT_ID'
+      }, 400);
+    }
+    
+    // Get grant details first
+    const detailsResult = await fetchLiveGrantDetails(grantId);
+    
+    if (!detailsResult.grant) {
+      return c.json({
+        success: false,
+        error: `Grant with ID '${grantId}' was not found`,
+        code: 'GRANT_NOT_FOUND'
+      }, 404);
+    }
+    
+    const recommendations = templateService.getRecommendations(detailsResult.grant);
+    
+    return c.json({
+      success: true,
+      grant_id: grantId,
+      recommendations: recommendations,
+      count: recommendations.length
+    });
+  } catch (error) {
+    console.error('Template recommendation error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to get template recommendations. Please try again later.',
+      code: 'RECOMMENDATION_ERROR'
     }, 500);
   }
 });
