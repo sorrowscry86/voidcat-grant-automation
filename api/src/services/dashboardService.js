@@ -160,7 +160,11 @@ export class DashboardService {
         notes: notes
       };
 
-      console.log('Application status updated:', updateData);
+      // Log only non-sensitive status and application ID (not user_id or notes)
+      console.log('Application status updated:', {
+        application_id: updateData.application_id,
+        status: updateData.status
+      });
       
       return {
         success: true,
