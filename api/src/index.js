@@ -1,9 +1,11 @@
 // VoidCat RDC Grant Search API Worker - COMPLETE VERSION
 // Deploy as: grant-search-api
 
+
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import Stripe from 'stripe';
+import { sendRegistrationEmail } from './services/emailService.js';
 
 const app = new Hono();
 
@@ -180,9 +182,24 @@ async function fetchLiveGrantData(query, agency) {
       }
       
       const liveData = await response.json();
-      
-      // Transform grants.gov data to our format
-      const transformedGrants = (liveData.opportunities || liveData.data || []).map(grant => ({
+
+      // Accept flexible schema: array or wrapped object
+      let opportunitiesRaw;
+      if (Array.isArray(liveData)) {
+        opportunitiesRaw = liveData;
+      } else if (liveData && typeof liveData === 'object') {
+        opportunitiesRaw = liveData.opportunities || liveData.data || liveData.results || [];
+      } else {
+        opportunitiesRaw = [];
+      }
+
+      if (!Array.isArray(opportunitiesRaw)) {
+        console.warn('Live data schema unexpected, normalizing to empty array', { type: typeof opportunitiesRaw });
+        opportunitiesRaw = [];
+      }
+
+      // Transform grants.gov data (or generic live feed) to internal format
+      const transformedGrants = opportunitiesRaw.map(grant => ({
         id: grant.opportunityId || grant.id || `LIVE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         title: grant.opportunityTitle || grant.title || 'Federal Grant Opportunity',
         agency: grant.agencyName || grant.agency || 'Federal Agency',
@@ -195,7 +212,7 @@ async function fetchLiveGrantData(query, agency) {
         data_source: 'live'
       }));
       
-      console.log(`✅ Live data fetch successful: ${transformedGrants.length} grants from grants.gov API`);
+      console.log(`✅ Live data fetch successful: ${transformedGrants.length} grants (raw length: ${opportunitiesRaw.length})`);
       result.grants = transformedGrants;
       result.actualDataSource = 'live';
       result.fallbackOccurred = false;
@@ -838,6 +855,18 @@ app.post('/api/users/register', async (c) => {
 
       if (result.success) {
         console.log(`User registered successfully: ${email}`);
+        // Send registration email asynchronously
+        c.executionCtx && c.executionCtx.waitUntil(
+          sendRegistrationEmail({ email, apiKey }, c.env)
+            .then(res => {
+              if (!res.success) {
+                console.warn('Registration email failed:', res.error);
+              }
+            })
+            .catch(e => {
+              console.warn('Registration email error:', e.message);
+            })
+        );
         return c.json({
           success: true,
           message: 'User registered successfully',
