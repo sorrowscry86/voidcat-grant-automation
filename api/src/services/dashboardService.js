@@ -190,7 +190,7 @@ export class DashboardService {
         ...applicationData
       };
 
-      console.log('New application added:', newApplication);
+      // console.log removed to avoid logging sensitive user/application data
       
       return {
         success: true,
