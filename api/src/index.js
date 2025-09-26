@@ -5,7 +5,11 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import Stripe from 'stripe';
-import { sendRegistrationEmail } from './services/emailService.js';
+import EmailService from './services/emailService.js';
+import TelemetryService from './services/telemetryService.js';
+import TemplateService from './services/templateService.js';
+import DashboardService from './services/dashboardService.js';
+import ABTestService from './services/abTestService.js';
 
 const app = new Hono();
 
@@ -21,6 +25,12 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 }));
+
+// Telemetry middleware for request/response logging and metrics
+app.use('*', async (c, next) => {
+  const telemetryService = new TelemetryService(c.env);
+  await telemetryService.createMiddleware()(c, next);
+});
 
 // Database helper
 async function getDB(env) {
@@ -628,7 +638,19 @@ function assessTechnicalComplexity(title) {
 // Basic grant search endpoint
 app.get('/api/grants/search', async (c) => {
   try {
-    const { query, agency, deadline, amount } = c.req.query();
+    const { 
+      query, 
+      agency, 
+      agencies,  // Support multiple agencies
+      deadline, 
+      deadline_from, 
+      deadline_to,
+      amount, 
+      amount_min, 
+      amount_max,
+      program_type,
+      eligibility 
+    } = c.req.query();
     
     // Validate input parameters
     if (query && query.length > 200) {
@@ -644,6 +666,7 @@ app.get('/api/grants/search', async (c) => {
     let actualDataSource;
     let fallbackOccurred;
     let dataSourceError;
+    let totalAvailable = 0;
     
     try {
       const fetchResult = await fetchLiveGrantData(query, agency);
@@ -651,6 +674,9 @@ app.get('/api/grants/search', async (c) => {
       actualDataSource = fetchResult.actualDataSource;
       fallbackOccurred = fetchResult.fallbackOccurred;
       dataSourceError = fetchResult.error;
+      
+      // Store initial count for filter info
+      totalAvailable = filteredGrants.length;
     } catch (dataError) {
       console.error('Grant data fetch failed:', dataError);
       return c.json({
@@ -661,45 +687,158 @@ app.get('/api/grants/search', async (c) => {
     }
     
     try {
-      // Apply search filters
+      // Apply text search filters
       if (query) {
         const searchQuery = query.toLowerCase().trim();
         filteredGrants = filteredGrants.filter(grant => 
           grant.title.toLowerCase().includes(searchQuery) ||
           grant.description.toLowerCase().includes(searchQuery) ||
-          grant.program.toLowerCase().includes(searchQuery)
+          grant.program.toLowerCase().includes(searchQuery) ||
+          grant.eligibility.toLowerCase().includes(searchQuery)
         );
       }
       
-      if (agency) {
+      // Apply agency filters (enhanced with multi-agency support)
+      if (agency || agencies) {
         const agencyMap = {
           'defense': 'department of defense',
+          'dod': 'department of defense', 
           'nsf': 'national science foundation',
           'energy': 'department of energy',
+          'doe': 'department of energy',
           'darpa': 'darpa',
-          'nasa': 'nasa'
+          'nasa': 'nasa',
+          'nih': 'national institutes of health',
+          'nist': 'national institute of standards',
+          'epa': 'environmental protection agency',
+          'usda': 'department of agriculture'
         };
-        const searchAgency = agencyMap[agency.toLowerCase()] || agency.toLowerCase();
-        filteredGrants = filteredGrants.filter(grant => 
-          grant.agency.toLowerCase().includes(searchAgency)
-        );
-      }
-      
-      // Apply deadline filter if provided
-      if (deadline) {
-        const targetDate = new Date(deadline);
-        if (isNaN(targetDate.getTime())) {
-          return c.json({
-            success: false,
-            error: 'Invalid deadline format. Please use YYYY-MM-DD format.',
-            code: 'INVALID_DATE_FORMAT'
-          }, 400);
+        
+        let targetAgencies = [];
+        
+        // Handle single agency parameter
+        if (agency) {
+          targetAgencies.push(agency);
         }
         
+        // Handle multiple agencies parameter (comma-separated)
+        if (agencies) {
+          targetAgencies = targetAgencies.concat(agencies.split(',').map(a => a.trim()));
+        }
+        
+        // Filter by agencies
+        filteredGrants = filteredGrants.filter(grant => {
+          const grantAgency = grant.agency.toLowerCase();
+          return targetAgencies.some(targetAgency => {
+            const searchAgency = agencyMap[targetAgency.toLowerCase()] || targetAgency.toLowerCase();
+            return grantAgency.includes(searchAgency);
+          });
+        });
+      }
+      
+      // Apply deadline filters (enhanced with date range support)
+      if (deadline || deadline_from || deadline_to) {
         filteredGrants = filteredGrants.filter(grant => {
           const grantDeadline = new Date(grant.deadline);
-          return grantDeadline <= targetDate;
+          if (isNaN(grantDeadline.getTime())) return false;
+          
+          // Single deadline filter (grants closing before this date)
+          if (deadline) {
+            const targetDate = new Date(deadline);
+            if (isNaN(targetDate.getTime())) return false;
+            return grantDeadline <= targetDate;
+          }
+          
+          // Date range filtering
+          let withinRange = true;
+          
+          if (deadline_from) {
+            const fromDate = new Date(deadline_from);
+            if (!isNaN(fromDate.getTime())) {
+              withinRange = withinRange && grantDeadline >= fromDate;
+            }
+          }
+          
+          if (deadline_to) {
+            const toDate = new Date(deadline_to);
+            if (!isNaN(toDate.getTime())) {
+              withinRange = withinRange && grantDeadline <= toDate;
+            }
+          }
+          
+          return withinRange;
         });
+      }
+      
+      // Apply amount filters (enhanced with range support)
+      if (amount || amount_min || amount_max) {
+        filteredGrants = filteredGrants.filter(grant => {
+          // Extract numeric values from amount string (e.g., "$250,000" or "$100,000 - $500,000")
+          const amountStr = grant.amount.toLowerCase();
+          const amounts = amountStr.match(/\$?([\d,]+)/g) || [];
+          const numericAmounts = amounts.map(a => parseInt(a.replace(/[$,]/g, '')));
+          
+          if (numericAmounts.length === 0) return true; // Keep grants with unclear amounts
+          
+          const minGrantAmount = Math.min(...numericAmounts);
+          const maxGrantAmount = Math.max(...numericAmounts);
+          
+          // Single amount filter (exact match or within range)
+          if (amount) {
+            const targetAmount = parseInt(amount);
+            if (isNaN(targetAmount)) return true;
+            return targetAmount >= minGrantAmount && targetAmount <= maxGrantAmount;
+          }
+          
+          // Amount range filtering
+          let withinRange = true;
+          
+          if (amount_min) {
+            const minAmount = parseInt(amount_min);
+            if (!isNaN(minAmount)) {
+              withinRange = withinRange && maxGrantAmount >= minAmount;
+            }
+          }
+          
+          if (amount_max) {
+            const maxAmount = parseInt(amount_max);
+            if (!isNaN(maxAmount)) {
+              withinRange = withinRange && minGrantAmount <= maxAmount;
+            }
+          }
+          
+          return withinRange;
+        });
+      }
+      
+      // Apply program type filter
+      if (program_type) {
+        const programTypes = program_type.split(',').map(p => p.trim().toLowerCase());
+        filteredGrants = filteredGrants.filter(grant => {
+          const grantProgram = grant.program.toLowerCase();
+          return programTypes.some(type => grantProgram.includes(type));
+        });
+      }
+      
+      // Apply eligibility filter
+      if (eligibility) {
+        const eligibilityTypes = eligibility.split(',').map(e => e.trim().toLowerCase());
+        filteredGrants = filteredGrants.filter(grant => {
+          const grantEligibility = grant.eligibility.toLowerCase();
+          return eligibilityTypes.some(type => grantEligibility.includes(type));
+        });
+      }
+
+      // Track grant search metrics with enhanced parameters
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.trackGrantSearch(
+          query, 
+          agency || agencies, 
+          filteredGrants.length, 
+          actualDataSource, 
+          fallbackOccurred
+        );
       }
 
       return c.json({
@@ -710,7 +849,31 @@ app.get('/api/grants/search', async (c) => {
         fallback_occurred: fallbackOccurred,
         timestamp: new Date().toISOString(),
         live_data_ready: DATA_CONFIG.USE_LIVE_DATA,
-        search_params: { query, agency, deadline, amount },
+        search_params: { 
+          query, 
+          agency, 
+          agencies,
+          deadline, 
+          deadline_from, 
+          deadline_to,
+          amount, 
+          amount_min, 
+          amount_max,
+          program_type,
+          eligibility 
+        },
+        filter_info: {
+          total_available: totalAvailable,
+          filtered_count: filteredGrants.length,
+          filters_applied: [
+            query && 'text_search',
+            (agency || agencies) && 'agency_filter', 
+            (deadline || deadline_from || deadline_to) && 'deadline_filter',
+            (amount || amount_min || amount_max) && 'amount_filter',
+            program_type && 'program_type_filter',
+            eligibility && 'eligibility_filter'
+          ].filter(Boolean)
+        },
         ...(fallbackOccurred && dataSourceError && { fallback_reason: dataSourceError })
       });
     } catch (filterError) {
@@ -785,6 +948,182 @@ app.get('/api/grants/:id', async (c) => {
   }
 });
 
+// Template endpoints
+// List available proposal templates
+app.get('/api/templates', async (c) => {
+  try {
+    const templateService = new TemplateService();
+    const { category, agency } = c.req.query();
+    
+    const filters = {};
+    if (category) filters.category = category;
+    if (agency) filters.agency = agency;
+    
+    const templates = templateService.getTemplates(filters);
+    
+    return c.json({
+      success: true,
+      count: templates.length,
+      templates: templates,
+      filters_applied: filters,
+      available_categories: ['sbir', 'sttr', 'research'],
+      available_agencies: ['defense', 'nasa', 'nsf', 'energy', 'nih']
+    });
+  } catch (error) {
+    console.error('Template listing error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve templates. Please try again later.',
+      code: 'TEMPLATE_LIST_ERROR'
+    }, 500);
+  }
+});
+
+// Get specific template details
+app.get('/api/templates/:id', async (c) => {
+  try {
+    const templateId = c.req.param('id');
+    const templateService = new TemplateService();
+    
+    if (!templateId || templateId.trim().length === 0) {
+      return c.json({
+        success: false,
+        error: 'Template ID is required',
+        code: 'MISSING_TEMPLATE_ID'
+      }, 400);
+    }
+    
+    try {
+      const template = templateService.getTemplate(templateId);
+      
+      return c.json({
+        success: true,
+        template: template
+      });
+    } catch (templateError) {
+      if (templateError.message.includes('not found')) {
+        return c.json({
+          success: false,
+          error: `Template with ID '${templateId}' was not found`,
+          code: 'TEMPLATE_NOT_FOUND'
+        }, 404);
+      }
+      throw templateError;
+    }
+  } catch (error) {
+    console.error('Template retrieval error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve template details. Please try again later.',
+      code: 'TEMPLATE_RETRIEVAL_ERROR'
+    }, 500);
+  }
+});
+
+// Generate proposal from template
+app.post('/api/templates/:id/generate', async (c) => {
+  try {
+    const templateId = c.req.param('id');
+    const templateService = new TemplateService();
+    
+    if (!templateId || templateId.trim().length === 0) {
+      return c.json({
+        success: false,
+        error: 'Template ID is required',
+        code: 'MISSING_TEMPLATE_ID'
+      }, 400);
+    }
+    
+    let customizations = {};
+    try {
+      customizations = await c.req.json();
+    } catch (parseError) {
+      // Use empty customizations if no body provided
+    }
+    
+    try {
+      const proposal = templateService.generateProposal(templateId, customizations);
+      
+      // Track proposal generation
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.trackProposalGeneration(
+          templateId, 
+          customizations.user_id || null, 
+          true, 
+          Date.now() - Date.now()
+        );
+      }
+      
+      return c.json({
+        success: true,
+        proposal: proposal,
+        template_id: templateId,
+        customizations_applied: Object.keys(customizations).length > 0
+      });
+    } catch (templateError) {
+      if (templateError.message.includes('not found')) {
+        return c.json({
+          success: false,
+          error: `Template with ID '${templateId}' was not found`,
+          code: 'TEMPLATE_NOT_FOUND'
+        }, 404);
+      }
+      throw templateError;
+    }
+  } catch (error) {
+    console.error('Proposal generation error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to generate proposal. Please try again later.',
+      code: 'PROPOSAL_GENERATION_ERROR'
+    }, 500);
+  }
+});
+
+// Get template recommendations for a grant
+app.get('/api/grants/:id/template-recommendations', async (c) => {
+  try {
+    const grantId = c.req.param('id');
+    const templateService = new TemplateService();
+    
+    if (!grantId || grantId.trim().length === 0) {
+      return c.json({
+        success: false,
+        error: 'Grant ID is required',
+        code: 'MISSING_GRANT_ID'
+      }, 400);
+    }
+    
+    // Get grant details first
+    const detailsResult = await fetchLiveGrantDetails(grantId);
+    
+    if (!detailsResult.grant) {
+      return c.json({
+        success: false,
+        error: `Grant with ID '${grantId}' was not found`,
+        code: 'GRANT_NOT_FOUND'
+      }, 404);
+    }
+    
+    const recommendations = templateService.getRecommendations(detailsResult.grant);
+    
+    return c.json({
+      success: true,
+      grant_id: grantId,
+      recommendations: recommendations,
+      count: recommendations.length
+    });
+  } catch (error) {
+    console.error('Template recommendation error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to get template recommendations. Please try again later.',
+      code: 'RECOMMENDATION_ERROR'
+    }, 500);
+  }
+});
+
 // User registration endpoint
 app.post('/api/users/register', async (c) => {
   try {
@@ -855,18 +1194,45 @@ app.post('/api/users/register', async (c) => {
 
       if (result.success) {
         console.log(`User registered successfully: ${email}`);
-        // Send registration email asynchronously
-        c.executionCtx && c.executionCtx.waitUntil(
-          sendRegistrationEmail({ email, apiKey }, c.env)
-            .then(res => {
-              if (!res.success) {
-                console.warn('Registration email failed:', res.error);
+        
+        // Send welcome email asynchronously (don't block registration response)
+        c.executionCtx.waitUntil((async () => {
+          try {
+            const emailService = new EmailService(c.env);
+            const emailData = emailService.generateRegistrationEmail({
+              name: name,
+              email: email,
+              apiKey: apiKey
+            });
+            
+            const emailResult = await emailService.sendEmail(emailData);
+            const telemetry = c.get('telemetry');
+            
+            if (emailResult.success) {
+              console.log(`Welcome email sent successfully to: ${email}`);
+              if (telemetry) {
+                telemetry.trackEmailDelivery(email, 'registration', true, emailResult.provider);
               }
-            })
-            .catch(e => {
-              console.warn('Registration email error:', e.message);
-            })
-        );
+            } else {
+              console.error(`Failed to send welcome email to ${email}:`, emailResult.error);
+              if (telemetry) {
+                telemetry.trackEmailDelivery(email, 'registration', false, emailResult.provider);
+              }
+            }
+          } catch (emailError) {
+            console.error(`Email service error for ${email}:`, emailError.message);
+            const telemetry = c.get('telemetry');
+            if (telemetry) {
+              telemetry.trackEmailDelivery(email, 'registration', false, 'unknown');
+            }
+          }
+        })());
+        
+        // Track successful registration
+        const telemetry = c.get('telemetry');
+        if (telemetry) {
+          telemetry.trackUserRegistration(email, true, 'free');
+        }
         return c.json({
           success: true,
           message: 'User registered successfully',
@@ -1153,6 +1519,314 @@ app.post('/api/grants/generate-proposal', async (c) => {
       success: false,
       error: 'Proposal generation service encountered an unexpected error. Please try again.',
       code: 'PROPOSAL_GENERATION_ERROR'
+    }, 500);
+  }
+});
+
+// Dashboard endpoints
+// Get user dashboard data
+app.get('/api/dashboard', async (c) => {
+  try {
+    // Check authentication
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ 
+        success: false, 
+        error: 'Authentication required. Please provide an API key to access dashboard.',
+        code: 'AUTH_REQUIRED'
+      }, 401);
+    }
+
+    const apiKey = authHeader.substring(7);
+    const dashboardService = new DashboardService(c.env);
+    
+    // In production, validate API key and get user ID from database
+    // For demo, use a mock user ID
+    const userId = `user-${apiKey.substring(0, 8)}`;
+    
+    const dashboardData = await dashboardService.getUserDashboard(userId, apiKey);
+    
+    return c.json({
+      success: true,
+      dashboard: dashboardData,
+      user_id: userId
+    });
+  } catch (error) {
+    console.error('Dashboard retrieval error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve dashboard data. Please try again later.',
+      code: 'DASHBOARD_ERROR'
+    }, 500);
+  }
+});
+
+// Update application status
+app.put('/api/dashboard/applications/:id', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ 
+        success: false, 
+        error: 'Authentication required.',
+        code: 'AUTH_REQUIRED'
+      }, 401);
+    }
+
+    const applicationId = c.req.param('id');
+    const apiKey = authHeader.substring(7);
+    const userId = `user-${apiKey.substring(0, 8)}`;
+    
+    let updateData;
+    try {
+      updateData = await c.req.json();
+    } catch (parseError) {
+      return c.json({
+        success: false,
+        error: 'Invalid request format. Please send valid JSON data.',
+        code: 'INVALID_JSON'
+      }, 400);
+    }
+
+    const { status, notes } = updateData;
+    
+    if (!status) {
+      return c.json({
+        success: false,
+        error: 'Status is required for application update',
+        code: 'MISSING_STATUS'
+      }, 400);
+    }
+
+    const dashboardService = new DashboardService(c.env);
+    const result = await dashboardService.updateApplicationStatus(userId, applicationId, status, notes);
+    
+    return c.json(result);
+  } catch (error) {
+    console.error('Application update error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to update application status. Please try again later.',
+      code: 'APPLICATION_UPDATE_ERROR'
+    }, 500);
+  }
+});
+
+// Add new application to tracking
+app.post('/api/dashboard/applications', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ 
+        success: false, 
+        error: 'Authentication required.',
+        code: 'AUTH_REQUIRED'
+      }, 401);
+    }
+
+    const apiKey = authHeader.substring(7);
+    const userId = `user-${apiKey.substring(0, 8)}`;
+    
+    let applicationData;
+    try {
+      applicationData = await c.req.json();
+    } catch (parseError) {
+      return c.json({
+        success: false,
+        error: 'Invalid request format. Please send valid JSON data.',
+        code: 'INVALID_JSON'
+      }, 400);
+    }
+
+    const { grant_id, grant_title, agency, deadline, amount } = applicationData;
+    
+    if (!grant_id || !grant_title) {
+      return c.json({
+        success: false,
+        error: 'Grant ID and title are required',
+        code: 'MISSING_REQUIRED_FIELDS'
+      }, 400);
+    }
+
+    const dashboardService = new DashboardService(c.env);
+    const result = await dashboardService.addApplication(userId, grant_id, applicationData);
+    
+    return c.json(result);
+  } catch (error) {
+    console.error('Add application error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to add application to tracking. Please try again later.',
+      code: 'ADD_APPLICATION_ERROR'
+    }, 500);
+  }
+});
+
+// Get analytics data (admin endpoint)
+app.get('/api/analytics', async (c) => {
+  try {
+    const { timeframe } = c.req.query();
+    const dashboardService = new DashboardService(c.env);
+    
+    const analytics = await dashboardService.getAnalytics(timeframe || '30d');
+    
+    return c.json({
+      success: true,
+      analytics: analytics
+    });
+  } catch (error) {
+    console.error('Analytics retrieval error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve analytics data. Please try again later.',
+      code: 'ANALYTICS_ERROR'
+    }, 500);
+  }
+});
+
+// A/B Testing and Feature Flags endpoints
+// Get user's feature flags and experiment variants
+app.get('/api/feature-flags', async (c) => {
+  try {
+    const { user_id } = c.req.query();
+    const abTestService = new ABTestService(c.env);
+    
+    // Use user_id from query param or generate from IP for anonymous users
+    const userId = user_id || `anon-${c.req.header('CF-Connecting-IP') || 'unknown'}`;
+    
+    const featureFlags = abTestService.getFeatureFlags(userId);
+    
+    return c.json({
+      success: true,
+      ...featureFlags
+    });
+  } catch (error) {
+    console.error('Feature flags retrieval error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve feature flags. Using defaults.',
+      feature_flags: {
+        advanced_search: true,
+        template_recommendations: true,
+        dashboard_analytics: true,
+        email_notifications: true
+      }
+    }, 200); // Return 200 with defaults to not break functionality
+  }
+});
+
+// Get list of active experiments
+app.get('/api/experiments', async (c) => {
+  try {
+    const { status } = c.req.query();
+    const abTestService = new ABTestService(c.env);
+    
+    const experiments = abTestService.listExperiments(status);
+    
+    return c.json({
+      success: true,
+      count: experiments.length,
+      experiments: experiments
+    });
+  } catch (error) {
+    console.error('Experiments listing error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve experiments list.',
+      code: 'EXPERIMENTS_LIST_ERROR'
+    }, 500);
+  }
+});
+
+// Get experiment results and analysis
+app.get('/api/experiments/:id/results', async (c) => {
+  try {
+    const experimentId = c.req.param('id');
+    const abTestService = new ABTestService(c.env);
+    
+    if (!experimentId) {
+      return c.json({
+        success: false,
+        error: 'Experiment ID is required',
+        code: 'MISSING_EXPERIMENT_ID'
+      }, 400);
+    }
+
+    try {
+      const results = abTestService.getExperimentResults(experimentId);
+      
+      return c.json({
+        success: true,
+        ...results
+      });
+    } catch (experimentError) {
+      if (experimentError.message.includes('not found')) {
+        return c.json({
+          success: false,
+          error: `Experiment '${experimentId}' not found`,
+          code: 'EXPERIMENT_NOT_FOUND'
+        }, 404);
+      }
+      throw experimentError;
+    }
+  } catch (error) {
+    console.error('Experiment results error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to retrieve experiment results.',
+      code: 'EXPERIMENT_RESULTS_ERROR'
+    }, 500);
+  }
+});
+
+// Track A/B test event
+app.post('/api/experiments/:id/track', async (c) => {
+  try {
+    const experimentId = c.req.param('id');
+    const abTestService = new ABTestService(c.env);
+    
+    if (!experimentId) {
+      return c.json({
+        success: false,
+        error: 'Experiment ID is required',
+        code: 'MISSING_EXPERIMENT_ID'
+      }, 400);
+    }
+
+    let eventData;
+    try {
+      eventData = await c.req.json();
+    } catch (parseError) {
+      return c.json({
+        success: false,
+        error: 'Invalid request format. Please send valid JSON data.',
+        code: 'INVALID_JSON'
+      }, 400);
+    }
+
+    const { user_id, event_type, event_data } = eventData;
+    
+    if (!user_id || !event_type) {
+      return c.json({
+        success: false,
+        error: 'user_id and event_type are required',
+        code: 'MISSING_REQUIRED_FIELDS'
+      }, 400);
+    }
+
+    const eventRecord = abTestService.trackEvent(user_id, experimentId, event_type, event_data);
+    
+    return c.json({
+      success: true,
+      message: 'Event tracked successfully',
+      event_id: eventRecord ? `${experimentId}-${Date.now()}` : null
+    });
+  } catch (error) {
+    console.error('A/B test tracking error:', error);
+    return c.json({
+      success: false,
+      error: 'Unable to track experiment event.',
+      code: 'TRACKING_ERROR'
     }, 500);
   }
 });
