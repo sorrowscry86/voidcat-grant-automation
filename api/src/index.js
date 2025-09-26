@@ -7,6 +7,7 @@ import { cors } from 'hono/cors';
 import Stripe from 'stripe';
 import EmailService from './services/emailService.js';
 import TelemetryService from './services/telemetryService.js';
+import RateLimiter from './services/rateLimiter.js';
 
 const app = new Hono();
 
@@ -1103,6 +1104,46 @@ app.post('/api/grants/generate-proposal', async (c) => {
     }
 
     const apiKey = authHeader.replace('Bearer ', '');
+    
+    // Apply rate limiting for proposal generation
+    const rateLimiter = new RateLimiter(c.env);
+    const rateLimitResult = await rateLimiter.checkAndIncrement(apiKey, 'proposal_generation');
+    
+    // Set rate limit headers
+    c.header('X-RateLimit-Limit', rateLimitResult.limit.toString());
+    c.header('X-RateLimit-Remaining', Math.max(0, rateLimitResult.limit - rateLimitResult.currentCount).toString());
+    c.header('X-RateLimit-Reset', Math.floor(rateLimitResult.resetTime.getTime() / 1000).toString());
+    
+    if (!rateLimitResult.allowed) {
+      if (rateLimitResult.retryAfter) {
+        c.header('Retry-After', rateLimitResult.retryAfter.toString());
+      }
+      
+      // Log rate limit hit
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.logInfo('Rate limit exceeded for proposal generation', {
+          rate_limit: {
+            operation: 'proposal_generation',
+            current_count: rateLimitResult.currentCount,
+            limit: rateLimitResult.limit,
+            retry_after: rateLimitResult.retryAfter
+          }
+        });
+      }
+      
+      return c.json({
+        success: false,
+        error: 'Rate limit exceeded. You can generate proposals at most 12 times per minute.',
+        code: 'RATE_LIMIT_EXCEEDED',
+        rate_limit: {
+          limit: rateLimitResult.limit,
+          current: rateLimitResult.currentCount,
+          retry_after: rateLimitResult.retryAfter,
+          reset_time: rateLimitResult.resetTime.toISOString()
+        }
+      }, 429);
+    }
     
     // Get user and check usage limits
     try {
