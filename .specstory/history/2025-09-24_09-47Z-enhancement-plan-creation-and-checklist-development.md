@@ -120,9 +120,32 @@ Want me to:
 
 ---
 
-_**User (2025-09-25 03:09Z)**_
+_**User (2025-09-25 03:10Z)**_
 
 Fix numbering of checklist and wait for next instruction
+
+---
+
+_**Assistant**_
+
+Updating the checklist numbering in the enhancement plan for proper 1–15 sequence. 
+```
+
+```
+- Plan: Fix the ordered list numbering in the sequenced checklist to 1–15 while preserving nested subtasks and spacing.
+- Result: Checklist in `Enhancement Plan.md` now numbers correctly from 1 to 15; nested subtasks remain intact and lint-friendly.
+
+If you want, I can:
+- Document `MAIL_FROM`/`MAIL_PROVIDER` in `ENVIRONMENT-VARIABLES.md`.
+- Add quick curl commands for verifying live data and registration emails.
+
+Waiting for your next instruction.
+
+---
+
+_**User (2025-09-25 03:12Z)**_
+
+Tell GitHub Coding Agent to continue working along the checklist, in order, following the enhancement plan as closely as possible. Enhance prompt as you see fit, but have it follow the whole enhancement plan, in order.
 
 ---
 
