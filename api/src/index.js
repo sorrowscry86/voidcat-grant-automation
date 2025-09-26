@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import Stripe from 'stripe';
 import { sendRegistrationEmail } from './services/emailService.js';
+import TelemetryService from './services/telemetryService.js';
 
 const app = new Hono();
 
@@ -21,6 +22,12 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 }));
+
+// Telemetry middleware for request/response logging and metrics
+app.use('*', async (c, next) => {
+  const telemetryService = new TelemetryService(c.env);
+  await telemetryService.createMiddleware()(c, next);
+});
 
 // Database helper
 async function getDB(env) {
@@ -143,7 +150,7 @@ const MOCK_GRANTS = [
 ];
 
 // Live data integration function with proper fallback tracking
-async function fetchLiveGrantData(query, agency) {
+async function fetchLiveGrantData(query, agency, telemetry = null) {
   const result = {
     grants: [],
     actualDataSource: 'mock',
@@ -164,6 +171,13 @@ async function fetchLiveGrantData(query, agency) {
       };
       
       console.log(`🔍 Attempting live data fetch from grants.gov API...`);
+      if (telemetry) {
+        telemetry.logInfo('Live data fetch attempt', {
+          endpoint: DATA_CONFIG.LIVE_DATA_SOURCES.GRANTS_GOV_API,
+          query: query || '',
+          agency: agency || ''
+        });
+      }
       
       const response = await fetch(DATA_CONFIG.LIVE_DATA_SOURCES.GRANTS_GOV_API, {
         method: 'POST',
@@ -213,6 +227,13 @@ async function fetchLiveGrantData(query, agency) {
       }));
       
   console.log(`✅ Live data fetch successful: ${transformedGrants.length} grants (raw length: ${opportunitiesRaw.length})`);
+      if (telemetry) {
+        telemetry.logInfo('Live data fetch successful', {
+          grants_count: transformedGrants.length,
+          raw_data_length: opportunitiesRaw.length,
+          data_source: 'live'
+        });
+      }
       result.grants = transformedGrants;
       result.actualDataSource = 'live';
       result.fallbackOccurred = false;
@@ -225,6 +246,14 @@ async function fetchLiveGrantData(query, agency) {
         agency,
         timestamp: new Date().toISOString()
       });
+      
+      if (telemetry) {
+        telemetry.logError('Live data fetch failed, using fallback', error, {
+          query: query || '',
+          agency: agency || '',
+          fallback_enabled: DATA_CONFIG.FALLBACK_TO_MOCK
+        });
+      }
       
       if (DATA_CONFIG.FALLBACK_TO_MOCK) {
         result.grants = MOCK_GRANTS;
@@ -253,7 +282,7 @@ async function fetchLiveGrantData(query, agency) {
 }
 
 // Fetch specific grant details by ID from live data sources
-async function fetchLiveGrantDetails(grantId) {
+async function fetchLiveGrantDetails(grantId, telemetry = null) {
   const result = {
     grant: null,
     actualDataSource: 'mock',
@@ -267,7 +296,7 @@ async function fetchLiveGrantDetails(grantId) {
       
       // Try to fetch all grants and find the specific one
       // In a real implementation, we'd have a specific endpoint for grant details
-      const searchResult = await fetchLiveGrantData('', '');
+      const searchResult = await fetchLiveGrantData('', '', telemetry);
       
       if (searchResult.actualDataSource === 'live' && !searchResult.fallbackOccurred) {
         const liveGrant = searchResult.grants.find(g => g.id === grantId);
@@ -646,7 +675,7 @@ app.get('/api/grants/search', async (c) => {
     let dataSourceError;
     
     try {
-      const fetchResult = await fetchLiveGrantData(query, agency);
+      const fetchResult = await fetchLiveGrantData(query, agency, c.get('telemetry'));
       filteredGrants = fetchResult.grants;
       actualDataSource = fetchResult.actualDataSource;
       fallbackOccurred = fetchResult.fallbackOccurred;
@@ -702,6 +731,12 @@ app.get('/api/grants/search', async (c) => {
         });
       }
 
+      // Track grant search metrics
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.trackGrantSearch(query, agency, filteredGrants.length, actualDataSource, fallbackOccurred);
+      }
+
       return c.json({
         success: true,
         count: filteredGrants.length,
@@ -755,7 +790,7 @@ app.get('/api/grants/:id', async (c) => {
     }
     
     // Fetch grant details from live data sources with fallback
-    const detailsResult = await fetchLiveGrantDetails(grantId);
+    const detailsResult = await fetchLiveGrantDetails(grantId, c.get('telemetry'));
     
     if (!detailsResult.grant) {
       return c.json({ 
@@ -1121,7 +1156,7 @@ app.post('/api/grants/generate-proposal', async (c) => {
     }
     
     // Fetch grant details from live data sources with fallback for proposal generation
-    const detailsResult = await fetchLiveGrantDetails(grant_id);
+    const detailsResult = await fetchLiveGrantDetails(grant_id, c.get('telemetry'));
     
     if (!detailsResult.grant) {
       return c.json({ 
