@@ -21,6 +21,42 @@ STRIPE_PRICE_ID="price_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
 ```
 
+### Email Service Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Email provider selection (mailchannels or resend)
+MAIL_PROVIDER="mailchannels"
+
+# From email address for outbound emails
+MAIL_FROM="noreply@voidcat.org"
+
+# MailChannels DKIM private key (for email authentication)
+MAILCHANNELS_DKIM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+
+# Resend API key (if using Resend provider)
+RESEND_API_KEY="re_..."
+```
+
+### Telemetry Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Logging level (DEBUG, INFO, WARN, ERROR)
+LOG_LEVEL="INFO"
+
+# External telemetry endpoint (optional)
+TELEMETRY_ENDPOINT="https://analytics.voidcat.org/collect"
+```
+
+### Rate Limiting Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Rate limit per minute for proposal generation
+RATE_LIMIT_PER_MIN="12"
+```
+
 #### Legacy/Alternative Names (Deprecated)
 ```bash
 # These are supported for backward compatibility but deprecated:
@@ -28,6 +64,26 @@ STRIPE_SK              # Legacy name for STRIPE_SECRET_KEY
 STRIPE_PUBLIC_KEY      # Legacy name for STRIPE_PUBLISHABLE_KEY
 STRIPE_PRODUCT_PRICE_ID # Legacy name for STRIPE_PRICE_ID
 STRIPE_WH_SECRET       # Legacy name for STRIPE_WEBHOOK_SECRET
+```
+
+### Required Environment Variables Summary
+
+#### Production Deployment Requirements
+```bash
+# Essential for payment processing
+STRIPE_SECRET_KEY="sk_live_..."
+STRIPE_PUBLISHABLE_KEY="pk_live_..."
+STRIPE_PRICE_ID="price_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+
+# Essential for email notifications
+MAIL_PROVIDER="mailchannels"
+MAIL_FROM="noreply@yourdomain.com"
+MAILCHANNELS_DKIM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----..."
+
+# Recommended for monitoring
+LOG_LEVEL="INFO"
+RATE_LIMIT_PER_MIN="12"
 ```
 
 ## Variable Precedence
