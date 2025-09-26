@@ -1,6 +1,7 @@
 // Email Service for VoidCat Grant Automation Platform
 // Supports MailChannels (Cloudflare Workers) and Resend
 
+import { convert } from 'html-to-text';
 /**
  * Email service configuration and provider selection
  */
@@ -184,16 +185,14 @@ export class EmailService {
    */
   htmlToText(html) {
     if (!html) return '';
-    
-    return html
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>/gi, '\n\n')
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&amp;/g, '&')
-      .trim();
+    // Use robust html-to-text library to prevent incomplete sanitization
+    return convert(html, {
+      wordwrap: false, // avoid wrapping lines
+      selectors: [ // preserve newlines for <br> and <p>
+        { selector: 'br', format: 'lineBreak' },
+        { selector: 'p', format: 'paragraph' }
+      ]
+    }).trim();
   }
 
   /**
