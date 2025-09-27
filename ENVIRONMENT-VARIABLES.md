@@ -147,6 +147,78 @@ MAIL_FROM="noreply@yourdomain.com"
 MAILCHANNELS_DKIM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----..."
 
 # Recommended for monitoring
+# Tier 4 Advanced Features Variables
+
+## JWT Authentication Configuration
+```bash
+# JWT secret key for token signing (CRITICAL - must be secure in production)
+JWT_SECRET_KEY="your-secure-jwt-secret-key-minimum-256-bits"
+
+# JWT token expiration times (in seconds)
+JWT_ACCESS_TOKEN_TTL="3600"     # 1 hour (default)
+JWT_REFRESH_TOKEN_TTL="604800"  # 7 days (default)
+```
+
+## Password Security Configuration
+```bash
+# Password hashing parameters
+PASSWORD_HASH_ITERATIONS="100000"  # PBKDF2 iterations (default)
+PASSWORD_MIN_LENGTH="8"            # Minimum password length
+PASSWORD_MAX_LENGTH="128"          # Maximum password length
+```
+
+## Metrics & Dashboard Configuration
+```bash
+# Metrics collection settings
+ENABLE_METRICS="true"              # Enable/disable metrics collection
+METRICS_RETENTION_DAYS="30"        # How long to keep metrics data
+
+# Dashboard access control
+DASHBOARD_ADMIN_EMAILS="admin@voidcat.org,sorrowscry86@users.noreply.github.com"
+```
+
+## Enhanced Email Configuration
+```bash
+# Email service provider selection
+MAIL_PROVIDER="mailchannels"       # "mailchannels" or "resend"
+MAIL_FROM="noreply@voidcat.org"
+
+# MailChannels configuration (for Cloudflare Workers)
+MAILCHANNELS_DKIM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----..."
+MAILCHANNELS_DKIM_SELECTOR="mailchannels"
+
+# Resend configuration (alternative provider)
+RESEND_API_KEY="re_..."
+```
+
+## Rate Limiting Enhancement
+```bash
+# Extended rate limiting configuration
+RATE_LIMIT_PER_MIN="12"                    # Proposal generation limit
+SEARCH_RATE_LIMIT_PER_MIN="60"            # Search queries limit
+REGISTRATION_RATE_LIMIT_PER_HOUR="5"      # Registration attempts limit
+LOGIN_RATE_LIMIT_PER_HOUR="20"            # Login attempts limit
+```
+
+## Feature Flags (Tier 4)
+```bash
+# Advanced feature toggles
+ENABLE_JWT_AUTH="true"             # Enable JWT authentication
+ENABLE_PASSWORD_AUTH="true"        # Enable password-based authentication
+ENABLE_DASHBOARD="true"            # Enable metrics dashboard
+ENABLE_ADVANCED_METRICS="true"    # Enable detailed analytics
+ENABLE_PASSWORD_RESET="true"       # Enable password reset functionality
+```
+
+## Security Headers Configuration
+```bash
+# Enhanced security headers
+SECURITY_HEADERS_ENABLED="true"
+CONTENT_SECURITY_POLICY="default-src 'self'; script-src 'self' 'unsafe-inline'"
+PERMISSIONS_POLICY="geolocation=(), microphone=(), camera=()"
+REFERRER_POLICY="strict-origin-when-cross-origin"
+```
+
 LOG_LEVEL="INFO"
 RATE_LIMIT_PER_MIN="12"
 ```

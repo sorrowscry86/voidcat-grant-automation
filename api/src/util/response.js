@@ -94,10 +94,123 @@ export function serviceUnavailable(service, message = null) {
   );
 }
 
+/**
+ * Create a consistent API response (Tier 4 enhancement)
+ * @param {Object} c - Hono context
+ * @param {boolean} success - Success status
+ * @param {string} message - Response message
+ * @param {number} status - HTTP status code
+ * @param {string} code - Error/success code
+ * @param {Object} data - Response data
+ * @returns {Response} JSON response
+ */
+export function createResponse(c, success, message, status = 200, code = null, data = {}) {
+  const response = {
+    success,
+    message,
+    timestamp: new Date().toISOString(),
+    ...data
+  };
+  
+  if (code) {
+    response.code = code;
+  }
+  
+  return c.json(response, status);
+}
+
+/**
+ * Validate input fields (Tier 4 enhancement)
+ * @param {Object} input - Input data to validate
+ * @param {Object} rules - Validation rules
+ * @returns {Object} Validation result
+ */
+export function validateInput(input, rules) {
+  const errors = [];
+  
+  for (const [field, rule] of Object.entries(rules)) {
+    const value = input[field];
+    
+    // Required field check
+    if (rule.required && (value === undefined || value === null || value === '')) {
+      errors.push(`${field} is required`);
+      continue;
+    }
+    
+    // Skip other validations if field is empty and not required
+    if (!value && !rule.required) {
+      continue;
+    }
+    
+    // Type validation
+    if (rule.type) {
+      switch (rule.type) {
+        case 'email':
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) {
+            errors.push(`${field} must be a valid email address`);
+          }
+          break;
+        case 'string':
+          if (typeof value !== 'string') {
+            errors.push(`${field} must be a string`);
+          }
+          break;
+        case 'number':
+          if (typeof value !== 'number' || isNaN(value)) {
+            errors.push(`${field} must be a valid number`);
+          }
+          break;
+        case 'boolean':
+          if (typeof value !== 'boolean') {
+            errors.push(`${field} must be true or false`);
+          }
+          break;
+      }
+    }
+    
+    // Length validation
+    if (typeof value === 'string') {
+      if (rule.minLength && value.length < rule.minLength) {
+        errors.push(`${field} must be at least ${rule.minLength} characters long`);
+      }
+      if (rule.maxLength && value.length > rule.maxLength) {
+        errors.push(`${field} must be no more than ${rule.maxLength} characters long`);
+      }
+    }
+    
+    // Range validation for numbers
+    if (typeof value === 'number') {
+      if (rule.min !== undefined && value < rule.min) {
+        errors.push(`${field} must be at least ${rule.min}`);
+      }
+      if (rule.max !== undefined && value > rule.max) {
+        errors.push(`${field} must be no more than ${rule.max}`);
+      }
+    }
+    
+    // Custom validation function
+    if (rule.validate && typeof rule.validate === 'function') {
+      const customResult = rule.validate(value);
+      if (customResult !== true) {
+        errors.push(customResult || `${field} failed custom validation`);
+      }
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+    error: errors.length > 0 ? errors[0] : null // Return first error for convenience
+  };
+}
+
 export default {
   success,
   error,
   validationError,
   rateLimitError,
-  serviceUnavailable
+  serviceUnavailable,
+  createResponse,
+  validateInput
 };

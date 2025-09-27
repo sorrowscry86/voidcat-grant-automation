@@ -13,6 +13,8 @@ import ConfigService from './services/configService.js';
 import healthRoutes from './routes/health.js';
 import grantsRoutes from './routes/grants.js';
 import usersRoutes from './routes/users.js';
+import authRoutes from './routes/auth.js'; // New: JWT authentication routes
+import dashboardRoutes from './routes/dashboard.js'; // New: Metrics dashboard routes
 
 // Initialize Hono app
 const app = new Hono();
@@ -39,6 +41,8 @@ app.use('*', async (c, next) => {
 app.route('/health', healthRoutes);
 app.route('/api/grants', grantsRoutes);
 app.route('/api/users', usersRoutes);
+app.route('/api/auth', authRoutes); // New: JWT authentication routes
+app.route('/api/dashboard', dashboardRoutes); // New: Metrics dashboard routes
 
 // Stripe endpoints (keeping in main file for now as they require complex setup)
 app.post('/api/stripe/create-checkout', async (c) => {
