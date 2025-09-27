@@ -7,6 +7,7 @@ import Stripe from 'stripe';
 
 // Import services
 import TelemetryService from './services/telemetryService.js';
+import ConfigService from './services/configService.js';
 
 // Import routes
 import healthRoutes from './routes/health.js';
@@ -16,18 +17,17 @@ import usersRoutes from './routes/users.js';
 // Initialize Hono app
 const app = new Hono();
 
-// CORS middleware - Restrict to specific domains for production
-app.use('*', cors({
-  origin: [
-    'https://sorrowscry86.github.io',
-    'https://voidcat.org',
-    'https://www.voidcat.org',
-    'http://localhost:3000', // For local development
-    'http://localhost:8080'  // For local development
-  ],
-  allowHeaders: ['Content-Type', 'Authorization'],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-}));
+// CORS middleware - Use configurable origins
+app.use('*', async (c, next) => {
+  const configService = new ConfigService(c.env);
+  const appConfig = configService.getAppConfig();
+  
+  return cors({
+    origin: appConfig.CORS_ORIGINS,
+    allowHeaders: ['Content-Type', 'Authorization'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  })(c, next);
+});
 
 // Telemetry middleware for request/response logging and metrics
 app.use('*', async (c, next) => {
@@ -53,11 +53,12 @@ app.post('/api/stripe/create-checkout', async (c) => {
       }, 400);
     }
 
-    // Get Stripe configuration with precedence
-    const stripeSecretKey = c.env.STRIPE_SECRET_KEY || c.env.STRIPE_SK;
-    const stripePriceId = c.env.STRIPE_PRICE_ID || c.env.STRIPE_PRODUCT_PRICE_ID;
+    // Get Stripe configuration using ConfigService
+    const configService = new ConfigService(c.env);
+    const stripeConfig = configService.getStripeConfig();
+    const appConfig = configService.getAppConfig();
 
-    if (!stripeSecretKey) {
+    if (!stripeConfig.SECRET_KEY) {
       console.error('Stripe secret key not configured');
       return c.json({ 
         success: false, 
@@ -66,7 +67,7 @@ app.post('/api/stripe/create-checkout', async (c) => {
       }, 503);
     }
 
-    if (!stripePriceId) {
+    if (!stripeConfig.PRICE_ID) {
       console.error('Stripe price ID not configured');
       return c.json({ 
         success: false, 
@@ -75,17 +76,17 @@ app.post('/api/stripe/create-checkout', async (c) => {
       }, 503);
     }
 
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
+    const stripe = new Stripe(stripeConfig.SECRET_KEY, { apiVersion: stripeConfig.API_VERSION });
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
-        price: stripePriceId,
+        price: stripeConfig.PRICE_ID,
         quantity: 1,
       }],
       mode: 'subscription',
-      success_url: `${c.req.header('origin') || 'https://sorrowscry86.github.io'}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: c.req.header('origin') || 'https://sorrowscry86.github.io',
+      success_url: `${c.req.header('origin') || appConfig.CORS_ORIGINS[0]}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: c.req.header('origin') || appConfig.CORS_ORIGINS[0],
       customer_email: email,
       metadata: {
         source: 'voidcat-grant-automation'
@@ -111,9 +112,12 @@ app.post('/api/stripe/create-checkout', async (c) => {
 app.post('/api/stripe/webhook', async (c) => {
   try {
     const sig = c.req.header('stripe-signature');
-    const stripeWebhookSecret = c.env.STRIPE_WEBHOOK_SECRET || c.env.STRIPE_WH_SECRET;
+    
+    // Get Stripe configuration using ConfigService
+    const configService = new ConfigService(c.env);
+    const stripeConfig = configService.getStripeConfig();
 
-    if (!stripeWebhookSecret) {
+    if (!stripeConfig.WEBHOOK_SECRET) {
       console.error('Stripe webhook secret not configured');
       return c.json({ 
         success: false, 
@@ -122,17 +126,16 @@ app.post('/api/stripe/webhook', async (c) => {
       }, 400);
     }
 
-    const stripeSecretKey = c.env.STRIPE_SECRET_KEY || c.env.STRIPE_SK;
-    if (!stripeSecretKey) {
+    if (!stripeConfig.SECRET_KEY) {
       return c.json({ success: false, error: 'Stripe not configured' }, 500);
     }
 
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
+    const stripe = new Stripe(stripeConfig.SECRET_KEY, { apiVersion: stripeConfig.API_VERSION });
     const body = await c.req.text();
 
     let event;
     try {
-      event = stripe.webhooks.constructEvent(body, sig, stripeWebhookSecret);
+      event = stripe.webhooks.constructEvent(body, sig, stripeConfig.WEBHOOK_SECRET);
     } catch (err) {
       console.error('Webhook signature verification failed:', err.message);
       return c.json({ success: false, error: 'Invalid signature' }, 400);
@@ -158,15 +161,20 @@ app.post('/api/stripe/webhook', async (c) => {
 
 // Root endpoint - API information
 app.get('/', async (c) => {
+  const configService = new ConfigService(c.env);
+  const appConfig = configService.getAppConfig();
+  
   return c.json({
-    service: 'VoidCat Grant Search API',
-    version: '1.0.0',
+    service: appConfig.SERVICE_NAME,
+    version: appConfig.VERSION,
+    environment: appConfig.ENVIRONMENT,
     description: 'Federal grant search and proposal automation platform',
     endpoints: [
       'GET /health',
       'GET /health/detailed',
       'GET /api/grants/search',
-      'GET /api/grants/:id', 
+      'GET /api/grants/:id',
+      'GET /api/grants/stats',
       'POST /api/users/register',
       'GET /api/users/me',
       'POST /api/grants/generate-proposal',

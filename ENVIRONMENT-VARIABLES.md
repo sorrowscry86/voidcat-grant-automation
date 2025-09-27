@@ -55,6 +55,71 @@ TELEMETRY_ENDPOINT="https://analytics.voidcat.org/collect"
 ```bash
 # Rate limit per minute for proposal generation
 RATE_LIMIT_PER_MIN="12"
+
+# Rate limit per minute for search requests
+SEARCH_RATE_LIMIT_PER_MIN="60"
+
+# Rate limit per hour for user registration
+REGISTRATION_RATE_LIMIT_PER_HOUR="5"
+```
+
+### Application Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Application environment (development, production)
+ENVIRONMENT="production"
+
+# Service name and version
+SERVICE_NAME="VoidCat Grant Search API"
+API_VERSION="1.0.0"
+
+# CORS allowed origins (comma-separated)
+CORS_ORIGINS="https://voidcat.org,https://www.voidcat.org,https://sorrowscry86.github.io"
+```
+
+### Data Source Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Enable live data fetching from grants.gov
+USE_LIVE_DATA="true"
+ENABLE_LIVE_DATA="true"
+
+# Live data API URLs (optional - defaults provided)
+GRANTS_GOV_API_URL="https://api.grants.gov/v1/api/search2"
+SBIR_API_URL="https://www.sbir.gov/api/opportunities.json"
+NSF_API_URL="https://www.nsf.gov/awardsearch/download.jsp"
+
+# Live data timeout in milliseconds
+LIVE_DATA_TIMEOUT="15000"
+```
+
+### Validation Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Maximum lengths for user inputs
+MAX_SEARCH_QUERY_LENGTH="200"
+MAX_NAME_LENGTH="100"
+MIN_NAME_LENGTH="2"
+MAX_COMPANY_LENGTH="200"
+MAX_GRANT_ID_LENGTH="50"
+```
+
+### Feature Flags Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Feature toggles
+ENABLE_EMAIL_NOTIFICATIONS="true"
+ENABLE_ADVANCED_FILTERS="false"
+ENABLE_PROPOSAL_GENERATION="true"
+ENABLE_RATE_LIMITING="true"
+ENABLE_TELEMETRY="true"
+ENABLE_REQUEST_LOGGING="true"
+ENABLE_PERFORMANCE_METRICS="true"
+ENABLE_ERROR_TRACKING="true"
 ```
 
 #### Legacy/Alternative Names (Deprecated)

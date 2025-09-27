@@ -6,18 +6,123 @@ import ConfigService from '../services/configService.js';
 import DataService from '../services/dataService.js';
 
 const grants = new Hono();
+  {
+    id: 'SBIR-25-001',
+    title: 'AI for Defense Applications',
+    agency: 'Department of Defense',
+    program: 'SBIR Phase I',
+    deadline: '2025-09-15',
+    amount: '$250,000',
+    description: 'Seeking innovative AI solutions for defense applications including autonomous systems, cybersecurity, and logistics optimization.',
+    eligibility: 'Small businesses with <500 employees',
+    matching_score: 0.95,
+    data_source: 'mock'
+  },
+  {
+    id: 'NSF-25-002',
+    title: 'Artificial Intelligence Research Institutes',
+    agency: 'National Science Foundation',
+    program: 'AI Institutes',
+    deadline: '2025-11-30',
+    amount: '$20,000,000',
+    description: 'Multi-institutional AI research institutes focused on advancing AI for materials discovery, climate science, and healthcare.',
+    eligibility: 'Academic institutions with industry partners',
+    matching_score: 0.87,
+    data_source: 'mock'
+  },
+  {
+    id: 'DARPA-25-004',
+    title: 'Explainable AI for Military Decision Making',
+    agency: 'DARPA',
+    program: 'XAI',
+    deadline: '2025-08-30',
+    amount: '$1,500,000',
+    description: 'Developing AI systems that can explain their decision-making processes for military applications.',
+    eligibility: 'U.S. organizations with security clearance capability',
+    matching_score: 0.91,
+    data_source: 'mock'
+  },
+  {
+    id: 'NASA-25-005',
+    title: 'AI for Space Exploration',
+    agency: 'NASA',
+    program: 'ROSES',
+    deadline: '2025-10-15',
+    amount: '$800,000',
+    description: 'AI technologies for autonomous spacecraft operations, planetary exploration, and space science data analysis.',
+    eligibility: 'U.S. and foreign entities (excluding China)',
+    matching_score: 0.88,
+    data_source: 'mock'
+  },
+  {
+    id: 'DARPA-25-006',
+    title: 'Artificial Intelligence Next Campaign',
+    agency: 'DARPA',
+    program: 'AI Next',
+    deadline: '2025-03-15',
+    amount: '$5,000,000',
+    description: 'Revolutionary AI research for national security applications including autonomous systems, cybersecurity, and logistics optimization.',
+    eligibility: 'Research institutions and innovative companies',
+    matching_score: 0.91,
+    tags: ['AI', 'Machine Learning', 'Defense', 'Research'],
+    data_source: 'mock'
+  },
+  {
+    id: 'NIH-25-007',
+    title: 'AI for Medical Diagnosis',
+    agency: 'National Institutes of Health',
+    program: 'STTR Phase II',
+    deadline: '2025-04-30',
+    amount: '$2,000,000',
+    description: 'Developing AI systems for early disease detection and personalized treatment recommendations.',
+    eligibility: 'Small businesses partnering with research institutions',
+    matching_score: 0.88,
+    tags: ['Healthcare', 'AI', 'Diagnostics', 'STTR'],
+    data_source: 'mock'
+  },
+  {
+    id: 'DOE-25-008',
+    title: 'Smart Grid AI Optimization',
+    agency: 'Department of Energy',
+    program: 'Grid Modernization',
+    deadline: '2025-06-01',
+    amount: '$3,500,000',
+    description: 'AI-powered optimization of electrical grid systems for improved efficiency and renewable energy integration.',
+    eligibility: 'US companies with energy sector experience',
+    matching_score: 0.85,
+    tags: ['Energy', 'Smart Grid', 'AI', 'Infrastructure'],
+    data_source: 'mock'
+  }
+];
+
+// Configuration for data sources
+const DATA_CONFIG = {
+  USE_LIVE_DATA: true,
+  FALLBACK_TO_MOCK: true,
+  LIVE_DATA_SOURCES: {
+    GRANTS_GOV_API: 'https://api.grants.gov/v1/api/search2',
+    SBIR_API: 'https://www.sbir.gov/api/opportunities.json',
+    NSF_API: 'https://www.nsf.gov/awardsearch/download.jsp'
+  }
+};
+
+// Helper functions (will be moved to utils in future)
+function calculateMatchingScore(grant, query) {
+  if (!query) return 0.75;
+  
+  const searchTerms = query.toLowerCase().split(' ');
+  const grantText = `${grant.title || ''} ${grant.description || ''}`.toLowerCase();
+  
+  let matches = 0;
+  searchTerms.forEach(term => {
+    if (grantText.includes(term)) matches++;
+  });
+  
+  return Math.min(0.95, Math.max(0.1, matches / searchTerms.length * 0.9 + 0.1));
+}
 
 // Live data integration function
-async function fetchLiveGrantData(query, agency, telemetry = null, config = null) {
-  const dataConfig = config || {
-    USE_LIVE_DATA: true,
-    FALLBACK_TO_MOCK: true,
-    LIVE_DATA_TIMEOUT: 15000,
-    LIVE_DATA_SOURCES: {
-      GRANTS_GOV_API: 'https://api.grants.gov/v1/api/search2'
-    }
-  };
-
+async function fetchLiveGrantData(query, agency, telemetry = null) {
   const result = {
     grants: [],
     actualDataSource: 'mock',
@@ -25,10 +130,10 @@ async function fetchLiveGrantData(query, agency, telemetry = null, config = null
     error: null
   };
 
-  if (dataConfig.USE_LIVE_DATA) {
+  if (DATA_CONFIG.USE_LIVE_DATA) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), dataConfig.LIVE_DATA_TIMEOUT);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       
       const searchBody = {
         keyword: query || '',
@@ -38,13 +143,13 @@ async function fetchLiveGrantData(query, agency, telemetry = null, config = null
       console.log(`🔍 Attempting live data fetch from grants.gov API...`);
       if (telemetry) {
         telemetry.logInfo('Live data fetch attempt', {
-          endpoint: dataConfig.LIVE_DATA_SOURCES.GRANTS_GOV_API,
+          endpoint: DATA_CONFIG.LIVE_DATA_SOURCES.GRANTS_GOV_API,
           query: query || '',
           agency: agency || ''
         });
       }
       
-      const response = await fetch(dataConfig.LIVE_DATA_SOURCES.GRANTS_GOV_API, {
+      const response = await fetch(DATA_CONFIG.LIVE_DATA_SOURCES.GRANTS_GOV_API, {
         method: 'POST',
         signal: controller.signal,
         headers: {
@@ -87,7 +192,7 @@ async function fetchLiveGrantData(query, agency, telemetry = null, config = null
         amount: grant.awardFloor ? `$${parseInt(grant.awardFloor).toLocaleString()} - $${parseInt(grant.awardCeiling || grant.awardFloor).toLocaleString()}` : 'Amount TBD',
         description: grant.description || grant.opportunityTitle || 'Federal funding opportunity',
         eligibility: grant.eligibilityDesc || 'See opportunity details for eligibility requirements',
-        matching_score: 0.8, // Will be calculated by DataService
+        matching_score: calculateMatchingScore(grant, query),
         data_source: 'live'
       }));
       
@@ -117,16 +222,12 @@ async function fetchLiveGrantData(query, agency, telemetry = null, config = null
         telemetry.logError('Live data fetch failed, using fallback', error, {
           query: query || '',
           agency: agency || '',
-          fallback_enabled: dataConfig.FALLBACK_TO_MOCK
+          fallback_enabled: DATA_CONFIG.FALLBACK_TO_MOCK
         });
       }
       
-      if (dataConfig.FALLBACK_TO_MOCK) {
-        // Use DataService for mock data
-        const dataService = new DataService();
-        const mockResult = dataService.getGrants({ query, agency });
-        
-        result.grants = mockResult.grants;
+      if (DATA_CONFIG.FALLBACK_TO_MOCK) {
+        result.grants = MOCK_GRANTS;
         result.actualDataSource = 'mock';
         result.fallbackOccurred = true;
         result.error = error.message;
@@ -138,12 +239,9 @@ async function fetchLiveGrantData(query, agency, telemetry = null, config = null
     }
   }
   
-  if (dataConfig.FALLBACK_TO_MOCK) {
+  if (DATA_CONFIG.FALLBACK_TO_MOCK) {
     console.log('Using mock data (live data disabled in configuration)');
-    const dataService = new DataService();
-    const mockResult = dataService.getGrants({ query, agency });
-    
-    result.grants = mockResult.grants;
+    result.grants = MOCK_GRANTS;
     result.actualDataSource = 'mock';
     result.fallbackOccurred = false;
     return result;
@@ -156,17 +254,13 @@ async function fetchLiveGrantData(query, agency, telemetry = null, config = null
 // Grant search endpoint
 grants.get('/search', async (c) => {
   try {
-    const configService = new ConfigService(c.env);
-    const validationConfig = configService.getValidationConfig();
-    const dataConfig = configService.getDataConfig();
-    
-    const { query, agency, deadline, amount, program, opportunityType } = c.req.query();
+    const { query, agency, deadline, amount } = c.req.query();
     
     // Validate input parameters
-    if (query && query.length > validationConfig.MAX_SEARCH_QUERY_LENGTH) {
+    if (query && query.length > 200) {
       return c.json({
         success: false,
-        error: `Search query is too long. Please use fewer than ${validationConfig.MAX_SEARCH_QUERY_LENGTH} characters.`,
+        error: 'Search query is too long. Please use fewer than 200 characters.',
         code: 'QUERY_TOO_LONG'
       }, 400);
     }
@@ -178,7 +272,7 @@ grants.get('/search', async (c) => {
     let dataSourceError;
     
     try {
-      const fetchResult = await fetchLiveGrantData(query, agency, c.get('telemetry'), dataConfig);
+      const fetchResult = await fetchLiveGrantData(query, agency, c.get('telemetry'));
       filteredGrants = fetchResult.grants;
       actualDataSource = fetchResult.actualDataSource;
       fallbackOccurred = fetchResult.fallbackOccurred;
@@ -193,44 +287,45 @@ grants.get('/search', async (c) => {
     }
     
     try {
-      // If we got mock data, apply additional filters using DataService
-      if (actualDataSource === 'mock') {
-        const dataService = new DataService();
-        const searchOptions = {
-          query,
-          agency,
-          deadline,
-          program,
-          opportunityType
+      // Apply search filters
+      if (query) {
+        const searchQuery = query.toLowerCase().trim();
+        filteredGrants = filteredGrants.filter(grant => 
+          grant.title.toLowerCase().includes(searchQuery) ||
+          grant.description.toLowerCase().includes(searchQuery) ||
+          grant.program.toLowerCase().includes(searchQuery)
+        );
+      }
+      
+      if (agency) {
+        const agencyMap = {
+          'defense': 'department of defense',
+          'nsf': 'national science foundation',
+          'energy': 'department of energy',
+          'darpa': 'darpa',
+          'nasa': 'nasa'
         };
-        
-        // Parse amount filter if provided
-        if (amount) {
-          const amountNum = parseInt(amount.replace(/[$,]/g, ''), 10);
-          if (!isNaN(amountNum)) {
-            searchOptions.maxAmount = amountNum;
-          }
+        const searchAgency = agencyMap[agency.toLowerCase()] || agency.toLowerCase();
+        filteredGrants = filteredGrants.filter(grant => 
+          grant.agency.toLowerCase().includes(searchAgency)
+        );
+      }
+      
+      // Apply deadline filter if provided
+      if (deadline) {
+        const targetDate = new Date(deadline);
+        if (isNaN(targetDate.getTime())) {
+          return c.json({
+            success: false,
+            error: 'Invalid deadline format. Please use YYYY-MM-DD format.',
+            code: 'INVALID_DATE_FORMAT'
+          }, 400);
         }
         
-        const mockResult = dataService.getGrants(searchOptions);
-        filteredGrants = mockResult.grants;
-      } else {
-        // Apply basic filters to live data
-        if (deadline) {
-          const targetDate = new Date(deadline);
-          if (isNaN(targetDate.getTime())) {
-            return c.json({
-              success: false,
-              error: 'Invalid deadline format. Please use YYYY-MM-DD format.',
-              code: 'INVALID_DATE_FORMAT'
-            }, 400);
-          }
-          
-          filteredGrants = filteredGrants.filter(grant => {
-            const grantDeadline = new Date(grant.deadline);
-            return grantDeadline <= targetDate;
-          });
-        }
+        filteredGrants = filteredGrants.filter(grant => {
+          const grantDeadline = new Date(grant.deadline);
+          return grantDeadline <= targetDate;
+        });
       }
 
       // Track grant search metrics
@@ -246,8 +341,8 @@ grants.get('/search', async (c) => {
         data_source: actualDataSource,
         fallback_occurred: fallbackOccurred,
         timestamp: new Date().toISOString(),
-        live_data_ready: dataConfig.USE_LIVE_DATA,
-        search_params: { query, agency, deadline, amount, program, opportunityType },
+        live_data_ready: DATA_CONFIG.USE_LIVE_DATA,
+        search_params: { query, agency, deadline, amount },
         ...(fallbackOccurred && dataSourceError && { fallback_reason: dataSourceError })
       });
     } catch (filterError) {
@@ -269,33 +364,9 @@ grants.get('/search', async (c) => {
   }
 });
 
-// Get grant statistics endpoint (must be before /:id route)
-grants.get('/stats', async (c) => {
-  try {
-    const dataService = new DataService();
-    const stats = dataService.getStatistics();
-    
-    return c.json({
-      success: true,
-      statistics: stats,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Grant statistics error:', error);
-    return c.json({
-      success: false,
-      error: 'Unable to retrieve grant statistics. Please try again later.',
-      code: 'STATS_ERROR'
-    }, 500);
-  }
-});
-
 // Get specific grant details
 grants.get('/:id', async (c) => {
   try {
-    const configService = new ConfigService(c.env);
-    const validationConfig = configService.getValidationConfig();
-    
     const grantId = c.req.param('id');
     
     // Validate grant ID format
@@ -307,7 +378,7 @@ grants.get('/:id', async (c) => {
       }, 400);
     }
     
-    if (grantId.length > validationConfig.MAX_GRANT_ID_LENGTH) {
+    if (grantId.length > 50) {
       return c.json({ 
         success: false, 
         error: 'Invalid grant ID format',
@@ -315,10 +386,8 @@ grants.get('/:id', async (c) => {
       }, 400);
     }
     
-    // Try to find grant in mock data using DataService
-    const dataService = new DataService();
-    const mockGrant = dataService.getMockGrantById(grantId);
-    
+    // Try to find grant in mock data first
+    const mockGrant = MOCK_GRANTS.find(g => g.id === grantId);
     if (mockGrant) {
       return c.json({
         success: true,
@@ -348,9 +417,6 @@ grants.get('/:id', async (c) => {
 // AI proposal generation endpoint (with rate limiting)
 grants.post('/generate-proposal', async (c) => {
   try {
-    const configService = new ConfigService(c.env);
-    const rateLimitConfig = configService.getRateLimitConfig();
-    
     // Check authentication
     const authHeader = c.req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -365,7 +431,7 @@ grants.post('/generate-proposal', async (c) => {
     
     // Apply rate limiting for proposal generation
     const rateLimiter = new RateLimiter(c.env);
-    const rateLimitResult = await rateLimiter.checkAndIncrement(apiKey, 'proposal_generation', rateLimitConfig.PROPOSALS_PER_MINUTE);
+    const rateLimitResult = await rateLimiter.checkAndIncrement(apiKey, 'proposal_generation');
     
     // Set rate limit headers
     c.header('X-RateLimit-Limit', rateLimitResult.limit.toString());
@@ -392,7 +458,7 @@ grants.post('/generate-proposal', async (c) => {
       
       return c.json({
         success: false,
-        error: `Rate limit exceeded. You can generate proposals at most ${rateLimitResult.limit} times per minute.`,
+        error: 'Rate limit exceeded. You can generate proposals at most 12 times per minute.',
         code: 'RATE_LIMIT_EXCEEDED',
         rate_limit: {
           limit: rateLimitResult.limit,
@@ -403,85 +469,56 @@ grants.post('/generate-proposal', async (c) => {
       }, 429);
     }
     
-    // Parse request data
-    let requestData;
-    try {
-      requestData = await c.req.json();
-    } catch (parseError) {
-      return c.json({
-        success: false,
-        error: 'Invalid request format. Please send valid JSON data.',
-        code: 'INVALID_JSON'
-      }, 400);
-    }
+    // Demo mode response (database not configured in local development)
+    const grantId = 'SBIR-25-001'; // Default for demo
+    console.log('Using mock data for grant details:', grantId);
     
-    const { grant_id, company_info } = requestData;
-    
-    if (!grant_id) {
-      return c.json({
-        success: false,
-        error: 'Grant ID is required for proposal generation',
-        code: 'MISSING_GRANT_ID'
-      }, 400);
-    }
-    
-    // Get grant details for proposal context
-    const dataService = new DataService();
-    const grant = dataService.getMockGrantById(grant_id);
-    
-    const grantTitle = grant ? grant.title : 'Federal Grant Opportunity';
-    const grantAmount = grant ? grant.amount : 'Amount TBD';
-    const grantAgency = grant ? grant.agency : 'Federal Agency';
-    
-    // Generate mock proposal (in production, this would use AI service)
-    const mockProposal = `# Grant Proposal for ${grantTitle}
+    const mockProposal = `# Grant Proposal for ${grantId}
 
 ## Executive Summary
-This proposal outlines our innovative approach to address the requirements of the ${grantTitle} grant. ${company_info ? `${company_info} brings` : 'Our company brings'} extensive experience in the relevant field and cutting-edge technology solutions.
+This proposal outlines our innovative approach to address the requirements of the AI for Defense Applications grant. Our company brings extensive experience in artificial intelligence, machine learning, and defense technology applications.
 
 ## Project Description
-We propose to develop innovative solutions that will address the grant requirements through:
+We propose to develop cutting-edge AI solutions that will revolutionize defense applications through:
 
 ### Technical Approach
-- Advanced research methodologies and proven frameworks
-- Cutting-edge technology implementation
-- Comprehensive testing and validation protocols
-- Scalable and sustainable solution architecture
+- Advanced machine learning algorithms
+- Autonomous system development
+- Cybersecurity enhancement protocols
+- Logistics optimization frameworks
 
 ### Key Innovations
-1. **Novel Approach**: Development of innovative solutions that push the boundaries of current technology
-2. **Real-time Implementation**: High-performance processing capabilities for immediate impact
-3. **Secure Architecture**: Industry-standard security protocols and best practices
+1. **Explainable AI Systems**: Development of transparent AI models that provide clear reasoning for decisions
+2. **Real-time Processing**: Implementation of high-speed data processing capabilities
+3. **Secure Architecture**: Military-grade security protocols and encryption
 
 ## Budget Justification
-The requested funding of ${grantAmount} will be allocated across:
-- Personnel (60%): Senior researchers, engineers, and project managers
-- Equipment (25%): Specialized equipment and infrastructure
-- Travel (10%): Collaboration with partners and stakeholders
-- Other Direct Costs (5%): Software licenses, materials, and indirect costs
+The requested funding of $250,000 will be allocated across:
+- Personnel (60%): Senior AI researchers and engineers
+- Equipment (25%): High-performance computing infrastructure
+- Travel (10%): Collaboration with defense partners
+- Other Direct Costs (5%): Software licenses and materials
 
 ## Timeline
-**Phase 1 (Months 1-6)**: Research and development of core components
-**Phase 2 (Months 7-12)**: System integration and comprehensive testing
-**Phase 3 (Months 13-18)**: Validation, optimization, and deployment preparation
+**Phase 1 (Months 1-6)**: Research and development of core algorithms
+**Phase 2 (Months 7-12)**: System integration and testing
+**Phase 3 (Months 13-18)**: Validation and deployment preparation
 
 ## Team Qualifications
 Our team consists of experienced professionals with proven track records in:
-- Advanced research and development
-- Technology innovation and implementation
-- ${grantAgency} collaboration and compliance
-- Project management and delivery
+- AI/ML development for defense applications
+- Cybersecurity and secure system design
+- Defense contractor collaboration
 
 ## Expected Outcomes
 Upon successful completion, this project will deliver:
-- Fully functional prototype or system
-- Comprehensive technical documentation
-- Training materials and user guides
+- Operational AI system prototype
+- Technical documentation and user manuals
+- Training materials for deployment personnel
 - Recommendations for full-scale implementation
-- Measurable impact on the target domain
 
 ## Conclusion
-This proposal represents a significant opportunity to advance the field through innovative technology and research. We are committed to delivering exceptional results that exceed expectations and provide lasting value to ${grantAgency} and the broader community.
+This proposal represents a significant opportunity to advance defense capabilities through innovative AI technology. We are committed to delivering exceptional results that exceed expectations and provide lasting value to the defense community.
 
 ---
 *Generated by VoidCat RDC Grant Automation Platform*
@@ -491,16 +528,11 @@ This proposal represents a significant opportunity to advance the field through 
     return c.json({
       success: true,
       message: 'Proposal generated successfully',
-      grant_id: grant_id,
+      grant_id: grantId,
       proposal: mockProposal,
       word_count: mockProposal.split(' ').length,
       generated_at: new Date().toISOString(),
-      grant_details: grant ? {
-        title: grant.title,
-        agency: grant.agency,
-        amount: grant.amount,
-        deadline: grant.deadline
-      } : null
+      demo_mode: true
     });
 
   } catch (error) {
