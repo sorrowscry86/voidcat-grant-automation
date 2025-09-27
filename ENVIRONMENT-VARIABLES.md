@@ -21,6 +21,107 @@ STRIPE_PRICE_ID="price_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
 ```
 
+### Email Service Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Email provider selection (mailchannels or resend)
+MAIL_PROVIDER="mailchannels"
+
+# From email address for outbound emails
+MAIL_FROM="noreply@voidcat.org"
+
+# MailChannels DKIM private key (for email authentication)
+MAILCHANNELS_DKIM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+
+# Resend API key (if using Resend provider)
+RESEND_API_KEY="re_..."
+```
+
+### Telemetry Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Logging level (DEBUG, INFO, WARN, ERROR)
+LOG_LEVEL="INFO"
+
+# External telemetry endpoint (optional)
+TELEMETRY_ENDPOINT="https://analytics.voidcat.org/collect"
+```
+
+### Rate Limiting Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Rate limit per minute for proposal generation
+RATE_LIMIT_PER_MIN="12"
+
+# Rate limit per minute for search requests
+SEARCH_RATE_LIMIT_PER_MIN="60"
+
+# Rate limit per hour for user registration
+REGISTRATION_RATE_LIMIT_PER_HOUR="5"
+```
+
+### Application Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Application environment (development, production)
+ENVIRONMENT="production"
+
+# Service name and version
+SERVICE_NAME="VoidCat Grant Search API"
+API_VERSION="1.0.0"
+
+# CORS allowed origins (comma-separated)
+CORS_ORIGINS="https://voidcat.org,https://www.voidcat.org,https://sorrowscry86.github.io"
+```
+
+### Data Source Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Enable live data fetching from grants.gov
+USE_LIVE_DATA="true"
+ENABLE_LIVE_DATA="true"
+
+# Live data API URLs (optional - defaults provided)
+GRANTS_GOV_API_URL="https://api.grants.gov/v1/api/search2"
+SBIR_API_URL="https://www.sbir.gov/api/opportunities.json"
+NSF_API_URL="https://www.nsf.gov/awardsearch/download.jsp"
+
+# Live data timeout in milliseconds
+LIVE_DATA_TIMEOUT="15000"
+```
+
+### Validation Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Maximum lengths for user inputs
+MAX_SEARCH_QUERY_LENGTH="200"
+MAX_NAME_LENGTH="100"
+MIN_NAME_LENGTH="2"
+MAX_COMPANY_LENGTH="200"
+MAX_GRANT_ID_LENGTH="50"
+```
+
+### Feature Flags Configuration Variables
+
+#### Primary Variables (Use These)
+```bash
+# Feature toggles
+ENABLE_EMAIL_NOTIFICATIONS="true"
+ENABLE_ADVANCED_FILTERS="false"
+ENABLE_PROPOSAL_GENERATION="true"
+ENABLE_RATE_LIMITING="true"
+ENABLE_TELEMETRY="true"
+ENABLE_REQUEST_LOGGING="true"
+ENABLE_PERFORMANCE_METRICS="true"
+ENABLE_ERROR_TRACKING="true"
+```
+
 #### Legacy/Alternative Names (Deprecated)
 ```bash
 # These are supported for backward compatibility but deprecated:
@@ -28,6 +129,98 @@ STRIPE_SK              # Legacy name for STRIPE_SECRET_KEY
 STRIPE_PUBLIC_KEY      # Legacy name for STRIPE_PUBLISHABLE_KEY
 STRIPE_PRODUCT_PRICE_ID # Legacy name for STRIPE_PRICE_ID
 STRIPE_WH_SECRET       # Legacy name for STRIPE_WEBHOOK_SECRET
+```
+
+### Required Environment Variables Summary
+
+#### Production Deployment Requirements
+```bash
+# Essential for payment processing
+STRIPE_SECRET_KEY="sk_live_..."
+STRIPE_PUBLISHABLE_KEY="pk_live_..."
+STRIPE_PRICE_ID="price_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+
+# Essential for email notifications
+MAIL_PROVIDER="mailchannels"
+MAIL_FROM="noreply@yourdomain.com"
+MAILCHANNELS_DKIM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----..."
+
+# Recommended for monitoring
+# Tier 4 Advanced Features Variables
+
+## JWT Authentication Configuration
+```bash
+# JWT secret key for token signing (CRITICAL - must be secure in production)
+JWT_SECRET_KEY="your-secure-jwt-secret-key-minimum-256-bits"
+
+# JWT token expiration times (in seconds)
+JWT_ACCESS_TOKEN_TTL="3600"     # 1 hour (default)
+JWT_REFRESH_TOKEN_TTL="604800"  # 7 days (default)
+```
+
+## Password Security Configuration
+```bash
+# Password hashing parameters
+PASSWORD_HASH_ITERATIONS="100000"  # PBKDF2 iterations (default)
+PASSWORD_MIN_LENGTH="8"            # Minimum password length
+PASSWORD_MAX_LENGTH="128"          # Maximum password length
+```
+
+## Metrics & Dashboard Configuration
+```bash
+# Metrics collection settings
+ENABLE_METRICS="true"              # Enable/disable metrics collection
+METRICS_RETENTION_DAYS="30"        # How long to keep metrics data
+
+# Dashboard access control
+DASHBOARD_ADMIN_EMAILS="admin@voidcat.org,sorrowscry86@users.noreply.github.com"
+```
+
+## Enhanced Email Configuration
+```bash
+# Email service provider selection
+MAIL_PROVIDER="mailchannels"       # "mailchannels" or "resend"
+MAIL_FROM="noreply@voidcat.org"
+
+# MailChannels configuration (for Cloudflare Workers)
+MAILCHANNELS_DKIM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----..."
+MAILCHANNELS_DKIM_SELECTOR="mailchannels"
+
+# Resend configuration (alternative provider)
+RESEND_API_KEY="re_..."
+```
+
+## Rate Limiting Enhancement
+```bash
+# Extended rate limiting configuration
+RATE_LIMIT_PER_MIN="12"                    # Proposal generation limit
+SEARCH_RATE_LIMIT_PER_MIN="60"            # Search queries limit
+REGISTRATION_RATE_LIMIT_PER_HOUR="5"      # Registration attempts limit
+LOGIN_RATE_LIMIT_PER_HOUR="20"            # Login attempts limit
+```
+
+## Feature Flags (Tier 4)
+```bash
+# Advanced feature toggles
+ENABLE_JWT_AUTH="true"             # Enable JWT authentication
+ENABLE_PASSWORD_AUTH="true"        # Enable password-based authentication
+ENABLE_DASHBOARD="true"            # Enable metrics dashboard
+ENABLE_ADVANCED_METRICS="true"    # Enable detailed analytics
+ENABLE_PASSWORD_RESET="true"       # Enable password reset functionality
+```
+
+## Security Headers Configuration
+```bash
+# Enhanced security headers
+SECURITY_HEADERS_ENABLED="true"
+CONTENT_SECURITY_POLICY="default-src 'self'; script-src 'self' 'unsafe-inline'"
+PERMISSIONS_POLICY="geolocation=(), microphone=(), camera=()"
+REFERRER_POLICY="strict-origin-when-cross-origin"
+```
+
+LOG_LEVEL="INFO"
+RATE_LIMIT_PER_MIN="12"
 ```
 
 ## Variable Precedence

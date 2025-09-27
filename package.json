@@ -14,7 +14,11 @@
     "test:payment-stress": "playwright test paymentStressTesting.spec.ts",
     "test:api-endpoints": "node test-api-endpoints.js",
     "test:live-payment": "./run-live-payment-tests.sh",
-    "test:comprehensive": "./comprehensive-live-testing.sh"
+    "test:comprehensive": "./comprehensive-live-testing.sh",
+    "test:edge": "playwright test --grep @edge",
+    "test:edge-ui": "playwright test --grep @edge --ui",
+    "test:contracts": "playwright test apiContracts.spec.ts",
+    "test:edge-cases": "playwright test edgeCases.spec.ts"
   },
   "keywords": [
     "grants",
