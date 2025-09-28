@@ -124,7 +124,50 @@ export class ConfigService {
       ENABLE_ADVANCED_FILTERS: this.getBooleanConfig('ENABLE_ADVANCED_FILTERS', false),
       ENABLE_PROPOSAL_GENERATION: this.getBooleanConfig('ENABLE_PROPOSAL_GENERATION', true),
       ENABLE_RATE_LIMITING: this.getBooleanConfig('ENABLE_RATE_LIMITING', true),
-      ENABLE_TELEMETRY: this.getBooleanConfig('ENABLE_TELEMETRY', true)
+      ENABLE_TELEMETRY: this.getBooleanConfig('ENABLE_TELEMETRY', true),
+      ENABLE_JWT_AUTH: this.getBooleanConfig('ENABLE_JWT_AUTH', true),
+      ENABLE_PASSWORD_AUTH: this.getBooleanConfig('ENABLE_PASSWORD_AUTH', true),
+      ENABLE_DASHBOARD: this.getBooleanConfig('ENABLE_DASHBOARD', true),
+      ENABLE_ADVANCED_METRICS: this.getBooleanConfig('ENABLE_ADVANCED_METRICS', true)
+    };
+  }
+
+  /**
+   * Get dashboard configuration
+   */
+  getDashboardConfig() {
+    return {
+      ADMIN_EMAILS: this.getArrayConfig('DASHBOARD_ADMIN_EMAILS', ['admin@voidcat.org']),
+      METRICS_RETENTION_DAYS: this.getNumberConfig('METRICS_RETENTION_DAYS', 30),
+      ENABLE_EXPORTS: this.getBooleanConfig('DASHBOARD_ENABLE_EXPORTS', true),
+      ENABLE_REALTIME: this.getBooleanConfig('DASHBOARD_ENABLE_REALTIME', true),
+      MAX_EXPORT_RECORDS: this.getNumberConfig('DASHBOARD_MAX_EXPORT_RECORDS', 10000)
+    };
+  }
+
+  /**
+   * Get JWT authentication configuration
+   */
+  getJWTConfig() {
+    return {
+      SECRET_KEY: this.getStringConfig('JWT_SECRET_KEY'), // No default - must be provided
+      ACCESS_TOKEN_TTL: this.getNumberConfig('JWT_ACCESS_TOKEN_TTL', 3600),
+      REFRESH_TOKEN_TTL: this.getNumberConfig('JWT_REFRESH_TOKEN_TTL', 604800),
+      ISSUER: this.getStringConfig('JWT_ISSUER', 'voidcat-grant-api'),
+      AUDIENCE: this.getStringConfig('JWT_AUDIENCE', 'voidcat-grant-platform')
+    };
+  }
+
+  /**
+   * Get password security configuration
+   */
+  getPasswordConfig() {
+    return {
+      HASH_ITERATIONS: this.getNumberConfig('PASSWORD_HASH_ITERATIONS', 100000),
+      MIN_LENGTH: this.getNumberConfig('PASSWORD_MIN_LENGTH', 8),
+      MAX_LENGTH: this.getNumberConfig('PASSWORD_MAX_LENGTH', 128),
+      REQUIRE_COMPLEXITY: this.getBooleanConfig('PASSWORD_REQUIRE_COMPLEXITY', true),
+      RESET_TOKEN_TTL_MINUTES: this.getNumberConfig('PASSWORD_RESET_TOKEN_TTL_MINUTES', 60)
     };
   }
 

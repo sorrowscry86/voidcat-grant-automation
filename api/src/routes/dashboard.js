@@ -5,6 +5,7 @@ import MetricsService from '../services/metricsService.js';
 import JWTService from '../services/jwtService.js';
 import { createResponse } from '../util/response.js';
 import { getDB } from '../db/connection.js';
+import ConfigService from '../services/configService.js';
 
 const dashboard = new Hono();
 
@@ -60,11 +61,12 @@ const requireAdmin = async (c, next) => {
       return createResponse(c, false, 'Invalid authentication', 401, 'INVALID_AUTH');
     }
     
-    // Check if user is admin (you can define admin logic here)
-    // For now, check if email contains 'admin' or if it's the first user
-    const isAdmin = user.email.includes('admin') || 
-                   user.email.includes('sorrowscry86') || 
-                   user.id === 1;
+    // SECURITY FIX: Use proper admin verification from configuration
+    const configService = new ConfigService(c.env);
+    const dashboardConfig = configService.getDashboardConfig();
+    const adminEmails = dashboardConfig.ADMIN_EMAILS;
+    
+    const isAdmin = adminEmails.includes(user.email);
     
     if (!isAdmin) {
       return createResponse(c, false, 'Admin access required', 403, 'ADMIN_REQUIRED');

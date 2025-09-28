@@ -40,9 +40,11 @@ export async function initializeSchema(db) {
         company TEXT,
         api_key TEXT UNIQUE NOT NULL,
         password_hash TEXT, -- New: Support for password authentication
-        password_reset_token TEXT, -- New: Password reset functionality
+        password_reset_token_hash TEXT, -- New: Secure password reset functionality (stores hash, not token)
         password_reset_expires DATETIME, -- New: Reset token expiration
         subscription_tier TEXT DEFAULT 'free',
+        stripe_customer_id TEXT, -- New: Stripe customer ID for subscription management
+        stripe_session_id TEXT, -- New: Latest Stripe session ID
         usage_count INTEGER DEFAULT 0,
         last_login_at DATETIME, -- New: Track login activity
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

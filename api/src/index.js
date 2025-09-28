@@ -149,7 +149,52 @@ app.post('/api/stripe/webhook', async (c) => {
     switch (event.type) {
       case 'checkout.session.completed':
         console.log('Checkout session completed:', event.data.object.id);
-        // TODO: Update user subscription tier in database
+        
+        // CRITICAL SECURITY FIX: Implement subscription upgrade logic
+        try {
+          const session = event.data.object;
+          const customerEmail = session.customer_details?.email || session.customer_email;
+          
+          if (customerEmail) {
+            const { getDB } = await import('./db/connection.js');
+            const db = await getDB(c.env);
+            
+            // Update user subscription tier to 'pro'
+            const updateResult = await db.prepare(`
+              UPDATE users 
+              SET subscription_tier = 'pro', 
+                  updated_at = CURRENT_TIMESTAMP,
+                  stripe_customer_id = ?,
+                  stripe_session_id = ?
+              WHERE email = ?
+            `).bind(
+              session.customer, 
+              session.id, 
+              customerEmail
+            ).run();
+            
+            if (updateResult.success && updateResult.changes > 0) {
+              console.log(`Successfully upgraded user ${customerEmail} to Pro subscription`);
+              
+              // Log the upgrade for telemetry
+              const telemetry = c.get('telemetry');
+              if (telemetry) {
+                telemetry.logInfo('Subscription upgraded', {
+                  email: customerEmail,
+                  tier: 'pro',
+                  stripe_session_id: session.id,
+                  amount_total: session.amount_total
+                });
+              }
+            } else {
+              console.error(`Failed to upgrade user ${customerEmail}: User not found or already upgraded`);
+            }
+          } else {
+            console.error('No customer email found in checkout session');
+          }
+        } catch (dbError) {
+          console.error('Database error during subscription upgrade:', dbError);
+        }
         break;
       default:
         console.log(`Unhandled event type: ${event.type}`);

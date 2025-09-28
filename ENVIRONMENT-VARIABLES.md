@@ -1,8 +1,63 @@
 # 🔧 Environment Variables Configuration
 
-## Standardized Variable Names
+## 🚨 CRITICAL SECURITY REQUIREMENTS
 
-This document defines the standardized environment variable names for the VoidCat Grant Automation Platform and documents precedence when multiple names are used.
+**BREAKING CHANGE**: The following security fixes have been implemented:
+
+### **JWT Authentication Security**
+- ✅ **MANDATORY**: `JWT_SECRET_KEY` environment variable is now **REQUIRED** - no fallback allowed
+- ✅ **Enforcement**: Application will fail to start if JWT_SECRET_KEY is not provided
+- ✅ **Production Ready**: No hardcoded secrets remain in the codebase
+
+```bash
+# CRITICAL: JWT Secret Key (REQUIRED - NO FALLBACK)
+JWT_SECRET_KEY="your-256-bit-secret-key-here"  # MUST be provided, minimum 32 characters
+JWT_ACCESS_TOKEN_TTL="3600"    # 1 hour (seconds)
+JWT_REFRESH_TOKEN_TTL="604800" # 7 days (seconds)
+```
+
+### **Enhanced Password Security**
+- ✅ **Secure Reset Tokens**: Cryptographically secure random tokens (no predictable JSON encoding)
+- ✅ **Token Hashing**: Reset tokens are hashed before database storage
+- ✅ **Timing Attack Protection**: Constant-time comparison for all token/password verification
+
+```bash
+# Password Security Configuration
+PASSWORD_HASH_ITERATIONS="100000"      # PBKDF2 iterations (minimum 100,000)
+PASSWORD_MIN_LENGTH="8"                # Minimum password length
+PASSWORD_MAX_LENGTH="128"              # Maximum password length
+PASSWORD_REQUIRE_COMPLEXITY="true"     # Enforce complexity requirements
+PASSWORD_RESET_TOKEN_TTL_MINUTES="60"  # Reset token expiration (minutes)
+```
+
+### **Admin Access Control**
+- ✅ **Configuration-Based**: Admin access now controlled via environment variables
+- ✅ **Security Logging**: Unauthorized admin access attempts are logged
+- ✅ **No Hardcoded Logic**: Removed hardcoded admin email patterns
+
+```bash
+# Dashboard Admin Configuration (REQUIRED for admin access)
+DASHBOARD_ADMIN_EMAILS="admin@voidcat.org,another-admin@company.com"
+METRICS_RETENTION_DAYS="30"
+DASHBOARD_ENABLE_EXPORTS="true"
+DASHBOARD_ENABLE_REALTIME="true" 
+DASHBOARD_MAX_EXPORT_RECORDS="10000"
+```
+
+### **Stripe Integration Security**
+- ✅ **Subscription Logic**: Implemented missing subscription upgrade functionality
+- ✅ **Database Updates**: Proper user tier upgrades after successful payments
+- ✅ **Security Logging**: Payment events logged with telemetry
+
+```bash
+# Stripe Configuration (Required for payments)
+STRIPE_SECRET_KEY="sk_live_..." # or sk_test_...
+STRIPE_PUBLISHABLE_KEY="pk_live_..." # or pk_test_...
+STRIPE_PRICE_ID="price_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+```
+
+## 📋 Complete Environment Variables List
 
 ### Stripe Configuration Variables
 

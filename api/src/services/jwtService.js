@@ -8,7 +8,13 @@
 export class JWTService {
   constructor(env) {
     this.env = env;
-    this.secretKey = env.JWT_SECRET_KEY || 'voidcat-jwt-secret-key-change-in-production';
+    
+    // CRITICAL SECURITY FIX: Enforce JWT secret key requirement
+    if (!env.JWT_SECRET_KEY) {
+      throw new Error('JWT_SECRET_KEY environment variable is required for JWT authentication. No fallback allowed in production.');
+    }
+    
+    this.secretKey = env.JWT_SECRET_KEY;
     this.algorithm = 'HS256';
     this.issuer = 'voidcat-grant-api';
     this.accessTokenTTL = parseInt(env.JWT_ACCESS_TOKEN_TTL || '3600'); // 1 hour

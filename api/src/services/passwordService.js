@@ -219,40 +219,58 @@ export class PasswordService {
   }
 
   /**
-   * Create a password reset token
+   * Create a secure password reset token
+   * SECURITY FIX: Use cryptographically secure random token instead of predictable JSON encoding
    */
   async generatePasswordResetToken(email) {
-    const tokenData = {
-      email: email,
-      timestamp: Date.now(),
-      random: crypto.randomUUID()
-    };
-
-    const token = btoa(JSON.stringify(tokenData))
+    // Generate a cryptographically secure random token
+    const tokenBytes = crypto.getRandomValues(new Uint8Array(32)); // 256 bits
+    const token = this.arrayBufferToBase64(tokenBytes.buffer)
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=/g, '');
 
-    return token;
+    // Store token hash and metadata separately (would be stored in database)
+    const tokenHash = await this.hashToken(token);
+    const tokenData = {
+      email: email,
+      timestamp: Date.now(),
+      token_hash: tokenHash
+    };
+
+    // Return both the token (to send to user) and data (to store in database)
+    return {
+      token: token,
+      data: tokenData
+    };
   }
 
   /**
-   * Verify a password reset token
+   * Hash a token for secure storage
    */
-  async verifyPasswordResetToken(token, email, maxAgeMinutes = 60) {
-    try {
-      // Decode token
-      const base64 = token.replace(/-/g, '+').replace(/_/g, '/');
-      const padding = '===='.substring(0, (4 - base64.length % 4) % 4);
-      const tokenData = JSON.parse(atob(base64 + padding));
+  async hashToken(token) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(token);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return this.arrayBufferToBase64(hashBuffer);
+  }
 
-      // Verify email matches
-      if (tokenData.email !== email) {
+  /**
+   * Verify a password reset token against stored hash
+   * SECURITY FIX: Verify against stored hash instead of decoding token data
+   */
+  async verifyPasswordResetToken(token, storedTokenData, maxAgeMinutes = 60) {
+    try {
+      // Hash the provided token
+      const tokenHash = await this.hashToken(token);
+
+      // Verify token hash matches (constant-time comparison)
+      if (!this.constantTimeStringEquals(tokenHash, storedTokenData.token_hash)) {
         return false;
       }
 
       // Verify token age
-      const tokenAge = Date.now() - tokenData.timestamp;
+      const tokenAge = Date.now() - storedTokenData.timestamp;
       const maxAge = maxAgeMinutes * 60 * 1000;
 
       if (tokenAge > maxAge) {
@@ -264,6 +282,22 @@ export class PasswordService {
       console.error('Password reset token verification error:', error);
       return false;
     }
+  }
+
+  /**
+   * Constant-time string comparison to prevent timing attacks
+   */
+  constantTimeStringEquals(a, b) {
+    if (a.length !== b.length) {
+      return false;
+    }
+
+    let result = 0;
+    for (let i = 0; i < a.length; i++) {
+      result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+
+    return result === 0;
   }
 
   /**
