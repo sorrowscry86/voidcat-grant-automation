@@ -27,14 +27,24 @@
 
 ## 🚀 Quick Deployment
 
-### 1. Deploy API to Cloudflare Workers
+### Automated Deployment
+
+```bash
+# Deploy everything with one command
+./scripts/deploy.sh
+```
+
+### Manual Steps
+
+1. **Deploy API to Cloudflare Workers:**
 ```bash
 cd api
 npm install
 npx wrangler deploy --env production
 ```
 
-### 2. Deploy Frontend
+2. **Deploy Frontend:**
+
 **Option A: GitHub Pages**
 - Push to GitHub repository
 - Enable GitHub Pages from `frontend/` directory
@@ -42,6 +52,12 @@ npx wrangler deploy --env production
 **Option B: Cloudflare Pages**
 - Connect repository to Cloudflare Pages
 - Set build directory to `frontend/`
+
+**Live URLs**:
+- **API**: https://grant-search-api.sorrowscry86.workers.dev
+- **Frontend**: https://sorrowscry86.github.io/voidcat-grant-automation
+
+For detailed deployment instructions, see [docs/deployment/](./docs/deployment/).
 
 ## 📊 Current Infrastructure
 
@@ -79,7 +95,30 @@ GET  /api/users/me                  - User profile
 POST /api/grants/generate-proposal  - AI proposal generation
 ```
 
-## 💰 Revenue Metrics
+---
+
+## 📚 Documentation
+
+### Quick Links
+- **[Complete Documentation](./docs/)** - Organized documentation directory
+- **[Deployment Guide](./docs/deployment/)** - Production deployment instructions  
+- **[Testing Guide](./docs/testing/)** - E2E testing with Playwright
+- **[Security Guide](./docs/security/)** - Environment variables and security
+- **[Enhancement Plan](./docs/enhancement/)** - Platform improvements roadmap
+
+### Repository Structure
+```
+/
+├── README.md                 # This file - project overview
+├── docs/                     # 📚 All documentation
+├── api/                      # 🔧 Cloudflare Workers API
+├── frontend/                 # 🎨 Static frontend application  
+├── tests/                    # 🧪 E2E test suite (Playwright)
+├── scripts/                  # 🚀 Deployment and utility scripts
+└── package.json             # Root dependencies and test configuration
+```
+
+## 💰 Revenue Metrics & Targets
 
 ### Success Targets (First 48 Hours)
 - ✅ User registrations: 10+
@@ -101,25 +140,11 @@ POST /api/grants/generate-proposal  - AI proposal generation
 - **Payments**: Stripe (Phase 2)
 - **Analytics**: Cloudflare Analytics
 
-## 🎯 Next Phase Development
-
-### Week 2 Priorities
-1. Stripe payment integration
-2. Enhanced AI proposal generation via MCP
-3. Real-time grant data feeds
-4. Advanced search filters
-
-### Month 2 Features
-1. Document upload and analysis
-2. Compliance checking automation
-3. Deadline management system
-4. Success rate analytics
-
 ## 📞 Support & Contact
 
 **VoidCat RDC Federal Grant Automation**
 - Platform: https://grant-search-api.sorrowscry86.workers.dev
-- Frontend: TBD (GitHub Pages deployment)
+- Frontend: https://sorrowscry86.github.io/voidcat-grant-automation
 - Support: Federal funding assistance for technology startups
 
 ### Team Information
@@ -129,78 +154,4 @@ POST /api/grants/generate-proposal  - AI proposal generation
 
 ---
 
-*Deployed: July 27, 2025 | Status: LIVE MVP*
-
-## 🔐 GitHub Secrets & Cloudflare Config
-
-> **⚠️ DEPLOYMENT ISSUE FIX:** If your Workers deployment is failing, see the [GitHub Secrets Setup Guide](./GITHUB-SECRETS-SETUP.md) for step-by-step instructions.
-
-Use GitHub Secrets for CI and Cloudflare Secrets for runtime. No secrets should live in code or `.env` files in this repo.
-
-### Required (for CI deploys)
-- `CLOUDFLARE_API_TOKEN` – API token with at least:
-	- Account > Workers Scripts: Edit
-	- Optional if managed in CI: D1 Database: Edit, Workers KV Storage: Edit, R2: Edit
-- `CLOUDFLARE_ACCOUNT_ID` – Your Cloudflare account ID
-
-**Quick Setup:** See [GITHUB-SECRETS-SETUP.md](./GITHUB-SECRETS-SETUP.md) for detailed instructions.
-
-### Optional (Stripe, syncs to Worker secret store)
-- `STRIPE_SECRET_KEY` – Server-side secret key (sk_live_... or sk_test_...)
-- `STRIPE_PUBLISHABLE_KEY` – Client publishable key (pk_live_... or pk_test_...)
-- `STRIPE_PRICE_ID` – Current subscription price ID (price_...)
-- `STRIPE_WEBHOOK_SECRET` – Webhook signing secret (whsec_...)
-
-The CI workflow at `.github/workflows/deploy-worker.yml` will:
-- Deploy the Worker with Wrangler using the Cloudflare secrets
-- If any Stripe secrets are provided, push them into the Worker (production env) via `wrangler secret put`
-
-### Set secrets in GitHub (UI)
-GitHub → Repository → Settings → Secrets and variables → Actions → New repository secret → add the keys above.
-
-### Set secrets in GitHub (CLI, Windows PowerShell)
-Requires GitHub CLI (`gh`) authenticated to your account:
-
-```powershell
-# From the repo root
-gh secret set CLOUDFLARE_API_TOKEN --body "<token>"
-gh secret set CLOUDFLARE_ACCOUNT_ID --body "<account_id>"
-
-# Optional Stripe
-gh secret set STRIPE_SECRET_KEY --body "sk_test_..."  # or sk_live_...
-gh secret set STRIPE_PUBLISHABLE_KEY --body "pk_test_..."  # or pk_live_...
-gh secret set STRIPE_PRICE_ID --body "price_..."
-gh secret set STRIPE_WEBHOOK_SECRET --body "whsec_..."
-```
-
-### Set secrets directly in Cloudflare (optional local dev)
-From `api/` with Wrangler installed and logged in:
-
-```powershell
-cd api
-npx wrangler secret put STRIPE_SECRET_KEY --env production
-npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env production
-npx wrangler secret put STRIPE_PRICE_ID --env production
-npx wrangler secret put STRIPE_WEBHOOK_SECRET --env production
-```
-
-### Verify deployment
-1) Push a commit touching files under `api/` or run the workflow manually (Actions → Deploy Cloudflare Worker)
-2) Check the run logs for a successful `wrangler deploy`
-3) Hit the health endpoint:
-
-```powershell
-curl https://grant-search-api.sorrowscry86.workers.dev/health
-```
-
-You should receive `{ "status": "ok" }`.
-
-### Make the repository public (after secrets are set)
-- GitHub UI: Settings → General → Danger Zone → Change repository visibility → Public
-- GitHub CLI (Windows PowerShell):
-
-```powershell
-gh repo edit --visibility public
-```
-
-Security note: `.gitignore` excludes local env files, caches, test artifacts, and other sensitive content. Keep secrets exclusively in GitHub/Cloudflare secret stores.
+*Deployed: September 2024 | Status: LIVE MVP*
