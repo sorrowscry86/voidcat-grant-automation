@@ -1,6 +1,6 @@
 // Password Service for VoidCat Grant Automation Platform - Tier 4.2
 // Provides secure password hashing and validation using modern crypto standards
-
+import crypto from 'crypto';
 /**
  * Password Service for secure password handling
  * Uses PBKDF2 with SHA-256 for password hashing
@@ -160,19 +160,23 @@ export class PasswordService {
     const allChars = lowercase + uppercase + numbers + specialChars;
     
     // Ensure at least one character from each category
-    let password = '';
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += specialChars[Math.floor(Math.random() * specialChars.length)];
+    let passwordChars = [];
+    passwordChars.push(lowercase[crypto.randomInt(lowercase.length)]);
+    passwordChars.push(uppercase[crypto.randomInt(uppercase.length)]);
+    passwordChars.push(numbers[crypto.randomInt(numbers.length)]);
+    passwordChars.push(specialChars[crypto.randomInt(specialChars.length)]);
     
     // Fill the rest randomly
     for (let i = 4; i < length; i++) {
-      password += allChars[Math.floor(Math.random() * allChars.length)];
+      passwordChars.push(allChars[crypto.randomInt(allChars.length)]);
     }
     
-    // Shuffle the password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+    // Shuffle the password using a cryptographically secure Fisher-Yates shuffle
+    for (let i = passwordChars.length - 1; i > 0; i--) {
+      const j = crypto.randomInt(i + 1);
+      [passwordChars[i], passwordChars[j]] = [passwordChars[j], passwordChars[i]];
+    }
+    return passwordChars.join('');
   }
 
   /**
