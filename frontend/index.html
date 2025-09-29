@@ -245,6 +245,243 @@
             </div>
         </div>
 
+        <!-- Enhanced Proposal Modal -->
+        <div x-show="showProposalModal" 
+             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+             x-transition>
+            <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                <!-- Modal Header -->
+                <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-2xl font-bold">📝 Generated Proposal</h3>
+                            <p class="text-blue-100 mt-1" x-text="currentProposal?.grant_id ? `Grant ID: ${currentProposal.grant_id}` : 'AI-Generated Grant Proposal'"></p>
+                        </div>
+                        <button @click="showProposalModal = false" 
+                                class="text-blue-100 hover:text-white text-2xl font-bold"
+                                aria-label="Close">
+                            ×
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="p-6 overflow-y-auto max-h-[60vh]">
+                    <div class="prose max-w-none">
+                        <pre class="whitespace-pre-wrap text-gray-800 font-mono text-sm leading-relaxed bg-gray-50 p-4 rounded-lg border" 
+                             x-text="currentProposal?.proposal || currentProposal"></pre>
+                    </div>
+                </div>
+                
+                <!-- Modal Footer -->
+                <div class="bg-gray-50 px-6 py-4 border-t">
+                    <div class="flex flex-wrap gap-3 justify-between items-center">
+                        <div class="flex flex-wrap gap-3">
+                            <button @click="exportProposalAsMarkdown()" 
+                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
+                                📄 Export Markdown
+                            </button>
+                            <button @click="copyProposalToClipboard()" 
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                                📋 Copy to Clipboard
+                            </button>
+                        </div>
+                        <div class="flex gap-3">
+                            <button @click="showProposalModal = false" 
+                                    class="border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-600 mt-3">
+                        💡 <strong>Tip:</strong> This is an AI-generated draft. Review and customize before submission.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enhanced Grant Details Modal -->
+        <div x-show="showGrantDetailsModal" 
+             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+             x-transition>
+            <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+                <!-- Modal Header -->
+                <div class="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-2xl font-bold">📋 Grant Details</h3>
+                            <p class="text-green-100 mt-1" x-text="currentGrantDetails?.agency || 'Federal Grant Opportunity'"></p>
+                        </div>
+                        <button @click="showGrantDetailsModal = false" 
+                                class="text-green-100 hover:text-white text-2xl font-bold"
+                                aria-label="Close">
+                            ×
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="p-6 overflow-y-auto max-h-[60vh]">
+                    <template x-if="currentGrantDetails">
+                        <div class="space-y-6">
+                            <!-- Grant Title and Basic Info -->
+                            <div>
+                                <h4 class="text-xl font-bold text-gray-900 mb-2" x-text="currentGrantDetails.title"></h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span class="font-semibold text-gray-700">🏛️ Agency:</span>
+                                        <span x-text="currentGrantDetails.agency" class="ml-2"></span>
+                                    </div>
+                                    <div>
+                                        <span class="font-semibold text-gray-700">📝 Program:</span>
+                                        <span x-text="currentGrantDetails.program" class="ml-2"></span>
+                                    </div>
+                                    <div>
+                                        <span class="font-semibold text-gray-700">📅 Deadline:</span>
+                                        <span x-text="formatDate(currentGrantDetails.deadline)" class="ml-2"></span>
+                                    </div>
+                                    <div>
+                                        <span class="font-semibold text-gray-700">💰 Amount:</span>
+                                        <span x-text="currentGrantDetails.amount" class="ml-2 font-bold text-green-600"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Description -->
+                            <div>
+                                <h5 class="font-semibold text-gray-700 mb-2">📄 Description:</h5>
+                                <p class="text-gray-700 leading-relaxed" x-text="currentGrantDetails.description"></p>
+                            </div>
+                            
+                            <!-- Eligibility -->
+                            <div>
+                                <h5 class="font-semibold text-gray-700 mb-2">✅ Eligibility:</h5>
+                                <p class="text-gray-700" x-text="currentGrantDetails.eligibility"></p>
+                            </div>
+                            
+                            <!-- Contact Information (if available) -->
+                            <template x-if="currentGrantDetails.contact">
+                                <div>
+                                    <h5 class="font-semibold text-gray-700 mb-2">📞 Contact Information:</h5>
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <p><strong>Name:</strong> <span x-text="currentGrantDetails.contact.name"></span></p>
+                                        <p><strong>Email:</strong> <span x-text="currentGrantDetails.contact.email"></span></p>
+                                        <p><strong>Phone:</strong> <span x-text="currentGrantDetails.contact.phone"></span></p>
+                                    </div>
+                                </div>
+                            </template>
+                            
+                            <!-- Matching Score -->
+                            <div>
+                                <h5 class="font-semibold text-gray-700 mb-2">🎯 Match Score:</h5>
+                                <div class="flex items-center">
+                                    <div class="w-32 bg-gray-200 rounded-full h-3 mr-3">
+                                        <div class="bg-blue-600 h-3 rounded-full transition-all" 
+                                             :style="`width: ${(currentGrantDetails.matching_score || 0) * 100}%`"></div>
+                                    </div>
+                                    <span class="text-sm font-semibold" 
+                                          x-text="`${Math.round((currentGrantDetails.matching_score || 0) * 100)}% match`"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                
+                <!-- Modal Footer -->
+                <div class="bg-gray-50 px-6 py-4 border-t">
+                    <div class="flex justify-between items-center">
+                        <p class="text-xs text-gray-600">
+                            💡 <strong>Tip:</strong> Click "Generate Proposal" to create an AI-powered application for this grant.
+                        </p>
+                        <div class="flex gap-3">
+                            <template x-if="currentGrantDetails && user">
+                                <button @click="generateProposal(currentGrantDetails.id); showGrantDetailsModal = false" 
+                                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                    ✨ Generate Proposal
+                                </button>
+                            </template>
+                            <button @click="showGrantDetailsModal = false" 
+                                    class="border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Modal -->
+        <div x-show="showNotificationModal" 
+             class="fixed top-4 right-4 z-60 max-w-sm"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform translate-x-full"
+             x-transition:enter-end="opacity-100 transform translate-x-0"
+             x-transition:leave="transition ease-in duration-300"
+             x-transition:leave-start="opacity-100 transform translate-x-0"
+             x-transition:leave-end="opacity-0 transform translate-x-full">
+            <div class="rounded-lg shadow-lg overflow-hidden"
+                 :class="notificationType === 'success' ? 'bg-green-500' : 
+                         notificationType === 'error' ? 'bg-red-500' : 
+                         notificationType === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'">
+                <div class="p-4">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <span class="text-white text-xl"
+                                  x-text="notificationType === 'success' ? '✅' : 
+                                          notificationType === 'error' ? '❌' : 
+                                          notificationType === 'warning' ? '⚠️' : 'ℹ️'"></span>
+                        </div>
+                        <div class="ml-3 flex-1">
+                            <p class="text-white font-medium" x-text="notificationMessage"></p>
+                        </div>
+                        <div class="ml-4 flex-shrink-0">
+                            <button @click="showNotificationModal = false" 
+                                    class="text-white hover:text-gray-200"
+                                    aria-label="Close">
+                                <span class="text-lg">×</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Modal -->
+        <div x-show="showErrorModal" 
+             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+             x-transition>
+            <div class="bg-white rounded-lg shadow-2xl max-w-md w-full">
+                <!-- Modal Header -->
+                <div class="bg-red-600 text-white p-4 rounded-t-lg">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-bold flex items-center gap-2">
+                            ❌ Error
+                        </h3>
+                        <button @click="showErrorModal = false" 
+                                class="text-red-100 hover:text-white text-xl font-bold"
+                                aria-label="Close">
+                            ×
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="p-6">
+                    <p class="text-gray-700" x-text="errorMessage"></p>
+                </div>
+                
+                <!-- Modal Footer -->
+                <div class="bg-gray-50 px-6 py-4 rounded-b-lg border-t">
+                    <div class="flex justify-end">
+                        <button @click="showErrorModal = false" 
+                                class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Grant Results -->
         <div x-show="grants.length > 0" class="space-y-4">
             <template x-for="grant in grants" :key="grant.id">
@@ -497,6 +734,19 @@
                 upgradeError: '',
                 menuOpen: false,
                 
+                // New modal states for UX overhaul
+                showProposalModal: false,
+                showGrantDetailsModal: false,
+                showNotificationModal: false,
+                showErrorModal: false,
+                
+                // Modal content
+                currentProposal: null,
+                currentGrantDetails: null,
+                notificationMessage: '',
+                errorMessage: '',
+                notificationType: 'success', // 'success', 'error', 'warning', 'info'
+                
                 // Form data
                 searchQuery: '',
                 selectedAgency: '',
@@ -657,7 +907,7 @@
                             }
                             this.showRegister = false;
                             this.registerForm = { name: '', email: '', company: '' };
-                            // alert('🎉 Registration successful! You can now generate proposals.');
+                            this.showNotification('🎉 Registration successful! You can now generate proposals.', 'success');
                         } else {
                             const error = data;
                             console.error('Registration failed:', (error?.error || 'Unknown error'));
@@ -789,11 +1039,11 @@ ${grant.contact.name}
 ${grant.contact.email}
 ${grant.contact.phone}
                             `;
-                            alert(details);
+                            this.showGrantDetails(grant);
                         }
                     } catch (error) {
                         console.error('Error viewing grant:', error);
-                        alert('Error loading grant details. Please try again.');
+                        this.showError('Error loading grant details. Please try again.');
                     }
                 },
 
@@ -854,20 +1104,21 @@ Generated at: ${new Date(data.generated_at).toLocaleString()}
 
 Note: This is an AI-generated draft. Review and customize before submission.
                             `;
-                            alert(proposalText);
+                            this.showProposal(data);
                         } else {
-                            alert('Error generating proposal: ' + data.error);
+                            this.showError('Error generating proposal: ' + data.error);
                         }
                     } catch (error) {
                         console.error('Error generating proposal:', error);
-                        alert('Error generating proposal. Please try again.');
+                        this.showError('Error generating proposal. Please try again.');
                     }
                 },
 
                 // Create Stripe Checkout Session
                 async createCheckoutSession() {
                     if (!this.user) {
-                        alert('Please log in to upgrade.');
+                        this.showNotification('Please log in to upgrade.', 'warning');
+                        this.showRegister = true;
                         return;
                     }
 
@@ -906,6 +1157,75 @@ Note: This is an AI-generated draft. Review and customize before submission.
                     } catch (error) {
                         console.error('Checkout error:', error);
                         this.upgradeError = error.message || 'Failed to create checkout session';
+                    }
+                },
+
+                // Modal helper methods for UX overhaul
+                showNotification(message, type = 'success') {
+                    this.notificationMessage = message;
+                    this.notificationType = type;
+                    this.showNotificationModal = true;
+                    
+                    // Auto-hide success notifications after 3 seconds
+                    if (type === 'success') {
+                        setTimeout(() => {
+                            this.showNotificationModal = false;
+                        }, 3000);
+                    }
+                },
+
+                showError(message) {
+                    this.errorMessage = message;
+                    this.showErrorModal = true;
+                },
+
+                showProposal(proposalData) {
+                    this.currentProposal = proposalData;
+                    this.showProposalModal = true;
+                },
+
+                showGrantDetails(grant) {
+                    this.currentGrantDetails = grant;
+                    this.showGrantDetailsModal = true;
+                },
+
+                closeAllModals() {
+                    this.showProposalModal = false;
+                    this.showGrantDetailsModal = false;
+                    this.showNotificationModal = false;
+                    this.showErrorModal = false;
+                    this.showRegister = false;
+                    this.upgradeToProModal = false;
+                },
+
+                // Export proposal as Markdown
+                exportProposalAsMarkdown() {
+                    if (!this.currentProposal) return;
+                    
+                    const markdownContent = this.currentProposal.proposal || this.currentProposal;
+                    const blob = new Blob([markdownContent], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `grant-proposal-${this.currentProposal.grant_id || 'generated'}-${new Date().toISOString().split('T')[0]}.md`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    this.showNotification('Proposal exported as Markdown file!', 'success');
+                },
+
+                // Copy proposal to clipboard
+                async copyProposalToClipboard() {
+                    if (!this.currentProposal) return;
+                    
+                    try {
+                        const content = this.currentProposal.proposal || this.currentProposal;
+                        await navigator.clipboard.writeText(content);
+                        this.showNotification('Proposal copied to clipboard!', 'success');
+                    } catch (error) {
+                        this.showError('Failed to copy to clipboard. Please try selecting and copying manually.');
                     }
                 },
 
