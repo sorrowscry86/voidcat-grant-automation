@@ -151,6 +151,19 @@ export class PasswordService {
   /**
    * Generate a secure random password
    */
+
+  // Helper to get unbiased random int for a given max (exclusive)
+  getSecureRandomInt(max) {
+    if (max < 1 || max > 256) throw new Error('Invalid max for random int');
+    // rejection sampling
+    let rand;
+    const limit = Math.floor(256 / max) * max;
+    do {
+      rand = crypto.getRandomValues(new Uint8Array(1))[0];
+    } while (rand >= limit);
+    return rand % max;
+  }
+
   generateSecurePassword(length = 16) {
     const lowercase = 'abcdefghijklmnopqrstuvwxyz';
     const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -159,24 +172,21 @@ export class PasswordService {
     
     const allChars = lowercase + uppercase + numbers + specialChars;
     
-    // Generate cryptographically secure random bytes
-    const randomBytes = crypto.getRandomValues(new Uint8Array(length));
-    
-    // Ensure at least one character from each category
+    // Ensure at least one character from each category using unbiased random
     let passwordChars = [];
-    passwordChars.push(lowercase[randomBytes[0] % lowercase.length]);
-    passwordChars.push(uppercase[randomBytes[1] % uppercase.length]);
-    passwordChars.push(numbers[randomBytes[2] % numbers.length]);
-    passwordChars.push(specialChars[randomBytes[3] % specialChars.length]);
+    passwordChars.push(lowercase[this.getSecureRandomInt(lowercase.length)]);
+    passwordChars.push(uppercase[this.getSecureRandomInt(uppercase.length)]);
+    passwordChars.push(numbers[this.getSecureRandomInt(numbers.length)]);
+    passwordChars.push(specialChars[this.getSecureRandomInt(specialChars.length)]);
     
-    // Fill the rest randomly
+    // Fill the rest randomly (unbiased)
     for (let i = 4; i < length; i++) {
-      passwordChars.push(allChars[randomBytes[i] % allChars.length]);
+      passwordChars.push(allChars[this.getSecureRandomInt(allChars.length)]);
     }
     
-    // Shuffle the password using a cryptographically secure Fisher-Yates shuffle
+    // Shuffle the password using a cryptographically secure Fisher-Yates shuffle (unbiased)
     for (let i = passwordChars.length - 1; i > 0; i--) {
-      const j = randomBytes[i] % (i + 1);
+      const j = this.getSecureRandomInt(i + 1);
       [passwordChars[i], passwordChars[j]] = [passwordChars[j], passwordChars[i]];
     }
     return passwordChars.join('');
