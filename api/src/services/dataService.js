@@ -450,6 +450,158 @@ export class DataService {
       last_updated: this.mockMeta.last_updated
     };
   }
+
+  /**
+   * Fetch live grant data from external APIs (moved from grants route)
+   */
+  async fetchLiveGrantData(query, agency, telemetry = null) {
+    const dataConfig = this.config.live_data || {
+      USE_LIVE_DATA: true,
+      FALLBACK_TO_MOCK: true,
+      LIVE_DATA_TIMEOUT: 15000,
+      LIVE_DATA_SOURCES: {
+        GRANTS_GOV_API: 'https://api.grants.gov/v1/api/search2'
+      }
+    };
+
+    const result = {
+      grants: [],
+      actualDataSource: 'mock',
+      fallbackOccurred: false,
+      error: null
+    };
+
+    if (dataConfig.USE_LIVE_DATA) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), dataConfig.LIVE_DATA_TIMEOUT);
+        
+        const searchBody = {
+          keyword: query || '',
+          ...(agency && { agency: agency })
+        };
+        
+        console.log(`🔍 DataService: Attempting live data fetch from grants.gov API...`);
+        if (telemetry) {
+          telemetry.logInfo('Live data fetch attempt', {
+            endpoint: dataConfig.LIVE_DATA_SOURCES.GRANTS_GOV_API,
+            query: query || '',
+            agency: agency || ''
+          });
+        }
+        
+        const response = await fetch(dataConfig.LIVE_DATA_SOURCES.GRANTS_GOV_API, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'VoidCat Grant Search API/1.0'
+          },
+          body: JSON.stringify(searchBody)
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Grant data API returned ${response.status}: ${response.statusText}`);
+        }
+        
+        const liveData = await response.json();
+
+        // Accept flexible schema: array or wrapped object
+        let opportunitiesRaw;
+        if (Array.isArray(liveData)) {
+          opportunitiesRaw = liveData;
+        } else if (liveData && typeof liveData === 'object') {
+          opportunitiesRaw = liveData.opportunities || liveData.data || liveData.results || [];
+        } else {
+          opportunitiesRaw = [];
+        }
+
+        if (!Array.isArray(opportunitiesRaw)) {
+          console.warn('Live data schema unexpected, normalizing to empty array', { type: typeof opportunitiesRaw });
+          opportunitiesRaw = [];
+        }
+
+        // Transform grants.gov data using DataService logic
+        const transformedGrants = this.transformLiveGrantData(opportunitiesRaw, query);
+        
+        console.log(`✅ DataService: Live data fetch successful: ${transformedGrants.length} grants`);
+        if (telemetry) {
+          telemetry.logInfo('Live data fetch successful', {
+            grants_count: transformedGrants.length,
+            raw_data_length: opportunitiesRaw.length,
+            data_source: 'live'
+          });
+        }
+
+        result.grants = transformedGrants;
+        result.actualDataSource = 'live';
+        result.fallbackOccurred = false;
+        return result;
+        
+      } catch (error) {
+        console.error('DataService: Live data fetch failed, falling back to mock data:', {
+          error: error.message,
+          query,
+          agency,
+          timestamp: new Date().toISOString()
+        });
+        
+        if (telemetry) {
+          telemetry.logError('Live data fetch failed, using fallback', error, {
+            query: query || '',
+            agency: agency || '',
+            fallback_enabled: dataConfig.FALLBACK_TO_MOCK
+          });
+        }
+        
+        if (dataConfig.FALLBACK_TO_MOCK) {
+          const mockResult = this.getGrants({ query, agency });
+          
+          result.grants = mockResult.grants;
+          result.actualDataSource = 'mock';
+          result.fallbackOccurred = true;
+          result.error = error.message;
+          return result;
+        } else {
+          result.error = error.message;
+          return result;
+        }
+      }
+    }
+    
+    if (dataConfig.FALLBACK_TO_MOCK) {
+      console.log('DataService: Using mock data (live data disabled)');
+      const mockResult = this.getGrants({ query, agency });
+      
+      result.grants = mockResult.grants;
+      result.actualDataSource = 'mock';
+      result.fallbackOccurred = false;
+      return result;
+    } else {
+      result.error = 'Live data is disabled and fallback to mock data is not allowed';
+      return result;
+    }
+  }
+
+  /**
+   * Transform live grant data to internal format
+   */
+  transformLiveGrantData(opportunitiesRaw, query) {
+    return opportunitiesRaw.map(grant => ({
+      id: grant.opportunityId || grant.id || `LIVE-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`,
+      title: grant.opportunityTitle || grant.title || 'Federal Grant Opportunity',
+      agency: grant.agencyName || grant.agency || 'Federal Agency',
+      program: grant.opportunityCategory || grant.program || 'Federal Program',
+      deadline: grant.closeDate || grant.deadline || '2025-12-31',
+      amount: grant.awardFloor ? `$${parseInt(grant.awardFloor).toLocaleString()} - $${parseInt(grant.awardCeiling || grant.awardFloor).toLocaleString()}` : 'Amount TBD',
+      description: grant.description || grant.opportunityTitle || 'Federal funding opportunity',
+      eligibility: grant.eligibilityDesc || 'See opportunity details for eligibility requirements',
+      matching_score: this.calculateMatchingScore(grant, query),
+      data_source: 'live'
+    }));
+  }
 }
 
 export default DataService;

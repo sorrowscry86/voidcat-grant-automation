@@ -7,151 +7,7 @@ import DataService from '../services/dataService.js';
 
 const grants = new Hono();
 
-// Live data integration function
-async function fetchLiveGrantData(query, agency, telemetry = null, config = null) {
-  const dataConfig = config || {
-    USE_LIVE_DATA: true,
-    FALLBACK_TO_MOCK: true,
-    LIVE_DATA_TIMEOUT: 15000,
-    LIVE_DATA_SOURCES: {
-      GRANTS_GOV_API: 'https://api.grants.gov/v1/api/search2'
-    }
-  };
 
-  const result = {
-    grants: [],
-    actualDataSource: 'mock',
-    fallbackOccurred: false,
-    error: null
-  };
-
-  if (dataConfig.USE_LIVE_DATA) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), dataConfig.LIVE_DATA_TIMEOUT);
-      
-      const searchBody = {
-        keyword: query || '',
-        ...(agency && { agency: agency })
-      };
-      
-      console.log(`🔍 Attempting live data fetch from grants.gov API...`);
-      if (telemetry) {
-        telemetry.logInfo('Live data fetch attempt', {
-          endpoint: dataConfig.LIVE_DATA_SOURCES.GRANTS_GOV_API,
-          query: query || '',
-          agency: agency || ''
-        });
-      }
-      
-      const response = await fetch(dataConfig.LIVE_DATA_SOURCES.GRANTS_GOV_API, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'VoidCat Grant Search API/1.0'
-        },
-        body: JSON.stringify(searchBody)
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`Grant data API returned ${response.status}: ${response.statusText}`);
-      }
-      
-      const liveData = await response.json();
-
-      // Accept flexible schema: array or wrapped object
-      let opportunitiesRaw;
-      if (Array.isArray(liveData)) {
-        opportunitiesRaw = liveData;
-      } else if (liveData && typeof liveData === 'object') {
-        opportunitiesRaw = liveData.opportunities || liveData.data || liveData.results || [];
-      } else {
-        opportunitiesRaw = [];
-      }
-
-      if (!Array.isArray(opportunitiesRaw)) {
-        console.warn('Live data schema unexpected, normalizing to empty array', { type: typeof opportunitiesRaw });
-        opportunitiesRaw = [];
-      }
-
-      // Transform grants.gov data to internal format
-      const transformedGrants = opportunitiesRaw.map(grant => ({
-        id: grant.opportunityId || grant.id || `LIVE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        title: grant.opportunityTitle || grant.title || 'Federal Grant Opportunity',
-        agency: grant.agencyName || grant.agency || 'Federal Agency',
-        program: grant.opportunityCategory || grant.program || 'Federal Program',
-        deadline: grant.closeDate || grant.deadline || '2025-12-31',
-        amount: grant.awardFloor ? `$${parseInt(grant.awardFloor).toLocaleString()} - $${parseInt(grant.awardCeiling || grant.awardFloor).toLocaleString()}` : 'Amount TBD',
-        description: grant.description || grant.opportunityTitle || 'Federal funding opportunity',
-        eligibility: grant.eligibilityDesc || 'See opportunity details for eligibility requirements',
-        matching_score: 0.8, // Will be calculated by DataService
-        data_source: 'live'
-      }));
-      
-      console.log(`✅ Live data fetch successful: ${transformedGrants.length} grants (raw length: ${opportunitiesRaw.length})`);
-      if (telemetry) {
-        telemetry.logInfo('Live data fetch successful', {
-          grants_count: transformedGrants.length,
-          raw_data_length: opportunitiesRaw.length,
-          data_source: 'live'
-        });
-      }
-
-      result.grants = transformedGrants;
-      result.actualDataSource = 'live';
-      result.fallbackOccurred = false;
-      return result;
-      
-    } catch (error) {
-      console.error('Live data fetch failed, falling back to mock data:', {
-        error: error.message,
-        query,
-        agency,
-        timestamp: new Date().toISOString()
-      });
-      
-      if (telemetry) {
-        telemetry.logError('Live data fetch failed, using fallback', error, {
-          query: query || '',
-          agency: agency || '',
-          fallback_enabled: dataConfig.FALLBACK_TO_MOCK
-        });
-      }
-      
-      if (dataConfig.FALLBACK_TO_MOCK) {
-        // Use DataService for mock data
-        const dataService = new DataService();
-        const mockResult = dataService.getGrants({ query, agency });
-        
-        result.grants = mockResult.grants;
-        result.actualDataSource = 'mock';
-        result.fallbackOccurred = true;
-        result.error = error.message;
-        return result;
-      } else {
-        result.error = error.message;
-        return result;
-      }
-    }
-  }
-  
-  if (dataConfig.FALLBACK_TO_MOCK) {
-    console.log('Using mock data (live data disabled in configuration)');
-    const dataService = new DataService();
-    const mockResult = dataService.getGrants({ query, agency });
-    
-    result.grants = mockResult.grants;
-    result.actualDataSource = 'mock';
-    result.fallbackOccurred = false;
-    return result;
-  } else {
-    result.error = 'Live data is disabled and fallback to mock data is not allowed';
-    return result;
-  }
-}
 
 // Grant search endpoint
 grants.get('/search', async (c) => {
@@ -171,14 +27,30 @@ grants.get('/search', async (c) => {
       }, 400);
     }
     
-    // Fetch grants from configured data source
+    // Use DataService for both live and mock data
     let filteredGrants;
     let actualDataSource;
     let fallbackOccurred;
     let dataSourceError;
     
     try {
-      const fetchResult = await fetchLiveGrantData(query, agency, c.get('telemetry'), dataConfig);
+      const dataService = new DataService({ live_data: dataConfig });
+      let fetchResult;
+      
+      if (dataConfig.USE_LIVE_DATA) {
+        // Try live data first with fallback to mock
+        fetchResult = await dataService.fetchLiveGrantData(query, agency, c.get('telemetry'));
+      } else {
+        // Use mock data only
+        const mockResult = dataService.getGrants({ query, agency });
+        fetchResult = {
+          grants: mockResult.grants,
+          actualDataSource: 'mock',
+          fallbackOccurred: false,
+          error: null
+        };
+      }
+      
       filteredGrants = fetchResult.grants;
       actualDataSource = fetchResult.actualDataSource;
       fallbackOccurred = fetchResult.fallbackOccurred;

@@ -44,7 +44,7 @@ export async function initializeSchema(db) {
         password_reset_expires DATETIME, -- New: Reset token expiration
         subscription_tier TEXT DEFAULT 'free',
         stripe_customer_id TEXT, -- New: Stripe customer ID for subscription management
-        stripe_session_id TEXT, -- New: Latest Stripe session ID
+        stripe_subscription_id TEXT, -- New: Stripe subscription ID for lifecycle management
         usage_count INTEGER DEFAULT 0,
         last_login_at DATETIME, -- New: Track login activity
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

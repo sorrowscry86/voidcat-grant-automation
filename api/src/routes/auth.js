@@ -298,16 +298,16 @@ auth.post('/reset-password', async (c) => {
     
     if (user) {
       // Generate reset token
-      const resetToken = await passwordService.generatePasswordResetToken(email);
+      const { token, data } = await passwordService.generatePasswordResetToken(email);
       
-      // Store reset token in database (expires in 1 hour)
+      // Store reset token hash in database (expires in 1 hour)
       await db.prepare(`
         UPDATE users SET 
-          password_reset_token = ?, 
+          password_reset_token_hash = ?, 
           password_reset_expires = datetime('now', '+1 hour'),
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).bind(resetToken, user.id).run();
+      `).bind(data.token_hash, user.id).run();
       
       // Send reset email asynchronously
       c.executionCtx.waitUntil((async () => {
@@ -319,11 +319,11 @@ auth.post('/reset-password', async (c) => {
               <h2>Password Reset Request</h2>
               <p>Hello ${user.name},</p>
               <p>You requested a password reset for your VoidCat Grant Automation account.</p>
-              <p>Use this reset token: <code>${resetToken}</code></p>
+              <p>Use this reset token: <code>${token}</code></p>
               <p>This token expires in 1 hour.</p>
               <p>If you didn't request this reset, please ignore this email.</p>
             `,
-            text: `Password Reset Request\n\nHello ${user.name},\n\nYou requested a password reset for your VoidCat Grant Automation account.\n\nUse this reset token: ${resetToken}\n\nThis token expires in 1 hour.\n\nIf you didn't request this reset, please ignore this email.`
+            text: `Password Reset Request\n\nHello ${user.name},\n\nYou requested a password reset for your VoidCat Grant Automation account.\n\nUse this reset token: ${token}\n\nThis token expires in 1 hour.\n\nIf you didn't request this reset, please ignore this email.`
           };
           
           const emailResult = await emailService.sendEmail(emailData);
@@ -375,15 +375,28 @@ auth.post('/confirm-reset', async (c) => {
     
     const db = await getDB(c.env);
     
-    // Find user with valid reset token
+    // Find user with non-expired reset token
     const user = await db.prepare(`
       SELECT * FROM users 
       WHERE email = ? 
-        AND password_reset_token = ? 
+        AND password_reset_token_hash IS NOT NULL 
         AND password_reset_expires > datetime('now')
-    `).bind(email, token).first();
+    `).bind(email).first();
     
     if (!user) {
+      return createResponse(c, false, 'Invalid or expired reset token', 400, 'INVALID_RESET_TOKEN');
+    }
+    
+    // Verify token hash using constant-time comparison
+    const tokenData = {
+      token_hash: user.password_reset_token_hash,
+      timestamp: new Date(user.password_reset_expires).getTime() - (60 * 60 * 1000), // Calculate original timestamp
+      email: email
+    };
+    
+    const isValidToken = await passwordService.verifyPasswordResetToken(token, tokenData, 60);
+    
+    if (!isValidToken) {
       return createResponse(c, false, 'Invalid or expired reset token', 400, 'INVALID_RESET_TOKEN');
     }
     
@@ -394,7 +407,7 @@ auth.post('/confirm-reset', async (c) => {
     const result = await db.prepare(`
       UPDATE users SET 
         password_hash = ?,
-        password_reset_token = NULL,
+        password_reset_token_hash = NULL,
         password_reset_expires = NULL,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?

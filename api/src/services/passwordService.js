@@ -1,6 +1,6 @@
 // Password Service for VoidCat Grant Automation Platform - Tier 4.2
 // Provides secure password hashing and validation using modern crypto standards
-import crypto from 'crypto';
+// Using Web Crypto API for Cloudflare Workers compatibility
 /**
  * Password Service for secure password handling
  * Uses PBKDF2 with SHA-256 for password hashing
@@ -159,21 +159,24 @@ export class PasswordService {
     
     const allChars = lowercase + uppercase + numbers + specialChars;
     
+    // Generate cryptographically secure random bytes
+    const randomBytes = crypto.getRandomValues(new Uint8Array(length));
+    
     // Ensure at least one character from each category
     let passwordChars = [];
-    passwordChars.push(lowercase[crypto.randomInt(lowercase.length)]);
-    passwordChars.push(uppercase[crypto.randomInt(uppercase.length)]);
-    passwordChars.push(numbers[crypto.randomInt(numbers.length)]);
-    passwordChars.push(specialChars[crypto.randomInt(specialChars.length)]);
+    passwordChars.push(lowercase[randomBytes[0] % lowercase.length]);
+    passwordChars.push(uppercase[randomBytes[1] % uppercase.length]);
+    passwordChars.push(numbers[randomBytes[2] % numbers.length]);
+    passwordChars.push(specialChars[randomBytes[3] % specialChars.length]);
     
     // Fill the rest randomly
     for (let i = 4; i < length; i++) {
-      passwordChars.push(allChars[crypto.randomInt(allChars.length)]);
+      passwordChars.push(allChars[randomBytes[i] % allChars.length]);
     }
     
     // Shuffle the password using a cryptographically secure Fisher-Yates shuffle
     for (let i = passwordChars.length - 1; i > 0; i--) {
-      const j = crypto.randomInt(i + 1);
+      const j = randomBytes[i] % (i + 1);
       [passwordChars[i], passwordChars[j]] = [passwordChars[j], passwordChars[i]];
     }
     return passwordChars.join('');

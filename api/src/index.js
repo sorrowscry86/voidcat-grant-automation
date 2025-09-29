@@ -19,6 +19,29 @@ import dashboardRoutes from './routes/dashboard.js'; // New: Metrics dashboard r
 // Initialize Hono app
 const app = new Hono();
 
+// Configuration validation middleware - Validate required config at startup
+app.use('*', async (c, next) => {
+  const configService = new ConfigService(c.env);
+  
+  // Validate configuration on first request (acts as startup validation)
+  if (!c.env._configValidated) {
+    const validation = configService.validateRequiredConfig();
+    if (!validation.valid) {
+      console.error('🚨 Configuration validation failed:', validation.errors);
+      return c.json({
+        success: false,
+        error: 'Server configuration is invalid',
+        code: 'INVALID_CONFIG',
+        details: validation.errors
+      }, 500);
+    }
+    console.log('✅ Configuration validation passed');
+    c.env._configValidated = true;
+  }
+  
+  return next();
+});
+
 // CORS middleware - Use configurable origins
 app.use('*', async (c, next) => {
   const configService = new ConfigService(c.env);
@@ -165,11 +188,11 @@ app.post('/api/stripe/webhook', async (c) => {
               SET subscription_tier = 'pro', 
                   updated_at = CURRENT_TIMESTAMP,
                   stripe_customer_id = ?,
-                  stripe_session_id = ?
+                  stripe_subscription_id = ?
               WHERE email = ?
             `).bind(
               session.customer, 
-              session.id, 
+              session.subscription, 
               customerEmail
             ).run();
             
@@ -182,7 +205,7 @@ app.post('/api/stripe/webhook', async (c) => {
                 telemetry.logInfo('Subscription upgraded', {
                   email: customerEmail,
                   tier: 'pro',
-                  stripe_session_id: session.id,
+                  stripe_subscription_id: session.subscription,
                   amount_total: session.amount_total
                 });
               }
