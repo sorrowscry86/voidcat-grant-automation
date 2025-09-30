@@ -55,6 +55,14 @@ verify-production.js
 test-validation.js
 test-fixes-demo.js
 debug-frontend.js
+serve-frontend.js
+test-*.js
+debug-*.js
+live-*.js
+
+# Temporary files and orphaned outputs
+tatus*
+verification-*.md
 
 # OS specific files
 .DS_Store

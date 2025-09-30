@@ -1,7 +1,7 @@
 {
   "name": "voidcat-grant-automation",
-  "version": "1.0.0",
-  "description": "VoidCat RDC Federal Grant Automation Platform - E2E Tests",
+  "version": "1.1.0",
+  "description": "VoidCat RDC Federal Grant Automation Platform - Organized repository with comprehensive documentation",
   "main": "index.js",
   "scripts": {
     "test": "playwright test",
@@ -12,13 +12,13 @@
     "start": "cd api && npx wrangler dev --port 3000",
     "test:install": "playwright install",
     "test:payment-stress": "playwright test paymentStressTesting.spec.ts",
-    "test:api-endpoints": "node test-api-endpoints.js",
-    "test:live-payment": "./run-live-payment-tests.sh",
-    "test:comprehensive": "./comprehensive-live-testing.sh",
+    "test:live-payment": "./scripts/run-live-payment-tests.sh",
+    "test:comprehensive": "./scripts/comprehensive-live-testing.sh",
     "test:edge": "playwright test --grep @edge",
     "test:edge-ui": "playwright test --grep @edge --ui",
     "test:contracts": "playwright test apiContracts.spec.ts",
-    "test:edge-cases": "playwright test edgeCases.spec.ts"
+    "test:edge-cases": "playwright test edgeCases.spec.ts",
+    "deploy": "./scripts/deploy.sh"
   },
   "keywords": [
     "grants",

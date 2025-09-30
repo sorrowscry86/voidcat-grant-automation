@@ -5,7 +5,30 @@ All notable changes to the VoidCat RDC Federal Grant Automation Platform will be
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2025-07-27
+## [1.1.0] - 2024-09-29
+
+### Changed
+- **Repository Organization**: Complete restructuring of project files for better maintainability
+- **Documentation Structure**: Reorganized all documentation into categorized directories under `docs/`
+  - `docs/testing/` - All testing documentation and guides
+  - `docs/deployment/` - Deployment instructions and configuration
+  - `docs/enhancement/` - Enhancement plans and improvements
+  - `docs/security/` - Security policies and environment setup
+- **Scripts Centralization**: Moved all deployment and utility scripts to dedicated `scripts/` directory
+- **Root Directory Cleanup**: Removed temporary and redundant files from repository root
+
+### Removed
+- Temporary development files (`test-validation.js`, `debug-frontend.js`, etc.)
+- Orphaned artifacts (`tatus`, `tatus --porcelain`)
+- Redundant documentation files
+- Development testing utilities no longer needed
+
+### Added
+- Comprehensive documentation navigation in `docs/README.md`
+- Script documentation in `scripts/README.md`
+- Enhanced `.gitignore` to prevent future accumulation of temporary files
+
+## [1.0.0] - 2024-07-27
 
 ### Added
 - Initial MVP release
