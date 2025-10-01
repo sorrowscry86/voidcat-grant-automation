@@ -4,6 +4,11 @@ import { Hono } from 'hono';
 import RateLimiter from '../services/rateLimiter.js';
 import ConfigService from '../services/configService.js';
 import DataService from '../services/dataService.js';
+import FederalAgencyService from '../services/federalAgencyService.js';
+import SemanticAnalysisService from '../services/semanticAnalysisService.js';
+import DeadlineTrackingService from '../services/deadlineTrackingService.js';
+import ComplianceService from '../services/complianceService.js';
+import AIProposalService from '../services/aiProposalService.js';
 
 const grants = new Hono();
 
@@ -381,6 +386,391 @@ This proposal represents a significant opportunity to advance the field through 
       success: false,
       error: 'Proposal generation service encountered an unexpected error. Please try again.',
       code: 'PROPOSAL_GENERATION_ERROR'
+    }, 500);
+  }
+});
+
+// Get federal agency portals endpoint
+grants.get('/federal-agencies', async (c) => {
+  try {
+    const agencyService = new FederalAgencyService();
+    const agencies = agencyService.getActiveAgencies();
+    const stats = agencyService.getStatistics();
+    const schedule = agencyService.getScanningSchedule();
+
+    return c.json({
+      success: true,
+      total_agencies: agencies.length,
+      agencies: agencies.map(agency => ({
+        id: agency.id,
+        name: agency.name,
+        acronym: agency.acronym,
+        portal_url: agency.portal_url,
+        program_types: agency.program_types,
+        solicitation_schedule: agency.solicitation_schedule
+      })),
+      statistics: stats,
+      scanning_schedule: schedule
+    });
+  } catch (error) {
+    console.error('Federal agencies endpoint error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to retrieve federal agency information',
+      code: 'AGENCY_INFO_ERROR'
+    }, 500);
+  }
+});
+
+// Semantic analysis endpoint - Calculate matching score
+grants.post('/analyze-match', async (c) => {
+  try {
+    const requestData = await c.req.json();
+    const { company_profile, grant_id } = requestData;
+
+    if (!company_profile || !grant_id) {
+      return c.json({
+        success: false,
+        error: 'Both company_profile and grant_id are required',
+        code: 'MISSING_PARAMETERS'
+      }, 400);
+    }
+
+    // Get grant details
+    const dataService = new DataService();
+    const grantResult = dataService.getGrants({ query: grant_id });
+    const grant = grantResult.grants.find(g => g.id === grant_id);
+
+    if (!grant) {
+      return c.json({
+        success: false,
+        error: 'Grant not found',
+        code: 'GRANT_NOT_FOUND'
+      }, 404);
+    }
+
+    // Perform semantic analysis
+    const semanticService = new SemanticAnalysisService();
+    const analysis = semanticService.calculateMatchingScore(company_profile, grant);
+
+    return c.json({
+      success: true,
+      grant_id: grant_id,
+      matching_analysis: analysis,
+      grant_details: {
+        title: grant.title,
+        agency: grant.agency,
+        deadline: grant.deadline
+      }
+    });
+  } catch (error) {
+    console.error('Semantic analysis error:', error);
+    return c.json({
+      success: false,
+      error: 'Matching analysis failed',
+      code: 'ANALYSIS_ERROR'
+    }, 500);
+  }
+});
+
+// Deadline tracking endpoint - Get application timeline
+grants.post('/application-timeline', async (c) => {
+  try {
+    const requestData = await c.req.json();
+    const { grant_id, buffer_days } = requestData;
+
+    if (!grant_id) {
+      return c.json({
+        success: false,
+        error: 'Grant ID is required',
+        code: 'MISSING_GRANT_ID'
+      }, 400);
+    }
+
+    // Get grant details
+    const dataService = new DataService();
+    const grantResult = dataService.getGrants({ query: grant_id });
+    const grant = grantResult.grants.find(g => g.id === grant_id);
+
+    if (!grant) {
+      return c.json({
+        success: false,
+        error: 'Grant not found',
+        code: 'GRANT_NOT_FOUND'
+      }, 404);
+    }
+
+    // Generate timeline
+    const deadlineService = new DeadlineTrackingService();
+    const timeline = deadlineService.generateApplicationTimeline(grant, { buffer_days });
+
+    return c.json({
+      success: true,
+      grant_id: grant_id,
+      timeline: timeline,
+      grant_details: {
+        title: grant.title,
+        deadline: grant.deadline
+      }
+    });
+  } catch (error) {
+    console.error('Timeline generation error:', error);
+    return c.json({
+      success: false,
+      error: 'Timeline generation failed',
+      code: 'TIMELINE_ERROR'
+    }, 500);
+  }
+});
+
+// Strategic calendar endpoint
+grants.get('/strategic-calendar', async (c) => {
+  try {
+    const { days_ahead, max_concurrent } = c.req.query();
+    
+    // Get all grants
+    const dataService = new DataService();
+    const allGrants = dataService.getGrants({ limit: 100 });
+
+    // Generate strategic calendar
+    const deadlineService = new DeadlineTrackingService();
+    const calendar = deadlineService.generateStrategicCalendar(
+      allGrants.grants,
+      { 
+        max_concurrent_proposals: parseInt(max_concurrent) || 3 
+      }
+    );
+
+    return c.json({
+      success: true,
+      calendar: calendar
+    });
+  } catch (error) {
+    console.error('Strategic calendar error:', error);
+    return c.json({
+      success: false,
+      error: 'Calendar generation failed',
+      code: 'CALENDAR_ERROR'
+    }, 500);
+  }
+});
+
+// Compliance validation endpoint
+grants.post('/validate-eligibility', async (c) => {
+  try {
+    const requestData = await c.req.json();
+    const { company_profile, grant_requirements } = requestData;
+
+    if (!company_profile || !grant_requirements) {
+      return c.json({
+        success: false,
+        error: 'Both company_profile and grant_requirements are required',
+        code: 'MISSING_PARAMETERS'
+      }, 400);
+    }
+
+    // Validate eligibility
+    const complianceService = new ComplianceService();
+    const validation = complianceService.validateEligibility(company_profile, grant_requirements);
+
+    return c.json({
+      success: true,
+      validation: validation
+    });
+  } catch (error) {
+    console.error('Eligibility validation error:', error);
+    return c.json({
+      success: false,
+      error: 'Eligibility validation failed',
+      code: 'VALIDATION_ERROR'
+    }, 500);
+  }
+});
+
+// Budget justification endpoint
+grants.post('/generate-budget-justification', async (c) => {
+  try {
+    const requestData = await c.req.json();
+    const { budget, project_details } = requestData;
+
+    if (!budget || !project_details) {
+      return c.json({
+        success: false,
+        error: 'Both budget and project_details are required',
+        code: 'MISSING_PARAMETERS'
+      }, 400);
+    }
+
+    // Generate budget justification
+    const complianceService = new ComplianceService();
+    const justification = complianceService.generateBudgetJustification(budget, project_details);
+
+    return c.json({
+      success: true,
+      budget_justification: justification
+    });
+  } catch (error) {
+    console.error('Budget justification error:', error);
+    return c.json({
+      success: false,
+      error: 'Budget justification generation failed',
+      code: 'BUDGET_ERROR'
+    }, 500);
+  }
+});
+
+// Certifications checklist endpoint
+grants.get('/certifications-checklist', async (c) => {
+  try {
+    const { grant_type, agency } = c.req.query();
+
+    if (!grant_type || !agency) {
+      return c.json({
+        success: false,
+        error: 'Both grant_type and agency parameters are required',
+        code: 'MISSING_PARAMETERS'
+      }, 400);
+    }
+
+    // Generate certifications checklist
+    const complianceService = new ComplianceService();
+    const checklist = complianceService.generateCertificationsChecklist(grant_type, agency);
+
+    return c.json({
+      success: true,
+      grant_type: grant_type,
+      agency: agency,
+      certifications: checklist
+    });
+  } catch (error) {
+    console.error('Certifications checklist error:', error);
+    return c.json({
+      success: false,
+      error: 'Certifications checklist generation failed',
+      code: 'CHECKLIST_ERROR'
+    }, 500);
+  }
+});
+
+// Pre-submission review endpoint
+grants.post('/pre-submission-review', async (c) => {
+  try {
+    const requestData = await c.req.json();
+    const { proposal, grant_requirements } = requestData;
+
+    if (!proposal || !grant_requirements) {
+      return c.json({
+        success: false,
+        error: 'Both proposal and grant_requirements are required',
+        code: 'MISSING_PARAMETERS'
+      }, 400);
+    }
+
+    // Perform pre-submission review
+    const complianceService = new ComplianceService();
+    const review = complianceService.performPreSubmissionReview(proposal, grant_requirements);
+
+    return c.json({
+      success: true,
+      review: review
+    });
+  } catch (error) {
+    console.error('Pre-submission review error:', error);
+    return c.json({
+      success: false,
+      error: 'Pre-submission review failed',
+      code: 'REVIEW_ERROR'
+    }, 500);
+  }
+});
+
+// AI-powered proposal generation endpoint (enhanced)
+grants.post('/generate-ai-proposal', async (c) => {
+  try {
+    const requestData = await c.req.json();
+    const { grant_id, company_profile, options } = requestData;
+
+    if (!grant_id || !company_profile) {
+      return c.json({
+        success: false,
+        error: 'Both grant_id and company_profile are required',
+        code: 'MISSING_PARAMETERS'
+      }, 400);
+    }
+
+    // Get grant details
+    const dataService = new DataService();
+    const grantResult = dataService.getGrants({ query: grant_id });
+    const grant = grantResult.grants.find(g => g.id === grant_id);
+
+    if (!grant) {
+      return c.json({
+        success: false,
+        error: 'Grant not found',
+        code: 'GRANT_NOT_FOUND'
+      }, 404);
+    }
+
+    // Generate AI-powered proposal
+    const aiService = new AIProposalService();
+    const proposal = await aiService.generateProposal(grant, company_profile, options || {});
+
+    return c.json({
+      success: true,
+      proposal: proposal,
+      grant_details: {
+        id: grant.id,
+        title: grant.title,
+        agency: grant.agency
+      }
+    });
+  } catch (error) {
+    console.error('AI proposal generation error:', error);
+    return c.json({
+      success: false,
+      error: 'AI proposal generation failed',
+      code: 'AI_PROPOSAL_ERROR'
+    }, 500);
+  }
+});
+
+// Template compliance check endpoint
+grants.get('/agency-template', async (c) => {
+  try {
+    const { agency } = c.req.query();
+
+    if (!agency) {
+      return c.json({
+        success: false,
+        error: 'Agency parameter is required',
+        code: 'MISSING_AGENCY'
+      }, 400);
+    }
+
+    // Get agency template
+    const aiService = new AIProposalService();
+    const template = aiService.templateLibrary[agency];
+
+    if (!template) {
+      return c.json({
+        success: false,
+        error: 'Template not found for specified agency',
+        code: 'TEMPLATE_NOT_FOUND',
+        available_agencies: Object.keys(aiService.templateLibrary)
+      }, 404);
+    }
+
+    return c.json({
+      success: true,
+      agency: agency,
+      template: template
+    });
+  } catch (error) {
+    console.error('Template retrieval error:', error);
+    return c.json({
+      success: false,
+      error: 'Template retrieval failed',
+      code: 'TEMPLATE_ERROR'
     }, 500);
   }
 });
