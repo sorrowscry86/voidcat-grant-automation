@@ -109,14 +109,15 @@ This document summarizes the complete implementation of the VoidCat Grant Automa
 #### ✅ Budget justification generation using FAR cost principles
 **Implementation:** FAR Part 31 compliant budget generation
 - **Allowable cost categories** (8 categories):
-  - Personnel (60% typical): Direct labor with rate justification
-  - Fringe Benefits (25% typical): Calculated as percentage of labor
-  - Equipment (15% typical): Items >$5,000 with useful life >1 year
+  - Personnel (50% typical): Direct labor with rate justification
+  - Fringe Benefits (15% typical): Calculated as percentage of labor
+  - Equipment (10% typical): Items >$5,000 with useful life >1 year
   - Materials & Supplies (5% typical): Consumable items
-  - Travel (8% typical): Justified business travel
-  - Consultants (10% typical): External expertise
-  - Other Direct Costs (7% typical): Publications, licenses
-  - Indirect Costs (25% typical): F&A overhead
+  - Travel (5% typical): Justified business travel
+  - Consultants (5% typical): External expertise
+  - Other Direct Costs (5% typical): Publications, licenses
+  - Indirect Costs (5% typical): F&A overhead
+  - **Total: 100%** ✅
 - **Unallowable costs enforcement:** Excludes alcoholic beverages, bad debts, entertainment, fines, lobbying
 - Percentage variance warnings when exceeding typical ranges by >50%
 - **Endpoint:** `POST /api/grants/generate-budget-justification`

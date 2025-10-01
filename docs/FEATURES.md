@@ -43,7 +43,7 @@ Retrieves configuration and status for all 11 federal agency SBIR/STTR portals.
     "active_agencies": 11,
     "by_program_type": {
       "SBIR": 11,
-      "STTR": 7
+      "STTR": 6
     }
   },
   "scanning_schedule": {
@@ -463,13 +463,15 @@ Generates FAR-compliant budget justification.
 ```
 
 **FAR Cost Principles Applied:**
-- Personnel: 60% (typical)
-- Equipment: 15% (items >$5,000)
+- Personnel: 50% (typical)
+- Fringe Benefits: 15% (employee benefits)
+- Equipment: 10% (items >$5,000)
 - Materials: 5% (consumables)
-- Travel: 8% (justified travel)
-- Consultants: 10% (external expertise)
-- Other Direct: 7% (publications, licenses)
-- Indirect: 25% (F&A overhead)
+- Travel: 5% (justified travel)
+- Consultants: 5% (external expertise)
+- Other Direct: 5% (publications, licenses)
+- Indirect: 5% (F&A overhead)
+- **Total: 100%**
 
 ### Certifications Checklist
 
@@ -590,11 +592,27 @@ if (matchAnalysis.matching_analysis.overall_score > 70) {
   const timeline = await timelineResponse.json();
 
   // 4. Validate eligibility
+  const grant = grants.grants[0];
   const eligibilityResponse = await fetch('/api/grants/validate-eligibility', {
     method: 'POST',
     body: JSON.stringify({
       company_profile: myCompany,
-      grant_requirements: grants.grants[0].requirements
+      grant_requirements: {
+        ownership: {
+          us_ownership_percentage: 51,
+          no_foreign_control: true
+        },
+        size_standard: {
+          max_employees: 500
+        },
+        citizenship: {
+          us_location_required: true
+        },
+        registrations: [
+          { type: 'SAM', critical: true },
+          { type: 'DUNS', critical: true }
+        ]
+      }
     })
   });
   const eligibility = await eligibilityResponse.json();
@@ -615,7 +633,12 @@ if (matchAnalysis.matching_analysis.overall_score > 70) {
       method: 'POST',
       body: JSON.stringify({
         proposal: proposal.proposal,
-        grant_requirements: grants.grants[0].requirements
+        grant_requirements: {
+          program_type: grant.program,
+          agency: grant.agency,
+          page_limit: 15,
+          required_sections: ['executive_summary', 'technical_approach']
+        }
       })
     });
     const review = await reviewResponse.json();
