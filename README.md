@@ -146,10 +146,6 @@ GET  /api/grants/agency-template            - Agency-specific templates
 - [Deployment Guide](./docs/deployment/) - Deployment instructions
 - [API Reference](./docs/FEATURES.md#api-endpoints) - Complete API reference
 
----
-
-## 📚 Documentation
-
 ### Quick Links
 - **[Complete Documentation](./docs/)** - Organized documentation directory
 - **[Deployment Guide](./docs/deployment/)** - Production deployment instructions  

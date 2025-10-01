@@ -301,7 +301,7 @@ export class AIProposalService {
     // Generate each required section
     if (template.required_sections.includes('Executive Summary') || 
         template.required_sections.includes('Project Summary')) {
-      proposal.sections.executive_summary = await this.generateExecutiveSummary(
+      proposal.sections.executive_summary = this.generateExecutiveSummary(
         grantDetails, companyProfile, requirements, template
       );
     }
@@ -309,30 +309,30 @@ export class AIProposalService {
     if (template.required_sections.includes('Technical Volume') ||
         template.required_sections.includes('Technical Approach') ||
         template.required_sections.includes('Project Description')) {
-      proposal.sections.technical_approach = await this.generateTechnicalApproach(
+      proposal.sections.technical_approach = this.generateTechnicalApproach(
         grantDetails, companyProfile, requirements, template
       );
     }
 
     if (template.required_sections.includes('Innovation')) {
-      proposal.sections.innovation = await this.generateInnovationSection(
+      proposal.sections.innovation = this.generateInnovationSection(
         grantDetails, companyProfile, requirements
       );
     }
 
-    proposal.sections.commercial_potential = await this.generateCommercialPotential(
+    proposal.sections.commercial_potential = this.generateCommercialPotential(
       grantDetails, companyProfile, template
     );
 
-    proposal.sections.team_qualifications = await this.generateTeamQualifications(
+    proposal.sections.team_qualifications = this.generateTeamQualifications(
       grantDetails, companyProfile, template
     );
 
-    proposal.sections.budget_narrative = await this.generateBudgetNarrative(
+    proposal.sections.budget_narrative = this.generateBudgetNarrative(
       grantDetails, companyProfile
     );
 
-    proposal.sections.timeline = await this.generateProjectTimeline(
+    proposal.sections.timeline = this.generateProjectTimeline(
       grantDetails, companyProfile
     );
 
@@ -351,7 +351,7 @@ export class AIProposalService {
    * @param {Object} template - Agency template
    * @returns {string} Executive summary
    */
-  async generateExecutiveSummary(grant, company, requirements, template) {
+  generateExecutiveSummary(grant, company, requirements, template) {
     // Simulate AI generation with sophisticated template
     const problemStatement = this.extractProblemStatement(grant);
     const solution = this.formulateSolution(grant, company);
@@ -368,7 +368,7 @@ export class AIProposalService {
    * @param {Object} template - Agency template
    * @returns {string} Technical approach
    */
-  async generateTechnicalApproach(grant, company, requirements, template) {
+  generateTechnicalApproach(grant, company, requirements, template) {
     const challenges = requirements.technical_challenges.slice(0, 3);
     const innovations = company.key_innovations || [];
 
@@ -406,7 +406,7 @@ export class AIProposalService {
    * @param {Object} requirements - Processed requirements
    * @returns {string} Innovation section
    */
-  async generateInnovationSection(grant, company, requirements) {
+  generateInnovationSection(grant, company, requirements) {
     let innovation = `## Innovation\n\n`;
     
     innovation += `### Technical Innovation\n`;
@@ -429,7 +429,7 @@ export class AIProposalService {
    * @param {Object} template - Agency template
    * @returns {string} Commercial potential
    */
-  async generateCommercialPotential(grant, company, template) {
+  generateCommercialPotential(grant, company, template) {
     let commercial = `## Commercial Potential\n\n`;
     
     commercial += `### Market Opportunity\n`;
@@ -459,7 +459,7 @@ export class AIProposalService {
    * @param {Object} template - Agency template
    * @returns {string} Team qualifications
    */
-  async generateTeamQualifications(grant, company, template) {
+  generateTeamQualifications(grant, company, template) {
     let team = `## Team Qualifications\n\n`;
     
     team += `### Principal Investigator\n`;
@@ -493,7 +493,7 @@ export class AIProposalService {
    * @param {Object} company - Company profile
    * @returns {string} Budget narrative
    */
-  async generateBudgetNarrative(grant, company) {
+  generateBudgetNarrative(grant, company) {
     const budget = grant.sample_budget || this.generateSampleBudget(grant);
     
     let narrative = `## Budget Narrative\n\n`;
@@ -514,7 +514,7 @@ export class AIProposalService {
    * @param {Object} company - Company profile
    * @returns {string} Project timeline
    */
-  async generateProjectTimeline(grant, company) {
+  generateProjectTimeline(grant, company) {
     const duration = this.extractDuration(grant.program || 'Phase I');
     
     let timeline = `## Project Timeline\n\n`;
@@ -573,9 +573,9 @@ export class AIProposalService {
   }
 
   estimateRevenue(grant) {
-    const amount = typeof grant.amount === 'string' 
+    const amount = (typeof grant.amount === 'string' 
       ? parseInt(grant.amount.replace(/[$,]/g, '')) 
-      : grant.amount;
+      : grant.amount) || 0;
     return `$${Math.floor(amount * 20 / 1000000)}M-${Math.floor(amount * 50 / 1000000)}M`;
   }
 
@@ -622,9 +622,9 @@ export class AIProposalService {
   }
 
   generateSampleBudget(grant) {
-    const amount = typeof grant.amount === 'string' 
+    const amount = (typeof grant.amount === 'string' 
       ? parseInt(grant.amount.replace(/[$,]/g, '')) 
-      : grant.amount || 250000;
+      : grant.amount) || 250000;
     
     return {
       personnel: { amount: Math.floor(amount * 0.60), justification: 'Direct labor for technical team' },
@@ -651,9 +651,32 @@ export class AIProposalService {
       issues: []
     };
 
+    // Mapping from template section names to actual proposal section keys
+    const sectionMapping = {
+      'Cover Page': 'cover_page',
+      'Technical Volume': 'technical_approach',
+      'Business Volume': 'commercial_potential',
+      'Cost Volume': 'budget_narrative',
+      'Project Summary': 'executive_summary',
+      'Project Description': 'technical_approach',
+      'References Cited': 'references',
+      'Budget Justification': 'budget_narrative',
+      'Biographical Sketches': 'team_qualifications',
+      'Specific Aims': 'executive_summary',
+      'Research Strategy': 'technical_approach',
+      'Bibliography': 'references',
+      'Executive Summary': 'executive_summary',
+      'Technical Approach': 'technical_approach',
+      'Innovation': 'innovation',
+      'Team Qualifications': 'team_qualifications',
+      'Schedule and Milestones': 'timeline',
+      'Project Narrative': 'technical_approach',
+      'Work Plan': 'timeline'
+    };
+
     // Check required sections
     template.required_sections.forEach(section => {
-      const sectionKey = section.toLowerCase().replace(/\s+/g, '_');
+      const sectionKey = sectionMapping[section] || section.toLowerCase().replace(/\s+/g, '_');
       if (!proposal.sections[sectionKey]) {
         compliance.sections_complete = false;
         compliance.issues.push(`Missing required section: ${section}`);

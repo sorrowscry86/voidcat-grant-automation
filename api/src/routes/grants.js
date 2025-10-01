@@ -12,6 +12,12 @@ import AIProposalService from '../services/aiProposalService.js';
 
 const grants = new Hono();
 
+// Initialize stateless services once at module level for better performance
+const federalAgencyService = new FederalAgencyService();
+const semanticAnalysisService = new SemanticAnalysisService();
+const deadlineTrackingService = new DeadlineTrackingService();
+// Use module-level complianceService
+const aiProposalService = new AIProposalService();
 
 
 // Grant search endpoint
@@ -393,10 +399,10 @@ This proposal represents a significant opportunity to advance the field through 
 // Get federal agency portals endpoint
 grants.get('/federal-agencies', async (c) => {
   try {
-    const agencyService = new FederalAgencyService();
-    const agencies = agencyService.getActiveAgencies();
-    const stats = agencyService.getStatistics();
-    const schedule = agencyService.getScanningSchedule();
+    // Use module-level federalAgencyService
+    const agencies = federalAgencyService.getActiveAgencies();
+    const stats = federalAgencyService.getStatistics();
+    const schedule = federalAgencyService.getScanningSchedule();
 
     return c.json({
       success: true,
@@ -438,8 +444,7 @@ grants.post('/analyze-match', async (c) => {
 
     // Get grant details
     const dataService = new DataService();
-    const grantResult = dataService.getGrants({ query: grant_id });
-    const grant = grantResult.grants.find(g => g.id === grant_id);
+    const grant = dataService.getMockGrantById(grant_id);
 
     if (!grant) {
       return c.json({
@@ -450,8 +455,8 @@ grants.post('/analyze-match', async (c) => {
     }
 
     // Perform semantic analysis
-    const semanticService = new SemanticAnalysisService();
-    const analysis = semanticService.calculateMatchingScore(company_profile, grant);
+    // Use module-level semanticAnalysisService
+    const analysis = semanticAnalysisService.calculateMatchingScore(company_profile, grant);
 
     return c.json({
       success: true,
@@ -489,8 +494,7 @@ grants.post('/application-timeline', async (c) => {
 
     // Get grant details
     const dataService = new DataService();
-    const grantResult = dataService.getGrants({ query: grant_id });
-    const grant = grantResult.grants.find(g => g.id === grant_id);
+    const grant = dataService.getMockGrantById(grant_id);
 
     if (!grant) {
       return c.json({
@@ -501,8 +505,8 @@ grants.post('/application-timeline', async (c) => {
     }
 
     // Generate timeline
-    const deadlineService = new DeadlineTrackingService();
-    const timeline = deadlineService.generateApplicationTimeline(grant, { buffer_days });
+    // Use module-level deadlineTrackingService
+    const timeline = deadlineTrackingService.generateApplicationTimeline(grant, { buffer_days });
 
     return c.json({
       success: true,
@@ -526,15 +530,15 @@ grants.post('/application-timeline', async (c) => {
 // Strategic calendar endpoint
 grants.get('/strategic-calendar', async (c) => {
   try {
-    const { days_ahead, max_concurrent } = c.req.query();
+    const { max_concurrent } = c.req.query();
     
     // Get all grants
     const dataService = new DataService();
     const allGrants = dataService.getGrants({ limit: 100 });
 
     // Generate strategic calendar
-    const deadlineService = new DeadlineTrackingService();
-    const calendar = deadlineService.generateStrategicCalendar(
+    // Use module-level deadlineTrackingService
+    const calendar = deadlineTrackingService.generateStrategicCalendar(
       allGrants.grants,
       { 
         max_concurrent_proposals: parseInt(max_concurrent) || 3 
@@ -570,7 +574,7 @@ grants.post('/validate-eligibility', async (c) => {
     }
 
     // Validate eligibility
-    const complianceService = new ComplianceService();
+    // Use module-level complianceService
     const validation = complianceService.validateEligibility(company_profile, grant_requirements);
 
     return c.json({
@@ -602,7 +606,7 @@ grants.post('/generate-budget-justification', async (c) => {
     }
 
     // Generate budget justification
-    const complianceService = new ComplianceService();
+    // Use module-level complianceService
     const justification = complianceService.generateBudgetJustification(budget, project_details);
 
     return c.json({
@@ -633,7 +637,7 @@ grants.get('/certifications-checklist', async (c) => {
     }
 
     // Generate certifications checklist
-    const complianceService = new ComplianceService();
+    // Use module-level complianceService
     const checklist = complianceService.generateCertificationsChecklist(grant_type, agency);
 
     return c.json({
@@ -667,7 +671,7 @@ grants.post('/pre-submission-review', async (c) => {
     }
 
     // Perform pre-submission review
-    const complianceService = new ComplianceService();
+    // Use module-level complianceService
     const review = complianceService.performPreSubmissionReview(proposal, grant_requirements);
 
     return c.json({
@@ -700,8 +704,7 @@ grants.post('/generate-ai-proposal', async (c) => {
 
     // Get grant details
     const dataService = new DataService();
-    const grantResult = dataService.getGrants({ query: grant_id });
-    const grant = grantResult.grants.find(g => g.id === grant_id);
+    const grant = dataService.getMockGrantById(grant_id);
 
     if (!grant) {
       return c.json({
@@ -712,8 +715,8 @@ grants.post('/generate-ai-proposal', async (c) => {
     }
 
     // Generate AI-powered proposal
-    const aiService = new AIProposalService();
-    const proposal = await aiService.generateProposal(grant, company_profile, options || {});
+    // Use module-level aiProposalService
+    const proposal = await aiProposalService.generateProposal(grant, company_profile, options || {});
 
     return c.json({
       success: true,
@@ -748,15 +751,17 @@ grants.get('/agency-template', async (c) => {
     }
 
     // Get agency template
-    const aiService = new AIProposalService();
-    const template = aiService.templateLibrary[agency];
+    // Use module-level aiProposalService
+    const template = Object.prototype.hasOwnProperty.call(aiProposalService.templateLibrary, agency)
+      ? aiProposalService.templateLibrary[agency]
+      : null;
 
     if (!template) {
       return c.json({
         success: false,
         error: 'Template not found for specified agency',
         code: 'TEMPLATE_NOT_FOUND',
-        available_agencies: Object.keys(aiService.templateLibrary)
+        available_agencies: Object.keys(aiProposalService.templateLibrary)
       }, 404);
     }
 

@@ -16,19 +16,19 @@ export class ComplianceService {
       allowable_cost_categories: {
         'personnel': {
           name: 'Direct Labor',
-          typical_percentage: 0.60,
+          typical_percentage: 0.50,
           description: 'Salaries and wages for personnel directly working on the project',
           documentation_required: ['labor rates', 'personnel qualifications', 'effort allocation']
         },
         'fringe_benefits': {
           name: 'Fringe Benefits',
-          typical_percentage: 0.25,
+          typical_percentage: 0.15,
           description: 'Employee benefits calculated as percentage of direct labor',
           documentation_required: ['fringe rate justification', 'benefit breakdown']
         },
         'equipment': {
           name: 'Equipment',
-          typical_percentage: 0.15,
+          typical_percentage: 0.10,
           description: 'Equipment purchases over $5,000 with useful life > 1 year',
           documentation_required: ['equipment list', 'vendor quotes', 'justification']
         },
@@ -40,25 +40,25 @@ export class ComplianceService {
         },
         'travel': {
           name: 'Travel',
-          typical_percentage: 0.08,
+          typical_percentage: 0.05,
           description: 'Domestic and international travel costs',
           documentation_required: ['travel plan', 'destination', 'purpose', 'attendees']
         },
         'consultants': {
           name: 'Consultant Services',
-          typical_percentage: 0.10,
+          typical_percentage: 0.05,
           description: 'External consultant and subcontractor costs',
           documentation_required: ['consultant justification', 'rates', 'scope of work']
         },
         'other_direct_costs': {
           name: 'Other Direct Costs',
-          typical_percentage: 0.07,
+          typical_percentage: 0.05,
           description: 'Publication costs, computer services, etc.',
           documentation_required: ['itemized breakdown', 'cost estimates']
         },
         'indirect_costs': {
           name: 'Indirect Costs (F&A)',
-          typical_percentage: 0.25,
+          typical_percentage: 0.05,
           description: 'Facilities and administrative costs',
           documentation_required: ['approved indirect cost rate', 'rate agreement']
         }
@@ -410,7 +410,7 @@ export class ComplianceService {
     });
 
     return {
-      alignment_score: matches / focusAreas.length,
+      alignment_score: focusAreas.length > 0 ? matches / focusAreas.length : 0,
       matched_areas: matches,
       total_areas: focusAreas.length
     };
@@ -497,7 +497,9 @@ export class ComplianceService {
       'indirect_costs': `Indirect costs of $${amount.toLocaleString()} calculated using company's approved indirect cost rate, covering facilities and administrative expenses.`
     };
 
-    return templates[category] || `Budget allocation of $${amount.toLocaleString()} for ${category}.`;
+    return Object.prototype.hasOwnProperty.call(templates, category)
+      ? templates[category]
+      : `Budget allocation of $${amount.toLocaleString()} for ${category}.`;
   }
 
   /**
