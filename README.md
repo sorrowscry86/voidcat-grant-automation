@@ -79,8 +79,28 @@ For detailed deployment instructions, see [docs/deployment/](./docs/deployment/)
 - [x] Subscription tier management
 - [x] Mobile-responsive interface
 
+### Intelligent Discovery Engine ✨ NEW
+- [x] 11 federal agency SBIR/STTR portal integration
+- [x] Semantic analysis with 0-100% matching scores
+- [x] Real-time technical alignment assessment
+- [x] Automated deadline tracking
+- [x] Strategic application calendar
+
+### AI-Powered Proposal Generation ✨ NEW
+- [x] Natural language processing of requirements
+- [x] Template-based compliance checking
+- [x] Agency-specific format validation
+- [x] Dynamic content generation
+- [x] Iterative refinement framework
+
+### Compliance Automation ✨ NEW
+- [x] Automatic eligibility validation
+- [x] FAR cost principles budget generation
+- [x] Required certifications checklist
+- [x] Pre-submission compliance review
+
 ### Grant Sources Integrated
-- SBIR/STTR programs
+- SBIR/STTR programs (11 federal agencies)
 - NSF Research Institutes
 - DOE Advanced Computing
 - DARPA Opportunities
@@ -88,6 +108,7 @@ For detailed deployment instructions, see [docs/deployment/](./docs/deployment/)
 
 ## 🔧 API Endpoints
 
+### Core Endpoints
 ```
 GET  /health                        - Health check
 GET  /api/grants/search             - Search grants
@@ -96,6 +117,34 @@ POST /api/users/register            - User registration
 GET  /api/users/me                  - User profile
 POST /api/grants/generate-proposal  - AI proposal generation
 ```
+
+### Discovery Engine Endpoints ✨ NEW
+```
+GET  /api/grants/federal-agencies           - List 11 federal agency portals
+POST /api/grants/analyze-match              - Calculate 0-100% matching score
+POST /api/grants/application-timeline       - Generate strategic timeline
+GET  /api/grants/strategic-calendar         - Get application calendar
+```
+
+### Compliance Automation Endpoints ✨ NEW
+```
+POST /api/grants/validate-eligibility       - Validate eligibility requirements
+POST /api/grants/generate-budget-justification - FAR-compliant budget
+GET  /api/grants/certifications-checklist   - Required certifications
+POST /api/grants/pre-submission-review      - Pre-submission compliance
+```
+
+### AI Proposal Endpoints ✨ NEW
+```
+POST /api/grants/generate-ai-proposal       - AI-powered proposal generation
+GET  /api/grants/agency-template            - Agency-specific templates
+```
+
+## 📚 Documentation
+
+- [Feature Documentation](./docs/FEATURES.md) - Comprehensive API and feature guide
+- [Deployment Guide](./docs/deployment/) - Deployment instructions
+- [API Reference](./docs/FEATURES.md#api-endpoints) - Complete API reference
 
 ---
 
