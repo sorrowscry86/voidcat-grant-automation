@@ -44,8 +44,8 @@ test.describe('DataService → SemanticAnalysisService Integration', () => {
     
     // Verify data integration
     expect(matchData.success).toBe(true);
-    expect(matchData.matching_score).toBeGreaterThanOrEqual(0);
-    expect(matchData.matching_score).toBeLessThanOrEqual(100);
+    expect(matchData.matching_analysis.overall_score).toBeGreaterThanOrEqual(0);
+    expect(matchData.matching_analysis.overall_score).toBeLessThanOrEqual(100);
     expect(matchData.grant_details).toBeDefined();
     expect(matchData.grant_details.id).toBe(targetGrant.id);
   });
@@ -76,7 +76,7 @@ test.describe('DataService → SemanticAnalysisService Integration', () => {
 
       expect(matchResponse.ok()).toBeTruthy();
       const matchData = await matchResponse.json();
-      expect(matchData.matching_score).toBeDefined();
+      expect(matchData.matching_analysis.overall_score).toBeDefined();
     }
   });
 });
@@ -278,7 +278,7 @@ test.describe('End-to-End Service Integration', () => {
     });
     expect(matchResponse.ok()).toBeTruthy();
     const matchData = await matchResponse.json();
-    expect(matchData.matching_score).toBeGreaterThan(0);
+    expect(matchData.matching_analysis.overall_score).toBeGreaterThan(0);
 
     // Step 3: Validate eligibility
     const eligibilityResponse = await request.post(`${API_BASE_URL}/api/grants/validate-eligibility`, {

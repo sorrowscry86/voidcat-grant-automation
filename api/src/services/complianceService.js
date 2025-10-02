@@ -658,9 +658,35 @@ export class ComplianceService {
     }
 
     // 5. Content requirements
+    // Mapping from template section names to actual proposal section keys (must match AIProposalService)
+    const sectionMapping = {
+      'Cover Page': 'cover_page',
+      'Technical Volume': 'technical_approach',
+      'Business Volume': 'commercial_potential',
+      'Cost Volume': 'budget_narrative',
+      'Project Summary': 'executive_summary',
+      'Project Description': 'technical_approach',
+      'References Cited': 'references',
+      'Budget Justification': 'budget_narrative',
+      'Biographical Sketches': 'team_qualifications',
+      'Specific Aims': 'executive_summary',
+      'Research Strategy': 'technical_approach',
+      'Bibliography': 'references',
+      'Executive Summary': 'executive_summary',
+      'Technical Approach': 'technical_approach',
+      'Innovation': 'innovation',
+      'Team Qualifications': 'team_qualifications',
+      'Schedule and Milestones': 'timeline',
+      'Project Narrative': 'technical_approach',
+      'Work Plan': 'timeline'
+    };
+    
     const requiredSections = grantRequirements.required_sections || [];
     const providedSections = Object.keys(proposal.sections || {});
-    const missingSections = requiredSections.filter(sec => !providedSections.includes(sec));
+    const missingSections = requiredSections.filter(sec => {
+      const sectionKey = sectionMapping[sec] || sec.toLowerCase().replace(/\s+/g, '_');
+      return !providedSections.includes(sectionKey);
+    });
     
     if (missingSections.length === 0) {
       review.checklist.content = true;

@@ -67,14 +67,14 @@ test.describe('Scenario A: Small Business SBIR (DOD)', () => {
     const data = await response.json();
     
     expect(data.success).toBe(true);
-    expect(data.matching_score).toBeGreaterThan(70); // High match expected
-    expect(data.confidence_level).toBe('high');
-    expect(data.recommendations).toBeDefined();
+    expect(data.matching_analysis.overall_score).toBeGreaterThan(70); // High match expected
+    expect(data.matching_analysis.confidence_level).toBe('high');
+    expect(data.matching_analysis.recommendations).toBeDefined();
     
     // Validate scoring breakdown
-    expect(data.scoring_breakdown).toBeDefined();
-    expect(data.scoring_breakdown.technical_alignment).toBeGreaterThan(0);
-    expect(data.scoring_breakdown.capability_match).toBeGreaterThan(0);
+    expect(data.matching_analysis.breakdown).toBeDefined();
+    expect(data.matching_analysis.breakdown.technical_alignment).toBeGreaterThan(0);
+    expect(data.matching_analysis.breakdown.capability_match).toBeGreaterThan(0);
   });
 
   test('Step 3: Validate eligibility requirements', async ({ request }) => {
@@ -242,7 +242,7 @@ test.describe('Scenario B: Academic Research Grant (NSF)', () => {
     });
     expect(matchResponse.ok()).toBeTruthy();
     const matchData = await matchResponse.json();
-    expect(matchData.matching_score).toBeGreaterThan(75); // High academic match
+    expect(matchData.matching_analysis.overall_score).toBeGreaterThan(75); // High academic match
 
     // Step 3: Generate proposal with academic focus
     const proposalResponse = await request.post(`${API_BASE_URL}/api/grants/generate-ai-proposal`, {

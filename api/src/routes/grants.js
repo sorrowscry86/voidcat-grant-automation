@@ -16,7 +16,7 @@ const grants = new Hono();
 const federalAgencyService = new FederalAgencyService();
 const semanticAnalysisService = new SemanticAnalysisService();
 const deadlineTrackingService = new DeadlineTrackingService();
-// Use module-level complianceService
+const complianceService = new ComplianceService();
 const aiProposalService = new AIProposalService();
 
 
