@@ -13,8 +13,11 @@ export class DeadlineTrackingService {
    * @returns {Object} Application timeline and milestones
    */
   generateApplicationTimeline(grant, options = {}) {
+    // Normalize dates to UTC midnight to avoid timezone/time-of-day errors
     const deadline = new Date(grant.deadline);
+    deadline.setUTCHours(0, 0, 0, 0);
     const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
     const daysUntilDeadline = Math.floor((deadline - today) / (1000 * 60 * 60 * 24));
 
     const timeline = {

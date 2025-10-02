@@ -18,6 +18,7 @@ const semanticAnalysisService = new SemanticAnalysisService();
 const deadlineTrackingService = new DeadlineTrackingService();
 const complianceService = new ComplianceService();
 const aiProposalService = new AIProposalService();
+const dataService = new DataService();
 
 
 // Grant search endpoint
@@ -78,7 +79,7 @@ grants.get('/search', async (c) => {
     try {
       // If we got mock data, apply additional filters using DataService
       if (actualDataSource === 'mock') {
-        const dataService = new DataService();
+        // Use module-level dataService
         const searchOptions = {
           query,
           agency,
@@ -155,7 +156,7 @@ grants.get('/search', async (c) => {
 // Get grant statistics endpoint (must be before /:id route)
 grants.get('/stats', async (c) => {
   try {
-    const dataService = new DataService();
+    // Use module-level dataService
     const stats = dataService.getStatistics();
     
     return c.json({
@@ -199,7 +200,7 @@ grants.get('/:id', async (c) => {
     }
     
     // Try to find grant in mock data using DataService
-    const dataService = new DataService();
+    // Use module-level dataService
     const mockGrant = dataService.getMockGrantById(grantId);
     
     if (mockGrant) {
@@ -309,7 +310,7 @@ grants.post('/generate-proposal', async (c) => {
     }
     
     // Get grant details for proposal context
-    const dataService = new DataService();
+    // Use module-level dataService
     const grant = dataService.getMockGrantById(grant_id);
     
     const grantTitle = grant ? grant.title : 'Federal Grant Opportunity';
@@ -443,7 +444,7 @@ grants.post('/analyze-match', async (c) => {
     }
 
     // Get grant details
-    const dataService = new DataService();
+    // Use module-level dataService
     const grant = dataService.getMockGrantById(grant_id);
 
     if (!grant) {
@@ -493,7 +494,7 @@ grants.post('/application-timeline', async (c) => {
     }
 
     // Get grant details
-    const dataService = new DataService();
+    // Use module-level dataService
     const grant = dataService.getMockGrantById(grant_id);
 
     if (!grant) {
@@ -533,7 +534,7 @@ grants.get('/strategic-calendar', async (c) => {
     const { max_concurrent } = c.req.query();
     
     // Get all grants
-    const dataService = new DataService();
+    // Use module-level dataService
     const allGrants = dataService.getGrants({ limit: 100 });
 
     // Generate strategic calendar
@@ -703,7 +704,7 @@ grants.post('/generate-ai-proposal', async (c) => {
     }
 
     // Get grant details
-    const dataService = new DataService();
+    // Use module-level dataService
     const grant = dataService.getMockGrantById(grant_id);
 
     if (!grant) {

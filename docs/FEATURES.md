@@ -424,7 +424,7 @@ Generates FAR-compliant budget justification.
     "consultants": 25000,
     "other_direct_costs": 17500,
     "indirect_costs": 37500,
-    "total": 250000
+    "total": 337500
   },
   "project_details": {
     "title": "AI for Defense Applications",
