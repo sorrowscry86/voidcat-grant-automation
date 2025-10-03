@@ -4,6 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VoidCat RDC - Federal Grant Automation</title>
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'GA_MEASUREMENT_ID');
+        
+        // Custom events for grant platform
+        function trackGrantSearch(query, resultsCount) {
+            gtag('event', 'grant_search', {
+                search_term: query,
+                results_count: resultsCount,
+                event_category: 'engagement'
+            });
+        }
+        
+        function trackProposalGeneration(grantId) {
+            gtag('event', 'proposal_generation', {
+                grant_id: grantId,
+                event_category: 'conversion'
+            });
+        }
+        
+        function trackUserRegistration(tier) {
+            gtag('event', 'sign_up', {
+                subscription_tier: tier,
+                event_category: 'conversion'
+            });
+        }
+        
+        function trackUpgrade() {
+            gtag('event', 'purchase', {
+                event_category: 'conversion',
+                value: 99
+            });
+        }
+    </script>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://js.stripe.com/v3/"></script>
@@ -885,7 +924,14 @@
                                         localStorage.setItem('voidcat_api_key', enc);
                                     });
                                 }
-                                await this.checkAuth();
+                                // Set user data immediately from registration response
+                                this.user = {
+                                    email: this.registerForm.email,
+                                    name: this.registerForm.name,
+                                    subscription_tier: data.subscription_tier || 'free',
+                                    usage_count: 0
+                                };
+                                await this.checkAuth(); // This will update with more complete user data
                             } else if (data.token) {
                                 this.apiKey = data.token;
                                 {
@@ -905,17 +951,20 @@
                                     usage_count: 0
                                 };
                             }
-                            this.showRegister = false;
-                            this.registerForm = { name: '', email: '', company: '' };
                             this.showNotification('🎉 Registration successful! You can now generate proposals.', 'success');
                         } else {
                             const error = data;
                             console.error('Registration failed:', (error?.error || 'Unknown error'));
+                            this.showNotification('❌ Registration failed: ' + (error?.error || 'Unknown error'), 'error');
                         }
                     } catch (error) {
                         console.error('Registration failed: ' + error.message);
+                        this.showNotification('❌ Registration failed: ' + error.message, 'error');
                     } finally {
                         this.registering = false;
+                        // Always close modal and clear form after registration attempt
+                        this.showRegister = false;
+                        this.registerForm = { name: '', email: '', company: '' };
                     }
                 },
 

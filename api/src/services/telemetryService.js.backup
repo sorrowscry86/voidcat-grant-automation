@@ -1,0 +1,214 @@
+// VoidCat RDC Telemetry Service
+// Provides structured logging, metrics collection, and request correlation
+
+export class TelemetryService {
+  constructor() {
+    this.requestId = null;
+    this.startTime = null;
+    this.metrics = {
+      requests: 0,
+      errors: 0,
+      fallbacks: 0,
+      liveDataSuccess: 0,
+      emailsSent: 0,
+      proposalsGenerated: 0
+    };
+  }
+
+  /**
+   * Initialize telemetry for a new request
+   * @param {Object} context - Hono context object
+   * @returns {string} - Generated request ID
+   */
+  initRequest(context) {
+    this.requestId = crypto.randomUUID();
+    this.startTime = Date.now();
+    this.metrics.requests++;
+    
+    // Add request ID to context for other services
+    context.set('requestId', this.requestId);
+    
+    this.log('info', 'Request started', {
+      method: context.req.method,
+      path: context.req.path,
+      userAgent: context.req.header('User-Agent'),
+      ip: context.req.header('CF-Connecting-IP') || 'unknown'
+    });
+    
+    return this.requestId;
+  }
+
+  /**
+   * Log structured message with context
+   * @param {string} level - Log level (info, warn, error)
+   * @param {string} message - Log message
+   * @param {Object} metadata - Additional context data
+   */
+  log(level, message, metadata = {}) {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level: level.toUpperCase(),
+      requestId: this.requestId,
+      message,
+      service: 'VoidCat-Grant-API',
+      ...metadata
+    };
+
+    // In development, pretty print. In production, structured JSON
+    if (typeof globalThis !== 'undefined' && globalThis.ENVIRONMENT === 'development') {
+      console.log(`[${logEntry.level}] ${logEntry.message}`, metadata);
+    } else {
+      console.log(JSON.stringify(logEntry));
+    }
+  }
+
+  /**
+   * Log live data fetch attempt and result
+   * @param {string} query - Search query
+   * @param {string} agency - Agency filter
+   * @param {Object} result - Fetch result
+   */
+  logLiveDataAttempt(query, agency, result) {
+    if (result.actualDataSource === 'live') {
+      this.metrics.liveDataSuccess++;
+      this.log('info', 'Live data fetch successful', {
+        query,
+        agency,
+        grantCount: result.grants.length,
+        dataSource: result.actualDataSource,
+        fallbackOccurred: result.fallbackOccurred
+      });
+    } else if (result.fallbackOccurred) {
+      this.metrics.fallbacks++;
+      this.log('warn', 'Live data fetch failed, using fallback', {
+        query,
+        agency,
+        error: result.error,
+        dataSource: result.actualDataSource,
+        fallbackReason: result.error
+      });
+    } else {
+      this.log('info', 'Using mock data (live data disabled)', {
+        query,
+        agency,
+        dataSource: result.actualDataSource
+      });
+    }
+  }
+
+  /**
+   * Log email send attempt
+   * @param {string} email - Recipient email
+   * @param {boolean} success - Whether email was sent successfully
+   * @param {string} error - Error message if failed
+   */
+  logEmailAttempt(email, success, error = null) {
+    if (success) {
+      this.metrics.emailsSent++;
+      this.log('info', 'Registration email sent', {
+        recipient: email.substring(0, 3) + '***@' + email.split('@')[1], // Partially mask email
+        provider: 'mailchannels'
+      });
+    } else {
+      this.log('warn', 'Registration email failed', {
+        recipient: email.substring(0, 3) + '***@' + email.split('@')[1],
+        error: error,
+        provider: 'mailchannels'
+      });
+    }
+  }
+
+  /**
+   * Log proposal generation
+   * @param {string} grantId - Grant ID
+   * @param {number} duration - Generation time in ms
+   * @param {boolean} success - Whether generation succeeded
+   */
+  logProposalGeneration(grantId, duration, success) {
+    if (success) {
+      this.metrics.proposalsGenerated++;
+      this.log('info', 'Proposal generated successfully', {
+        grantId,
+        duration,
+        performance: duration < 5000 ? 'good' : 'slow'
+      });
+    } else {
+      this.log('error', 'Proposal generation failed', {
+        grantId,
+        duration
+      });
+    }
+  }
+
+  /**
+   * Log error with context
+   * @param {Error} error - Error object
+   * @param {Object} context - Additional context
+   */
+  logError(error, context = {}) {
+    this.metrics.errors++;
+    this.log('error', error.message, {
+      stack: error.stack,
+      name: error.name,
+      ...context
+    });
+  }
+
+  /**
+   * Complete request and log summary
+   * @param {Object} context - Hono context
+   * @param {number} statusCode - HTTP status code
+   */
+  completeRequest(context, statusCode) {
+    const duration = Date.now() - this.startTime;
+    
+    this.log('info', 'Request completed', {
+      statusCode,
+      duration,
+      performance: duration < 500 ? 'fast' : duration < 2000 ? 'medium' : 'slow'
+    });
+
+    // Reset for next request
+    this.requestId = null;
+    this.startTime = null;
+  }
+
+  /**
+   * Get current metrics snapshot
+   * @returns {Object} - Current metrics
+   */
+  getMetrics() {
+    return {
+      ...this.metrics,
+      uptime: Date.now() - (this.startTime || Date.now()),
+      liveDataRatio: this.metrics.liveDataSuccess / Math.max(this.metrics.requests, 1),
+      errorRate: this.metrics.errors / Math.max(this.metrics.requests, 1),
+      fallbackRate: this.metrics.fallbacks / Math.max(this.metrics.requests, 1)
+    };
+  }
+
+  /**
+   * Create middleware for Hono
+   * @returns {Function} - Hono middleware function
+   */
+  middleware() {
+    return async (c, next) => {
+      this.initRequest(c);
+      
+      try {
+        await next();
+        this.completeRequest(c, c.res.status);
+      } catch (error) {
+        this.logError(error, {
+          method: c.req.method,
+          path: c.req.path
+        });
+        this.completeRequest(c, 500);
+        throw error;
+      }
+    };
+  }
+}
+
+// Create singleton instance
+export const telemetryService = new TelemetryService();

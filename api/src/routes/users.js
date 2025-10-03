@@ -2,13 +2,12 @@
 
 import { Hono } from 'hono';
 import EmailService from '../services/emailService.js';
+import { getDB, initializeSchema } from '../db/connection.js';
 
 const users = new Hono();
 
-// Database helper (will be moved to db directory)
-async function getDB(env) {
-  return env.VOIDCAT_DB;
-}
+// Database initialization flag to prevent multiple schema initializations
+let schemaInitialized = false;
 
 // User registration endpoint
 users.post('/register', async (c) => {
@@ -60,6 +59,18 @@ users.post('/register', async (c) => {
     try {
       const db = await getDB(c.env);
       
+      // Initialize database schema if not already done
+      if (!schemaInitialized) {
+        console.log('Initializing database schema...');
+        const initResult = await initializeSchema(db);
+        if (initResult) {
+          schemaInitialized = true;
+          console.log('Database schema initialized successfully');
+        } else {
+          console.warn('Database schema initialization failed, proceeding anyway');
+        }
+      }
+      
       // Check if user already exists
       const existingUser = await db.prepare(`
         SELECT email FROM users WHERE email = ?
@@ -74,9 +85,9 @@ users.post('/register', async (c) => {
       }
       
       const result = await db.prepare(`
-        INSERT INTO users (email, api_key, subscription_tier, created_at)
-        VALUES (?, ?, 'free', CURRENT_TIMESTAMP)
-      `).bind(email, apiKey).run();
+        INSERT INTO users (email, name, company, api_key, subscription_tier, created_at)
+        VALUES (?, ?, ?, ?, 'free', CURRENT_TIMESTAMP)
+      `).bind(email, name, company || null, apiKey).run();
 
       if (result.success) {
         console.log(`User registered successfully: ${email}`);

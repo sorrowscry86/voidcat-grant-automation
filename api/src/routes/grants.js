@@ -3,7 +3,7 @@
 import { Hono } from 'hono';
 import RateLimiter from '../services/rateLimiter.js';
 import ConfigService from '../services/configService.js';
-import DataService from '../services/dataService.js';
+import dataServiceFactory from '../services/dataServiceFactory.js';
 import FederalAgencyService from '../services/federalAgencyService.js';
 import SemanticAnalysisService from '../services/semanticAnalysisService.js';
 import DeadlineTrackingService from '../services/deadlineTrackingService.js';
@@ -18,7 +18,8 @@ const semanticAnalysisService = new SemanticAnalysisService();
 const deadlineTrackingService = new DeadlineTrackingService();
 const complianceService = new ComplianceService();
 const aiProposalService = new AIProposalService();
-const dataService = new DataService();
+
+// DataService is now managed by factory to prevent inconsistent instantiation
 
 
 // Grant search endpoint
@@ -46,14 +47,16 @@ grants.get('/search', async (c) => {
     let dataSourceError;
     
     try {
-      const dataService = new DataService({ live_data: dataConfig });
+      // Get DataService instance from factory with proper configuration
+      const dataService = await dataServiceFactory.getInstance({ live_data: dataConfig });
       let fetchResult;
       
-      if (dataConfig.USE_LIVE_DATA) {
-        // Try live data first with fallback to mock
-        fetchResult = await dataService.fetchLiveGrantData(query, agency, c.get('telemetry'));
+      // Phase 2A: Use enhanced data fetching with caching and multi-source aggregation
+      if (c.env.FEATURE_LIVE_DATA && dataConfig.USE_LIVE_DATA) {
+        // Use Phase 2A enhanced method with KV caching and multi-source
+        fetchResult = await dataService.fetchWithCache(query, agency, c.env, c.get('telemetry'));
       } else {
-        // Use mock data only
+        // Use mock data only when FEATURE_LIVE_DATA is false or USE_LIVE_DATA is false
         const mockResult = dataService.getGrants({ query, agency });
         fetchResult = {
           grants: mockResult.grants,
@@ -79,7 +82,8 @@ grants.get('/search', async (c) => {
     try {
       // If we got mock data, apply additional filters using DataService
       if (actualDataSource === 'mock') {
-        // Use module-level dataService
+        // Get DataService instance from factory (reuses existing instance)
+        const dataService = await dataServiceFactory.getInstance({ live_data: dataConfig });
         const searchOptions = {
           query,
           agency,
@@ -156,7 +160,8 @@ grants.get('/search', async (c) => {
 // Get grant statistics endpoint (must be before /:id route)
 grants.get('/stats', async (c) => {
   try {
-    // Use module-level dataService
+    // Get DataService instance from factory (uses default config)
+    const dataService = await dataServiceFactory.getInstance();
     const stats = dataService.getStatistics();
     
     return c.json({
@@ -200,7 +205,8 @@ grants.get('/:id', async (c) => {
     }
     
     // Try to find grant in mock data using DataService
-    // Use module-level dataService
+    // Get DataService instance from factory (uses default config)
+    const dataService = await dataServiceFactory.getInstance();
     const mockGrant = dataService.getMockGrantById(grantId);
     
     if (mockGrant) {
@@ -310,7 +316,8 @@ grants.post('/generate-proposal', async (c) => {
     }
     
     // Get grant details for proposal context
-    // Use module-level dataService
+    // Get DataService instance from factory (uses default config)
+    const dataService = await dataServiceFactory.getInstance();
     const grant = dataService.getMockGrantById(grant_id);
     
     const grantTitle = grant ? grant.title : 'Federal Grant Opportunity';
@@ -715,9 +722,15 @@ grants.post('/generate-ai-proposal', async (c) => {
       }, 404);
     }
 
-    // Generate AI-powered proposal
-    // Use module-level aiProposalService
-    const proposal = await aiProposalService.generateProposal(grant, company_profile, options || {});
+    // Phase 2A: Generate AI-powered proposal with real AI integration
+    let proposal;
+    if (c.env.FEATURE_REAL_AI) {
+      // Use Phase 2A enhanced AI generation with Claude and GPT-4
+      proposal = await aiProposalService.generateProposalWithAI(grant, company_profile, c.env, c.get('telemetry'));
+    } else {
+      // Use template-based generation (fallback)
+      proposal = await aiProposalService.generateProposal(grant, company_profile, options || {});
+    }
 
     return c.json({
       success: true,

@@ -1,77 +1,76 @@
 # VoidCat RDC Federal Grant Automation Platform
 
-🚀 **LIVE MVP**: AI-powered federal grant discovery and proposal automation for startups and small businesses.
+AI-powered federal grant discovery and proposal automation platform built with Cloudflare Workers API and static frontend.
 
-## 🎯 Project Overview
+## 🚀 Features
 
-**Revenue Target**: $500 Month 1 → $2,500 Month 3 → $10,000+ Month 6
-
-**Business Model**:
-- Free Tier: 1 grant application/month
-- Pro Tier: $99/month unlimited access  
-- Success Fee: 5% of awarded grants over $50k
-
-**Current Status**: Production-ready MVP with organized codebase and comprehensive documentation structure.
-
-## 🏗️ Architecture
+- Federal grant search and discovery
+- AI-powered proposal generation
+- Compliance automation and validation
+- Freemium business model with success-based fees
+- Comprehensive E2E testing (230+ tests)
+- Production-ready architecture
 
 ### Backend API (Cloudflare Workers)
+
 - **Location**: `/api/`
 - **Framework**: Hono.js
 - **Database**: Cloudflare D1 (SQLite)
 - **Storage**: Cloudflare R2 + KV
-- **Deployment**: `grant-search-api.sorrowscry86.workers.dev`
+- **Authentication**: API Key-based
 
 ### Frontend (Static Site)
+
 - **Location**: `/frontend/`
-- **Framework**: Alpine.js + Tailwind CSS
+- **Framework**: Alpine.js + Tailwind CSS (CDN)
 - **Deployment**: GitHub Pages or Cloudflare Pages
+- **Features**: Responsive design, real-time search, payment integration
 
-## 🚀 Quick Deployment
+---
 
-### Automated Deployment
-
-```bash
-# Deploy everything with one command
-./scripts/deploy.sh
-```
-
-### Manual Steps
+## 🚀 Quick Deploy
 
 1. **Deploy API to Cloudflare Workers:**
-```bash
-cd api
-npm install
-npx wrangler deploy --env production
-```
+
+   ```bash
+   cd api
+   npx wrangler deploy --env production  # Takes 30-60 seconds
+   ```
 
 2. **Deploy Frontend:**
 
-**Option A: GitHub Pages**
-- Push to GitHub repository
-- Enable GitHub Pages from `frontend/` directory
+   **Option A: GitHub Pages**
+   
+   - Push to GitHub repository
+   - Enable GitHub Pages from Settings → Pages
 
-**Option B: Cloudflare Pages**
-- Connect repository to Cloudflare Pages
-- Set build directory to `frontend/`
+   **Option B: Cloudflare Pages**
+   
+   - Connect repository to Cloudflare Pages
+   - Deploy from `/frontend/` directory
 
-**Live URLs**:
-- **API**: https://grant-search-api.sorrowscry86.workers.dev
-- **Frontend**: https://sorrowscry86.github.io/voidcat-grant-automation
+**Live Endpoints:**
 
-For detailed deployment instructions, see [docs/deployment/](./docs/deployment/).
+- **API**: <https://grant-search-api.sorrowscry86.workers.dev>
+- **Frontend**: <https://sorrowscry86.github.io/voidcat-grant-automation>
+
+---
 
 ## 📊 Current Infrastructure
 
 ### Cloudflare Resources
+
 - ✅ D1 Database: `voidcat-users`
+- ✅ KV Namespace: `FEDERAL_CACHE`
 - ✅ R2 Bucket: `voidcat-assets`
-- ✅ KV Namespace: `OAUTH_KV`
-- ✅ Workers: `remote-mcp-server`, `my-mcp-server`
+- ✅ Workers: API deployed to production
+
+---
 
 ## 🎯 Features Implemented
 
 ### Core MVP Features
+
 - [x] Federal grant search and discovery
 - [x] User registration and authentication
 - [x] AI-powered proposal generation
@@ -80,6 +79,7 @@ For detailed deployment instructions, see [docs/deployment/](./docs/deployment/)
 - [x] Mobile-responsive interface
 
 ### Intelligent Discovery Engine ✨ NEW
+
 - [x] 11 federal agency SBIR/STTR portal integration
 - [x] Semantic analysis with 0-100% matching scores
 - [x] Real-time technical alignment assessment
@@ -87,6 +87,7 @@ For detailed deployment instructions, see [docs/deployment/](./docs/deployment/)
 - [x] Strategic application calendar
 
 ### AI-Powered Proposal Generation ✨ NEW
+
 - [x] Natural language processing of requirements
 - [x] Template-based compliance checking
 - [x] Agency-specific format validation
@@ -94,12 +95,14 @@ For detailed deployment instructions, see [docs/deployment/](./docs/deployment/)
 - [x] Iterative refinement framework
 
 ### Compliance Automation ✨ NEW
+
 - [x] Automatic eligibility validation
 - [x] FAR cost principles budget generation
 - [x] Required certifications checklist
 - [x] Pre-submission compliance review
 
 ### Grant Sources Integrated
+
 - SBIR/STTR programs (11 federal agencies)
 - NSF Research Institutes
 - DOE Advanced Computing
@@ -109,7 +112,8 @@ For detailed deployment instructions, see [docs/deployment/](./docs/deployment/)
 ## 🔧 API Endpoints
 
 ### Core Endpoints
-```
+
+```http
 GET  /health                        - Health check
 GET  /api/grants/search             - Search grants
 GET  /api/grants/:id                - Get grant details
@@ -119,7 +123,8 @@ POST /api/grants/generate-proposal  - AI proposal generation
 ```
 
 ### Discovery Engine Endpoints ✨ NEW
-```
+
+```http
 GET  /api/grants/federal-agencies           - List 11 federal agency portals
 POST /api/grants/analyze-match              - Calculate 0-100% matching score
 POST /api/grants/application-timeline       - Generate strategic timeline
@@ -127,7 +132,8 @@ GET  /api/grants/strategic-calendar         - Get application calendar
 ```
 
 ### Compliance Automation Endpoints ✨ NEW
-```
+
+```http
 POST /api/grants/validate-eligibility       - Validate eligibility requirements
 POST /api/grants/generate-budget-justification - FAR-compliant budget
 GET  /api/grants/certifications-checklist   - Required certifications
@@ -135,54 +141,49 @@ POST /api/grants/pre-submission-review      - Pre-submission compliance
 ```
 
 ### AI Proposal Endpoints ✨ NEW
-```
+
+```http
 POST /api/grants/generate-ai-proposal       - AI-powered proposal generation
 GET  /api/grants/agency-template            - Agency-specific templates
 ```
 
 ## 📚 Documentation
 
-- [Feature Documentation](./docs/FEATURES.md) - Comprehensive API and feature guide
-- [Deployment Guide](./docs/deployment/) - Deployment instructions
-- [API Reference](./docs/FEATURES.md#api-endpoints) - Complete API reference
-
 ### Quick Links
+
 - **[Complete Documentation](./docs/)** - Organized documentation directory
-- **[Deployment Guide](./docs/deployment/)** - Production deployment instructions  
+- **[Deployment Guide](./docs/deployment/)** - Production deployment instructions
 - **[Testing Guide](./docs/testing/)** - E2E testing with Playwright
 - **[Security Guide](./docs/security/)** - Environment variables and security
 - **[Enhancement Plan](./docs/enhancement/)** - Platform improvements roadmap
 
 ### Repository Structure
-```
+
+```text
 /
 ├── README.md                 # This file - project overview
 ├── CHANGELOG.md              # Version history and updates
 ├── LICENSE                   # MIT license
 ├── docs/                     # 📚 Organized documentation by category
-│   ├── testing/             # Testing guides and reports  
+│   ├── testing/             # Testing guides and reports
 │   ├── deployment/          # Production deployment instructions
 │   ├── enhancement/         # Platform improvement plans
 │   └── security/            # Security policies and environment setup
 ├── api/                      # 🔧 Cloudflare Workers API
-├── frontend/                 # 🎨 Static frontend application  
+├── frontend/                 # 🎨 Static frontend application
 ├── tests/                    # 🧪 E2E test suite (Playwright)
 ├── scripts/                  # 🚀 Deployment and utility scripts
 └── package.json             # Root dependencies and test configuration
 ```
 
-## 💰 Revenue Metrics & Targets
+## 📈 Project Metrics
 
-### Success Targets (First 48 Hours)
-- ✅ User registrations: 10+
-- ✅ Grant searches: 50+
-- ✅ Demo requests: 3+
-- ✅ Pro tier interest: 1+
+### Platform Statistics
 
-### Growth Projections
-- **Week 1**: 2 Pro subscribers = $198/month
-- **Week 4**: 5 Pro subscribers = $495/month
-- **Month 3**: 25 subscribers + success fees = $2,500/month
+- ✅ 230+ comprehensive E2E tests
+- ✅ Multiple federal agency integrations
+- ✅ AI-powered proposal generation
+- ✅ Production-ready deployment
 
 ## 🛠️ Technology Stack
 
@@ -196,23 +197,26 @@ GET  /api/grants/agency-template            - Agency-specific templates
 ## 📞 Support & Contact
 
 **VoidCat RDC Federal Grant Automation**
-- Platform: https://grant-search-api.sorrowscry86.workers.dev
-- Frontend: https://sorrowscry86.github.io/voidcat-grant-automation
+
+- Platform: <https://grant-search-api.sorrowscry86.workers.dev>
+- Frontend: <https://sorrowscry86.github.io/voidcat-grant-automation>
 - Support: Federal funding assistance for technology startups
 
 ### Team Information
+
 - **Team**: VoidCat RDC Team
 - **Maintainer/Lead**: Wykeve (sorrowscry86@voidcat.org)
 - **License**: MIT
 
 ---
 
-*Last Updated: September 29, 2024 | Status: LIVE MVP | Version 1.1.0*
+*Last Updated: October 3, 2025 | Status: LIVE MVP | Version 1.1.0*
 
 ## Recent Updates (v1.1.0)
 
 🧹 **Repository Organization**: Complete restructuring for better maintainability
+
 - Organized all documentation into categorized `docs/` directories
-- Centralized deployment and utility scripts in `scripts/` directory  
+- Centralized deployment and utility scripts in `scripts/` directory
 - Cleaned up temporary files and redundant documentation
 - Enhanced project structure for easier navigation and development

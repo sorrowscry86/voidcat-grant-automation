@@ -129,7 +129,6 @@ stripe_*
 *.db
 
 # Documentation (sensitive operational details)
-GEMINI.md
 PRODUCTION-LAUNCH-CHECKLIST.md
 STRIPE-CLI-GUIDE.md
 INTERNAL-*.md

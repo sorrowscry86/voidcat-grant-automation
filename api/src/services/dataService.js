@@ -452,6 +452,449 @@ export class DataService {
   }
 
   /**
+   * Phase 2A: Fetch with KV caching (12-hour TTL)
+   * @param {string} query - Search query
+   * @param {string} agency - Agency filter
+   * @param {Object} env - Cloudflare environment with FEDERAL_CACHE binding
+   * @param {Object} telemetry - Telemetry service
+   * @returns {Object} Cached or fresh grant data
+   */
+  async fetchWithCache(query, agency, env, telemetry = null) {
+    // Feature flag check
+    if (!env.FEATURE_LIVE_DATA) {
+      return await this.fetchLiveGrantData(query, agency, telemetry);
+    }
+
+    try {
+      // Generate cache key
+      const cacheKey = `federal:q=${encodeURIComponent(query || '')}&a=${encodeURIComponent(agency || '')}`;
+      
+      // Check KV cache first
+      if (env.FEDERAL_CACHE) {
+        const cached = await env.FEDERAL_CACHE.get(cacheKey, 'json');
+        if (cached) {
+          console.log(`🎯 DataService: Cache HIT for key: ${cacheKey}`);
+          if (telemetry) {
+            telemetry.logInfo('Cache hit', { cache_key: cacheKey, data_source: 'cache' });
+          }
+          return {
+            ...cached,
+            fromCache: true,
+            cacheKey,
+            cacheTtl: 43200 // 12 hours
+          };
+        }
+        console.log(`🔍 DataService: Cache MISS for key: ${cacheKey}`);
+      }
+
+      // Fetch fresh data with multi-source aggregation
+      const freshData = await this.fetchMultiSourceData(query, agency, telemetry);
+      
+      // Cache the result for 12 hours
+      if (env.FEDERAL_CACHE && freshData.grants.length > 0) {
+        await env.FEDERAL_CACHE.put(cacheKey, JSON.stringify(freshData), {
+          expirationTtl: 43200 // 12 hours
+        });
+        console.log(`💾 DataService: Cached ${freshData.grants.length} grants for 12 hours`);
+      }
+      
+      return {
+        ...freshData,
+        fromCache: false,
+        cacheKey
+      };
+      
+    } catch (error) {
+      console.error('DataService: Cache operation failed, falling back to direct fetch:', error);
+      if (telemetry) {
+        telemetry.logError('Cache operation failed', error);
+      }
+      return await this.fetchLiveGrantData(query, agency, telemetry);
+    }
+  }
+
+  /**
+   * Phase 2A: Multi-source data aggregation with retry logic
+   * @param {string} query - Search query
+   * @param {string} agency - Agency filter
+   * @param {Object} telemetry - Telemetry service
+   * @returns {Object} Aggregated grant data from multiple sources
+   */
+  async fetchMultiSourceData(query, agency, telemetry = null) {
+    const allGrants = [];
+    const sources = [];
+    let hasErrors = false;
+    
+    try {
+      // Source 1: Grants.gov API (existing)
+      console.log('🔍 DataService: Fetching from Grants.gov...');
+      const grantsGovResult = await this.fetchWithRetry(
+        () => this.fetchFromGrantsGov(query, agency),
+        3, // max retries
+        1000, // initial delay
+        telemetry
+      );
+      
+      if (grantsGovResult.grants && grantsGovResult.grants.length > 0) {
+        allGrants.push(...grantsGovResult.grants);
+        sources.push('grants.gov');
+        console.log(`✅ DataService: Grants.gov returned ${grantsGovResult.grants.length} grants`);
+      }
+      
+    } catch (error) {
+      console.error('DataService: Grants.gov fetch failed:', error);
+      hasErrors = true;
+      if (telemetry) {
+        telemetry.logError('Grants.gov fetch failed', error);
+      }
+    }
+
+    try {
+      // Source 2: SBIR.gov API (new)
+      console.log('🔍 DataService: Fetching from SBIR.gov...');
+      const sbirResult = await this.fetchWithRetry(
+        () => this.fetchFromSbirGov(query, agency),
+        3, // max retries
+        1000, // initial delay  
+        telemetry
+      );
+      
+      if (sbirResult.grants && sbirResult.grants.length > 0) {
+        allGrants.push(...sbirResult.grants);
+        sources.push('sbir.gov');
+        console.log(`✅ DataService: SBIR.gov returned ${sbirResult.grants.length} grants`);
+      }
+      
+    } catch (error) {
+      console.error('DataService: SBIR.gov fetch failed:', error);
+      hasErrors = true;
+      if (telemetry) {
+        telemetry.logError('SBIR.gov fetch failed', error);
+      }
+    }
+
+    // If no live data was fetched, fallback to mock
+    if (allGrants.length === 0) {
+      console.log('🔄 DataService: No live data available, using mock fallback');
+      const mockResult = this.getGrants({ query, agency });
+      return {
+        grants: mockResult.grants,
+        actualDataSource: 'mock',
+        fallbackOccurred: true,
+        sources: ['mock'],
+        error: hasErrors ? 'All external sources failed' : null
+      };
+    }
+
+    // Merge and deduplicate results
+    const deduplicatedGrants = this.mergeAndDeduplicate(allGrants, query);
+    
+    return {
+      grants: deduplicatedGrants,
+      actualDataSource: 'live',
+      fallbackOccurred: false,
+      sources,
+      totalFromSources: allGrants.length,
+      afterDeduplication: deduplicatedGrants.length
+    };
+  }
+
+  /**
+   * Phase 2A: Fetch from SBIR.gov API
+   * @param {string} query - Search query
+   * @param {string} agency - Agency filter
+   * @returns {Object} SBIR grant data
+   */
+  async fetchFromSbirGov(query, agency) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    try {
+      const response = await fetch('https://www.sbir.gov/api/opportunities.json', {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'VoidCat Grant Search API/1.0',
+          'Accept': 'application/json'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`SBIR API returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const opportunities = data.opportunities || data.results || data || [];
+      
+      if (!Array.isArray(opportunities)) {
+        console.warn('SBIR API returned unexpected format');
+        return { grants: [] };
+      }
+      
+      const transformedGrants = this.transformSbirData(opportunities, query, agency);
+      
+      return {
+        grants: transformedGrants,
+        source: 'sbir.gov',
+        raw_count: opportunities.length
+      };
+      
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw new Error(`SBIR.gov fetch failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Phase 2A: Transform SBIR.gov data to internal format
+   * @param {Array} opportunities - Raw SBIR opportunities
+   * @param {string} query - Search query for scoring
+   * @param {string} agency - Agency filter
+   * @returns {Array} Transformed grant objects
+   */
+  transformSbirData(opportunities, query, agency) {
+    return opportunities
+      .filter(opp => {
+        // Basic data validation
+        if (!opp.title && !opp.opportunity_title) return false;
+        
+        // Agency filter
+        if (agency) {
+          const oppAgency = (opp.agency || opp.funding_agency || '').toLowerCase();
+          if (!oppAgency.includes(agency.toLowerCase())) return false;
+        }
+        
+        return true;
+      })
+      .map(opp => ({
+        id: opp.opportunity_id || opp.id || `SBIR-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`,
+        title: opp.title || opp.opportunity_title || 'SBIR/STTR Opportunity',
+        agency: opp.agency || opp.funding_agency || 'SBIR Agency',
+        program: opp.program || opp.solicitation_topic || 'SBIR/STTR',
+        deadline: opp.proposals_due_date || opp.close_date || opp.deadline || '2025-12-31',
+        amount: this.formatSbirAmount(opp.award_amount || opp.funding_amount),
+        description: opp.description || opp.abstract || opp.title || 'SBIR/STTR funding opportunity',
+        eligibility: 'Small businesses (<500 employees) with research partnerships',
+        matching_score: this.calculateMatchingScore(opp, query),
+        tags: this.extractSbirTags(opp),
+        data_source: 'sbir.gov',
+        opportunity_type: opp.type || 'SBIR/STTR',
+        funding_agency_code: opp.agency_code || 'SBIR',
+        cfda_number: opp.cfda_number || 'TBD'
+      }));
+  }
+
+  /**
+   * Format SBIR amount data
+   * @param {*} amount - Raw amount data
+   * @returns {string} Formatted amount string
+   */
+  formatSbirAmount(amount) {
+    if (!amount) return 'Amount TBD';
+    if (typeof amount === 'string') return amount;
+    if (typeof amount === 'number') return `$${amount.toLocaleString()}`;
+    if (amount.min && amount.max) {
+      return `$${parseInt(amount.min).toLocaleString()} - $${parseInt(amount.max).toLocaleString()}`;
+    }
+    return 'Amount TBD';
+  }
+
+  /**
+   * Extract tags from SBIR opportunity data
+   * @param {Object} opp - SBIR opportunity
+   * @returns {Array} Array of tags
+   */
+  extractSbirTags(opp) {
+    const tags = [];
+    
+    if (opp.topic_keywords) {
+      tags.push(...opp.topic_keywords.split(',').map(t => t.trim()));
+    }
+    
+    if (opp.research_areas) {
+      tags.push(...opp.research_areas);
+    }
+    
+    // Add program type
+    if (opp.type) {
+      tags.push(opp.type);
+    } else {
+      tags.push('SBIR/STTR');
+    }
+    
+    return tags.filter(tag => tag && tag.length > 0);
+  }
+
+  /**
+   * Phase 2A: Fetch from Grants.gov with improved error handling
+   * @param {string} query - Search query
+   * @param {string} agency - Agency filter
+   * @returns {Object} Grants.gov data
+   */
+  async fetchFromGrantsGov(query, agency) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    try {
+      const searchBody = {
+        keyword: query || '',
+        ...(agency && { agency: agency })
+      };
+      
+      const response = await fetch('https://api.grants.gov/v1/api/search2', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'VoidCat Grant Search API/1.0'
+        },
+        body: JSON.stringify(searchBody)
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`Grants.gov API returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const liveData = await response.json();
+      
+      // Handle flexible schema
+      let opportunitiesRaw;
+      if (Array.isArray(liveData)) {
+        opportunitiesRaw = liveData;
+      } else if (liveData && typeof liveData === 'object') {
+        opportunitiesRaw = liveData.opportunities || liveData.data || liveData.results || [];
+      } else {
+        opportunitiesRaw = [];
+      }
+      
+      if (!Array.isArray(opportunitiesRaw)) {
+        opportunitiesRaw = [];
+      }
+      
+      const transformedGrants = this.transformLiveGrantData(opportunitiesRaw, query);
+      
+      return {
+        grants: transformedGrants,
+        source: 'grants.gov',
+        raw_count: opportunitiesRaw.length
+      };
+      
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw new Error(`Grants.gov fetch failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Phase 2A: Retry wrapper with exponential backoff
+   * @param {Function} operation - Async operation to retry
+   * @param {number} maxRetries - Maximum retry attempts
+   * @param {number} initialDelay - Initial delay in ms
+   * @param {Object} telemetry - Telemetry service
+   * @returns {*} Operation result
+   */
+  async fetchWithRetry(operation, maxRetries = 3, initialDelay = 1000, telemetry = null) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await operation();
+        if (attempt > 1 && telemetry) {
+          telemetry.logInfo('Retry successful', { attempt, maxRetries });
+        }
+        return result;
+      } catch (error) {
+        lastError = error;
+        
+        if (attempt === maxRetries) {
+          console.error(`DataService: Operation failed after ${maxRetries} attempts:`, error);
+          break;
+        }
+        
+        const delay = initialDelay * Math.pow(2, attempt - 1); // Exponential backoff
+        console.log(`DataService: Attempt ${attempt} failed, retrying in ${delay}ms...`);
+        
+        if (telemetry) {
+          telemetry.logWarning('Retry attempt', { attempt, maxRetries, delay, error: error.message });
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    throw lastError;
+  }
+
+  /**
+   * Phase 2A: Merge grants from multiple sources and deduplicate
+   * @param {Array} allGrants - Grants from all sources
+   * @param {string} query - Search query for re-scoring
+   * @returns {Array} Deduplicated and sorted grants
+   */
+  mergeAndDeduplicate(allGrants, query) {
+    const seenIds = new Set();
+    const seenTitles = new Set();
+    const deduplicated = [];
+    
+    // Sort by data source priority: live sources first, then mock
+    const prioritized = allGrants.sort((a, b) => {
+      const aPriority = a.data_source === 'mock' ? 3 : (a.data_source === 'sbir.gov' ? 1 : 2);
+      const bPriority = b.data_source === 'mock' ? 3 : (b.data_source === 'sbir.gov' ? 1 : 2);
+      return aPriority - bPriority;
+    });
+    
+    for (const grant of prioritized) {
+      // Skip duplicates by ID
+      if (seenIds.has(grant.id)) continue;
+      
+      // Skip near-duplicates by title (fuzzy matching)
+      const normalizedTitle = grant.title.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+      let isDuplicate = false;
+      
+      for (const existingTitle of seenTitles) {
+        if (this.calculateStringSimilarity(normalizedTitle, existingTitle) > 0.85) {
+          isDuplicate = true;
+          break;
+        }
+      }
+      
+      if (isDuplicate) continue;
+      
+      // Add to results
+      seenIds.add(grant.id);
+      seenTitles.add(normalizedTitle);
+      
+      // Recalculate matching score
+      grant.matching_score = this.calculateMatchingScore(grant, query);
+      
+      deduplicated.push(grant);
+    }
+    
+    // Sort by relevance score
+    return deduplicated.sort((a, b) => b.matching_score - a.matching_score);
+  }
+
+  /**
+   * Calculate string similarity (Jaccard similarity)
+   * @param {string} str1 - First string
+   * @param {string} str2 - Second string
+   * @returns {number} Similarity score 0-1
+   */
+  calculateStringSimilarity(str1, str2) {
+    const set1 = new Set(str1.split(' ').filter(w => w.length > 2));
+    const set2 = new Set(str2.split(' ').filter(w => w.length > 2));
+    
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+    
+    return union.size === 0 ? 0 : intersection.size / union.size;
+  }
+
+  /**
    * Fetch live grant data from external APIs (moved from grants route)
    */
   async fetchLiveGrantData(query, agency, telemetry = null) {

@@ -18,9 +18,9 @@ binding = "OAUTH_KV"
 id = "ae1f4c3087dd4b208a449f7fbd7c93d3"
 
 # Phase 2A: Federal data caching (12-hour TTL)
-[[kv_namespaces]]
-binding = "FEDERAL_CACHE"
-id = "777bf110b3f4487a8144f540ba6c2130"
+# [[kv_namespaces]]
+# binding = "FEDERAL_CACHE"
+# id = "REPLACE_WITH_ID_FROM_SETUP_SCRIPT"
 
 [[r2_buckets]]
 binding = "ASSETS"
@@ -54,10 +54,6 @@ database_id = "b22bd380-29ca-4a22-be8a-655a382a58a1"
 binding = "OAUTH_KV"
 id = "ae1f4c3087dd4b208a449f7fbd7c93d3"
 
-[[env.staging.kv_namespaces]]
-binding = "FEDERAL_CACHE"
-id = "777bf110b3f4487a8144f540ba6c2130"
-
 [[env.staging.r2_buckets]]
 binding = "ASSETS"
 bucket_name = "voidcat-assets"
@@ -90,10 +86,6 @@ database_id = "b22bd380-29ca-4a22-be8a-655a382a58a1"
 [[env.production.kv_namespaces]]
 binding = "OAUTH_KV"
 id = "ae1f4c3087dd4b208a449f7fbd7c93d3"
-
-[[env.production.kv_namespaces]]
-binding = "FEDERAL_CACHE"
-id = "777bf110b3f4487a8144f540ba6c2130"
 
 [[env.production.r2_buckets]]
 binding = "ASSETS"

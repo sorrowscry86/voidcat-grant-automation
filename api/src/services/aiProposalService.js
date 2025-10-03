@@ -5,6 +5,496 @@ export class AIProposalService {
   constructor(config = {}) {
     this.config = config;
     this.templateLibrary = this.initializeTemplateLibrary();
+    this.totalCost = 0;
+    this.apiCallLog = [];
+  }
+
+  /**
+   * Phase 2A: Generate proposal with real AI integration
+   * @param {Object} grantDetails - Grant information
+   * @param {Object} companyProfile - Company profile
+   * @param {Object} env - Cloudflare environment with API keys
+   * @param {Object} telemetry - Telemetry service
+   * @returns {Object} AI-enhanced proposal
+   */
+  async generateProposalWithAI(grantDetails, companyProfile, env, telemetry = null) {
+    // Feature flag check
+    if (!env.FEATURE_REAL_AI) {
+      return this.generateProposal(grantDetails, companyProfile);
+    }
+
+    try {
+      console.log('🤖 AIProposalService: Starting AI-enhanced proposal generation...');
+      if (telemetry) {
+        telemetry.logInfo('AI proposal generation started', {
+          grant_id: grantDetails.id,
+          agency: grantDetails.agency,
+          ai_enabled: true
+        });
+      }
+
+      // Reset cost tracking for this proposal
+      this.totalCost = 0;
+      this.apiCallLog = [];
+
+      // Get agency template
+      const agencyKey = this.determineAgencyKey(grantDetails.agency);
+      const template = this.templateLibrary[agencyKey] || this.templateLibrary['DOD'];
+      
+      // Process requirements
+      const requirements = this.processGrantRequirements(grantDetails);
+      
+      // Initialize proposal structure
+      const proposal = {
+        metadata: {
+          grant_id: grantDetails.id,
+          agency: grantDetails.agency,
+          template_used: agencyKey,
+          generated_at: new Date().toISOString(),
+          ai_enhanced: true,
+          total_ai_cost: 0,
+          api_calls: []
+        },
+        sections: {},
+        formatting: template.format,
+        compliance: {}
+      };
+
+      // Generate sections with AI
+      if (template.required_sections.includes('Executive Summary') || 
+          template.required_sections.includes('Project Summary')) {
+        proposal.sections.executive_summary = await this.generateExecutiveSummaryWithAI(
+          grantDetails, companyProfile, requirements, template, env
+        );
+      }
+
+      if (template.required_sections.includes('Technical Volume') ||
+          template.required_sections.includes('Technical Approach') ||
+          template.required_sections.includes('Project Description')) {
+        proposal.sections.technical_approach = await this.generateTechnicalApproachWithAI(
+          grantDetails, companyProfile, requirements, template, env
+        );
+      }
+
+      if (template.required_sections.includes('Innovation')) {
+        proposal.sections.innovation = await this.generateInnovationSectionWithAI(
+          grantDetails, companyProfile, requirements, env
+        );
+      }
+
+      proposal.sections.commercial_potential = await this.generateCommercialPotentialWithAI(
+        grantDetails, companyProfile, template, env
+      );
+
+      proposal.sections.budget_narrative = await this.generateBudgetNarrativeWithAI(
+        grantDetails, companyProfile, env
+      );
+
+      // Template-based sections (no AI enhancement needed)
+      proposal.sections.team_qualifications = this.generateTeamQualifications(
+        grantDetails, companyProfile, template
+      );
+
+      proposal.sections.timeline = this.generateProjectTimeline(
+        grantDetails, companyProfile
+      );
+
+      // Metadata
+      proposal.metadata.word_count = this.calculateWordCount(proposal.sections);
+      proposal.metadata.compliance_check = this.checkTemplateCompliance(proposal, template);
+      proposal.metadata.total_ai_cost = this.totalCost;
+      proposal.metadata.api_calls = this.apiCallLog;
+
+      if (telemetry) {
+        telemetry.logInfo('AI proposal generation completed', {
+          grant_id: grantDetails.id,
+          total_cost: this.totalCost,
+          api_calls: this.apiCallLog.length,
+          word_count: proposal.metadata.word_count
+        });
+      }
+
+      console.log(`✅ AIProposalService: AI proposal completed. Cost: $${this.totalCost.toFixed(4)}`);
+      return proposal;
+
+    } catch (error) {
+      console.error('AIProposalService: AI generation failed, falling back to templates:', error);
+      if (telemetry) {
+        telemetry.logError('AI proposal generation failed, using fallback', error);
+      }
+      return this.generateProposal(grantDetails, companyProfile);
+    }
+  }
+
+  /**
+   * Phase 2A: Call Claude API (Anthropic)
+   * @param {string} prompt - AI prompt
+   * @param {string} apiKey - Anthropic API key
+   * @param {Object} options - API options
+   * @returns {Object} Claude API response
+   */
+  async callClaudeAPI(prompt, apiKey, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: options.model || 'claude-3-5-sonnet-20241022',
+          max_tokens: options.maxTokens || 4096,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: options.temperature || 0.3
+        })
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Claude API returned ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      
+      // Extract usage and calculate cost
+      const usage = data.usage || {};
+      const cost = this.trackCost('claude', {
+        input_tokens: usage.input_tokens || 0,
+        output_tokens: usage.output_tokens || 0
+      });
+
+      this.apiCallLog.push({
+        model: 'claude-3-5-sonnet',
+        timestamp: new Date().toISOString(),
+        input_tokens: usage.input_tokens || 0,
+        output_tokens: usage.output_tokens || 0,
+        cost
+      });
+
+      return {
+        content: data.content?.[0]?.text || '',
+        usage,
+        cost
+      };
+
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw new Error(`Claude API call failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Phase 2A: Call GPT-4 API (OpenAI)
+   * @param {string} prompt - AI prompt
+   * @param {string} apiKey - OpenAI API key
+   * @param {Object} options - API options
+   * @returns {Object} GPT-4 API response
+   */
+  async callGPT4API(prompt, apiKey, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: options.model || 'gpt-4-turbo',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: options.maxTokens || 4096,
+          temperature: options.temperature || 0.3
+        })
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`GPT-4 API returned ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      
+      // Extract usage and calculate cost
+      const usage = data.usage || {};
+      const cost = this.trackCost('gpt4', {
+        prompt_tokens: usage.prompt_tokens || 0,
+        completion_tokens: usage.completion_tokens || 0
+      });
+
+      this.apiCallLog.push({
+        model: 'gpt-4-turbo',
+        timestamp: new Date().toISOString(),
+        prompt_tokens: usage.prompt_tokens || 0,
+        completion_tokens: usage.completion_tokens || 0,
+        cost
+      });
+
+      return {
+        content: data.choices?.[0]?.message?.content || '',
+        usage,
+        cost
+      };
+
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw new Error(`GPT-4 API call failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Phase 2A: Track AI API costs
+   * @param {string} model - Model used ('claude' or 'gpt4')
+   * @param {Object} usage - Token usage data
+   * @returns {number} Cost in USD
+   */
+  trackCost(model, usage) {
+    let cost = 0;
+    
+    if (model === 'claude') {
+      // Claude 3.5 Sonnet pricing (as of Oct 2025)
+      const inputCost = (usage.input_tokens || 0) * 0.003 / 1000; // $3 per 1M input tokens
+      const outputCost = (usage.output_tokens || 0) * 0.015 / 1000; // $15 per 1M output tokens
+      cost = inputCost + outputCost;
+    } else if (model === 'gpt4') {
+      // GPT-4 Turbo pricing (as of Oct 2025)
+      const promptCost = (usage.prompt_tokens || 0) * 0.01 / 1000; // $10 per 1M prompt tokens
+      const completionCost = (usage.completion_tokens || 0) * 0.03 / 1000; // $30 per 1M completion tokens
+      cost = promptCost + completionCost;
+    }
+    
+    this.totalCost += cost;
+    return cost;
+  }
+
+  /**
+   * Phase 2A: Generate executive summary with Claude AI
+   */
+  async generateExecutiveSummaryWithAI(grant, company, requirements, template, env) {
+    const prompt = `Generate a compelling executive summary for a ${grant.agency} ${grant.program} proposal.
+
+Grant Details:
+- Title: ${grant.title}
+- Agency: ${grant.agency}
+- Amount: ${grant.amount}
+- Description: ${grant.description}
+- Deadline: ${grant.deadline}
+
+Company Profile:
+- Name: ${company.name || 'Innovative Technology Company'}
+- Core Expertise: ${company.core_expertise || 'Advanced Technology Solutions'}
+- Years in Business: ${company.years_in_business || '5+'}
+- Past Achievements: ${company.past_achievements || 'Successful project delivery'}
+
+Template Requirements:
+- Page Limit: ${template.format.page_limit} pages
+- Key Focus: ${template.key_focus}
+- Evaluation Criteria: ${template.evaluation_criteria.join(', ')}
+
+Please generate a concise, compelling executive summary (300-500 words) that:
+1. Clearly states the problem being addressed
+2. Presents our innovative solution approach
+3. Highlights the expected impact and benefits
+4. Emphasizes our team's qualifications
+5. Aligns with ${grant.agency}'s mission and priorities
+
+Use professional, confident language appropriate for federal grant proposals.`;
+
+    try {
+      const result = await this.callClaudeAPI(prompt, env.ANTHROPIC_API_KEY);
+      return result.content;
+    } catch (error) {
+      console.warn('Claude API failed for executive summary, using template fallback:', error);
+      return this.generateExecutiveSummary(grant, company, requirements, template);
+    }
+  }
+
+  /**
+   * Phase 2A: Generate technical approach with Claude AI
+   */
+  async generateTechnicalApproachWithAI(grant, company, requirements, template, env) {
+    const prompt = `Generate a detailed technical approach section for a ${grant.agency} ${grant.program} proposal.
+
+Grant Details:
+- Title: ${grant.title}
+- Agency: ${grant.agency}
+- Description: ${grant.description}
+- Technical Domain: ${grant.technical_domain || 'Advanced Technology'}
+
+Company Capabilities:
+- Core Technologies: ${company.core_technologies || 'Cutting-edge solutions'}
+- Technical Capabilities: ${company.technical_capabilities || 'Advanced engineering'}
+- Development Methodology: ${company.development_methodology || 'Agile development'}
+- Key Innovations: ${company.key_innovations?.join(', ') || 'Proprietary innovations'}
+
+Technical Requirements:
+- Challenges: ${requirements.technical_challenges?.slice(0, 3).join(', ') || 'Complex technical challenges'}
+- Expected Outcomes: ${grant.expected_outcomes || 'Breakthrough technical capabilities'}
+- Performance Targets: ${grant.performance_target || 'Superior performance metrics'}
+
+Template Focus: ${template.key_focus}
+
+Generate a comprehensive technical approach (800-1200 words) that includes:
+1. **Technical Overview** - High-level approach and methodology
+2. **Phase-Based Development Plan** - 3 phases with clear objectives
+3. **Technical Methodology** - Specific methods and technologies
+4. **Challenge Mitigation** - How you'll address key technical risks
+5. **Innovation Highlights** - Novel aspects of your approach
+6. **Performance Validation** - Testing and validation strategy
+
+Use technical language appropriate for ${grant.agency} evaluators while remaining clear and compelling.`;
+
+    try {
+      const result = await this.callClaudeAPI(prompt, env.ANTHROPIC_API_KEY, { maxTokens: 6144 });
+      return result.content;
+    } catch (error) {
+      console.warn('Claude API failed for technical approach, using template fallback:', error);
+      return this.generateTechnicalApproach(grant, company, requirements, template);
+    }
+  }
+
+  /**
+   * Phase 2A: Generate innovation section with Claude AI
+   */
+  async generateInnovationSectionWithAI(grant, company, requirements, env) {
+    const prompt = `Generate an innovation section for a federal grant proposal that demonstrates breakthrough potential.
+
+Grant Context:
+- Title: ${grant.title}
+- Agency: ${grant.agency}
+- Technical Domain: ${grant.technical_domain || 'Advanced Technology'}
+- Application Area: ${grant.application_area || 'Broad applications'}
+
+Company Innovation Profile:
+- Key Innovations: ${company.key_innovations?.join(', ') || 'Proprietary breakthrough technologies'}
+- Technologies: ${company.technologies || 'Advanced technology stack'}
+- Core Expertise: ${company.core_expertise || 'Deep technical expertise'}
+- Competitive Advantages: ${company.competitive_advantages?.join(', ') || 'Market-leading capabilities'}
+
+Generate a compelling innovation section (400-600 words) that:
+1. **Technical Innovation** - 3 specific breakthrough innovations
+2. **Competitive Advantage** - How this surpasses existing solutions
+3. **Impact Potential** - Transformative effects on the field
+4. **Intellectual Property** - Innovation protection strategy
+5. **Scalability** - Path from prototype to widespread adoption
+
+Emphasize breakthrough potential and transformative impact. Use confident, forward-looking language.`;
+
+    try {
+      const result = await this.callClaudeAPI(prompt, env.ANTHROPIC_API_KEY);
+      return result.content;
+    } catch (error) {
+      console.warn('Claude API failed for innovation section, using template fallback:', error);
+      return this.generateInnovationSection(grant, company, requirements);
+    }
+  }
+
+  /**
+   * Phase 2A: Generate commercial potential with GPT-4
+   */
+  async generateCommercialPotentialWithAI(grant, company, template, env) {
+    const prompt = `Generate a commercial potential section for a ${grant.agency} grant proposal focusing on market opportunity and business impact.
+
+Grant Information:
+- Title: ${grant.title}
+- Agency: ${grant.agency}
+- Program: ${grant.program}
+- Amount: ${grant.amount}
+- Application Domain: ${grant.application_domain || grant.technical_domain}
+
+Company Business Profile:
+- Market Focus: ${company.market_focus || 'Technology solutions'}
+- Target Markets: ${company.target_markets?.join(', ') || 'Government and commercial sectors'}
+- Business Model: ${company.business_model || 'Technology licensing and products'}
+- Revenue Model: ${company.revenue_model || 'Product sales and licensing'}
+
+Template Requirements:
+- Key Focus: ${template.key_focus}
+- Commercialization Timeline: ${grant.commercialization_timeline || '3-5 years'}
+
+Generate a business-focused commercial potential section (600-800 words) covering:
+1. **Market Opportunity** - Market size, growth, and segments
+2. **Commercialization Strategy** - Phase I, II, III progression
+3. **Revenue Projections** - Realistic financial forecasts
+4. **Customer Validation** - Target customers and adoption path
+5. **Competitive Positioning** - Market differentiation
+6. **Risk Mitigation** - Business and technical risk management
+
+${template.key_focus.includes('Dual-use') ? 'Emphasize dual-use applications for both government and commercial markets.' : 'Focus on broad market applicability and societal benefit.'}
+
+Use business-oriented language with specific, quantifiable projections where possible.`;
+
+    try {
+      const result = await this.callGPT4API(prompt, env.OPENAI_API_KEY, { maxTokens: 5120 });
+      return result.content;
+    } catch (error) {
+      console.warn('GPT-4 API failed for commercial potential, using template fallback:', error);
+      return this.generateCommercialPotential(grant, company, template);
+    }
+  }
+
+  /**
+   * Phase 2A: Generate budget narrative with GPT-4
+   */
+  async generateBudgetNarrativeWithAI(grant, company, env) {
+    const amount = (typeof grant.amount === 'string' 
+      ? parseInt(grant.amount.replace(/[$,]/g, '')) 
+      : grant.amount) || 250000;
+
+    const prompt = `Generate a detailed budget narrative for a ${grant.program} proposal with total funding of ${grant.amount}.
+
+Project Context:
+- Grant Title: ${grant.title}
+- Agency: ${grant.agency}
+- Total Amount: $${amount.toLocaleString()}
+- Duration: ${grant.duration || '24 months'}
+
+Company Profile:
+- Team Size: ${company.team_size || '5-10 engineers'}
+- Key Personnel: ${company.key_personnel?.join(', ') || 'Senior engineers and project manager'}
+- Overhead Rate: ${company.overhead_rate || '15-20%'}
+
+Generate a comprehensive budget narrative (400-600 words) that includes:
+
+1. **Personnel Costs** (60% of budget)
+   - Principal Investigator
+   - Technical team members
+   - Project management
+   - Hourly rates and time allocation
+
+2. **Equipment and Materials** (15% of budget)
+   - Specialized equipment needs
+   - Software licenses
+   - Materials and supplies
+
+3. **Indirect Costs** (15% of budget)
+   - Facilities
+   - Administrative overhead
+   - Utilities and support
+
+4. **Other Direct Costs** (10% of budget)
+   - Travel (if applicable)
+   - Consultants
+   - Subcontractors
+
+Provide specific dollar amounts, justify major expenses, and demonstrate cost-effectiveness. Use professional financial language appropriate for federal contracting.`;
+
+    try {
+      const result = await this.callGPT4API(prompt, env.OPENAI_API_KEY);
+      return result.content;
+    } catch (error) {
+      console.warn('GPT-4 API failed for budget narrative, using template fallback:', error);
+      return this.generateBudgetNarrative(grant, company);
+    }
   }
 
   /**
@@ -344,7 +834,7 @@ export class AIProposalService {
   }
 
   /**
-   * Generate executive summary using AI
+   * Generate executive summary using template (fallback method)
    * @param {Object} grant - Grant details
    * @param {Object} company - Company profile
    * @param {Object} requirements - Processed requirements

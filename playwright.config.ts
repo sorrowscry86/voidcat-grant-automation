@@ -59,7 +59,6 @@ export default defineConfig({
       },
     },
 
-    /* Temporarily disable other browsers until we can install them
     {
       name: 'firefox',
       use: { 
@@ -79,7 +78,6 @@ export default defineConfig({
     },
 
     /* Test against mobile viewports with increased timeouts */
-    /*
     {
       name: 'Mobile Chrome',
       use: { 
@@ -96,7 +94,6 @@ export default defineConfig({
         actionTimeout: TIMEOUTS.VERY_LONG,
       },
     },
-    */
   ],
 
   /* Web server for local API testing */
