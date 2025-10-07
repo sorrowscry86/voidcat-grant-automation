@@ -90,7 +90,20 @@ export class RegistrationModal {
     
     // Look for the welcome message with more specific selector
     const welcomeText = this.page.locator('.text-right p.text-sm.text-gray-600').filter({ hasText: 'Welcome,' });
-    await expect(welcomeText).toBeVisible({ timeout: 20000 });
+    
+    try {
+      await expect(welcomeText).toBeVisible({ timeout: 20000 });
+    } catch (error) {
+      // Enhanced error logging for debugging
+      console.error('Welcome message not visible after registration');
+      console.error('User data:', user);
+      console.error('Current URL:', this.page.url());
+      
+      // Take a screenshot for debugging
+      await this.page.screenshot({ path: `test-results/registration-failure-${Date.now()}.png`, fullPage: true });
+      
+      throw error;
+    }
   }
 
   async verifyTierInfoText() {
