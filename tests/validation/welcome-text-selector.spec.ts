@@ -38,8 +38,8 @@ test.describe('Welcome Text Selector Validation', () => {
       </html>
     `);
     
-    // Wait for Alpine.js to initialize
-    await page.waitForTimeout(500);
+    // Wait for Alpine.js to initialize by checking for the Alpine object
+    await page.waitForFunction(() => window.Alpine);
   });
 
   test('should NOT find welcome text before registration', async ({ page }) => {
@@ -52,10 +52,8 @@ test.describe('Welcome Text Selector Validation', () => {
     // Click the register button to set the user
     await page.click('button:has-text("Register")');
     
-    // Wait for Alpine.js to update the DOM (simulating our fix)
-    await page.waitForTimeout(1000);
-    
     // The new selector should find the welcome message
+    // Rely on Playwright's auto-waiting instead of fixed timeout
     const welcomeText = page.locator('.text-right p.text-sm.text-gray-600').filter({ hasText: 'Welcome,' });
     await expect(welcomeText).toBeVisible({ timeout: 20000 });
   });
@@ -64,10 +62,8 @@ test.describe('Welcome Text Selector Validation', () => {
     // Click the register button to set the user
     await page.click('button:has-text("Register")');
     
-    // Wait for Alpine.js to update the DOM
-    await page.waitForTimeout(1000);
-    
     // Verify the welcome text contains the expected content
+    // Playwright's auto-waiting will poll until the element appears
     const welcomeText = page.locator('.text-right p.text-sm.text-gray-600').filter({ hasText: 'Welcome,' });
     await expect(welcomeText).toContainText('Test User');
   });
@@ -82,9 +78,6 @@ test.describe('Welcome Text Selector Validation', () => {
     
     // Click the register button to set the user
     await page.click('button:has-text("Register")');
-    
-    // Wait for Alpine.js to update the DOM
-    await page.waitForTimeout(1000);
     
     // The new selector should ONLY match the welcome message in the header,
     // not the extra text we added
@@ -120,12 +113,10 @@ test.describe('Selector Performance Comparison', () => {
     // Old selector matches ALL of these
     const oldSelector = page.locator('text=/Welcome, /');
     const oldCount = await oldSelector.count();
-    console.log('Old selector matches:', oldCount, 'elements');
     
     // New selector only matches the specific one
     const newSelector = page.locator('.text-right p.text-sm.text-gray-600').filter({ hasText: 'Welcome,' });
     const newCount = await newSelector.count();
-    console.log('New selector matches:', newCount, 'element(s)');
     
     // Verify the new selector is more specific
     expect(newCount).toBeLessThan(oldCount);

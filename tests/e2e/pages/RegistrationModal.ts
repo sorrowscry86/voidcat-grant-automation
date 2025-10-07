@@ -84,14 +84,12 @@ export class RegistrationModal {
     await this.verifyModalClosed();
 
     // After registration, verify that the welcome message appears, indicating successful login
-    // Wait for Alpine.js to update the DOM with user data
     // The welcome message format is "Welcome, [name/email]" and appears in the header
-    await this.page.waitForTimeout(1000); // Give Alpine.js time to update the DOM
-    
     // Look for the welcome message with more specific selector
     const welcomeText = this.page.locator('.text-right p.text-sm.text-gray-600').filter({ hasText: 'Welcome,' });
     
     try {
+      // Rely on Playwright's auto-waiting with extended timeout for Alpine.js reactivity
       await expect(welcomeText).toBeVisible({ timeout: 20000 });
     } catch (error) {
       // Enhanced error logging for debugging
