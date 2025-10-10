@@ -24,7 +24,7 @@ AI-powered federal grant discovery and proposal automation platform built with C
 - **Location**: `/frontend/`
 - **Framework**: Alpine.js + Tailwind CSS (CDN)
 - **Deployment**: GitHub Pages or Cloudflare Pages
-- **Features**: Responsive design, real-time search, payment integration
+- **Features**: Responsive design, real-time search, payment integration, dark mode
 
 ---
 
@@ -77,6 +77,7 @@ AI-powered federal grant discovery and proposal automation platform built with C
 - [x] Grant opportunity matching
 - [x] Subscription tier management
 - [x] Mobile-responsive interface
+- [x] Dark mode toggle with localStorage persistence ✨ NEW
 
 ### Intelligent Discovery Engine ✨ NEW
 
