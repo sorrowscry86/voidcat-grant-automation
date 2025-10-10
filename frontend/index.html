@@ -44,12 +44,18 @@
     </script>
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Dark mode configuration for Tailwind CSS
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://js.stripe.com/v3/"></script>
     <meta name="description" content="AI-powered federal grant discovery and proposal automation for startups and small businesses">
     <meta name="keywords" content="federal grants, SBIR, STTR, grant automation, AI proposal generation">
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-300">
     <div x-data="grantApp()" class="container mx-auto px-4 py-8">
         <!-- Header -->
         <header class="mb-8">
@@ -61,11 +67,22 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
-                    <h1 class="text-3xl font-bold text-gray-900">VoidCat RDC</h1>
-                    <p class="text-gray-600">Federal Grant Automation Platform</p>
-                    <p class="text-sm text-green-600 font-semibold">🚀 Now Live - MVP Version</p>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">VoidCat RDC</h1>
+                    <p class="text-gray-600 dark:text-gray-300">Federal Grant Automation Platform</p>
+                    <p class="text-sm text-green-600 dark:text-green-400 font-semibold">🚀 Now Live - MVP Version</p>
                 </div>
-                <div class="flex space-x-4">
+                <div class="flex items-center space-x-4">
+                    <!-- Dark Mode Toggle -->
+                    <button @click="toggleDarkMode()" 
+                            aria-label="Toggle dark mode"
+                            class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                        <svg x-show="!darkMode" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                        <svg x-show="darkMode" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                    </button>
                     <template x-if="!user">
                         <button @click="showRegister = true" 
                                 class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
@@ -74,8 +91,8 @@
                     </template>
                     <template x-if="user">
                         <div class="text-right">
-                            <p class="text-sm text-gray-600">Welcome, <span x-text="user.name || user.email"></span></p>
-                            <p class="text-xs text-gray-500 capitalize">Tier: <span x-text="user.subscription_tier"></span></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">Welcome, <span x-text="user.name || user.email"></span></p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 capitalize">Tier: <span x-text="user.subscription_tier"></span></p>
                             <template x-if="user.subscription_tier === 'free'">
                                 <div class="upgrade-section mt-2">
                                     <button @click="upgradeToProModal = true" 
@@ -83,14 +100,14 @@
                                             class="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-4 py-2 rounded-lg hover:from-purple-600 hover:to-blue-600 font-semibold shadow-lg transition-all transform hover:scale-105">
                                         ✨ Upgrade to Pro - $99/month
                                     </button>
-                                    <p class="text-xs text-orange-600 mt-1 font-medium">
+                                    <p class="text-xs text-orange-600 dark:text-orange-400 mt-1 font-medium">
                                         <span x-text="user.usage_count || 0"></span>/1 free grants used
                                     </p>
                                 </div>
                             </template>
                             <template x-if="user.subscription_tier === 'pro'">
                                 <div class="mt-2">
-                                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
+                                    <span class="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm font-semibold">
                                         ✅ Pro Member
                                     </span>
                                 </div>
@@ -101,24 +118,24 @@
             </div>
             <!-- Mobile dropdown nav -->
             <nav class="md:hidden mt-3" x-show="menuOpen" x-transition>
-                <ul class="bg-white border rounded-lg shadow-sm divide-y">
-                    <li><a href="#features" class="block px-4 py-2 hover:bg-gray-50">Features</a></li>
-                    <li><a href="#demo" class="block px-4 py-2 hover:bg-gray-50">Demo</a></li>
-                    <li><a href="#pricing" class="block px-4 py-2 hover:bg-gray-50">Pricing</a></li>
-                    <li><a href="#login" class="block px-4 py-2 hover:bg-gray-50">Login</a></li>
+                <ul class="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-sm divide-y dark:divide-gray-700">
+                    <li><a href="#features" class="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200">Features</a></li>
+                    <li><a href="#demo" class="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200">Demo</a></li>
+                    <li><a href="#pricing" class="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200">Pricing</a></li>
+                    <li><a href="#login" class="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200">Login</a></li>
                 </ul>
             </nav>
         </header>
 
         <!-- Search Section -->
-        <div class="bg-white rounded-lg shadow-sm border p-6 mb-8">
-            <h2 class="text-xl font-semibold mb-4">🔍 Search Grant Opportunities</h2>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4 dark:text-white">🔍 Search Grant Opportunities</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <input x-model="searchQuery" 
               placeholder="Search keywords (AI, defense, energy...)" aria-label="Search keywords"
-                       class="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                       class="border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:text-white">
                 <select x-model="selectedAgency" 
-                        class="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                        class="border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white">
                     <option value="">All Agencies</option>
                     <option value="defense">Department of Defense</option>
                     <option value="nsf">National Science Foundation</option>
@@ -133,9 +150,9 @@
                     <span x-show="loading">Searching...</span>
                 </button>
             </div>
-            <div x-show="grants.length > 0" class="text-sm text-gray-600">
+            <div x-show="grants.length > 0" class="text-sm text-gray-600 dark:text-gray-300">
                 Found <span x-text="grants.length"></span> matching opportunities
-                <span x-show="usingDemoData" class="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">
+                <span x-show="usingDemoData" class="ml-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded text-xs font-medium">
                     📋 Demo Data (API unavailable)
                 </span>
             </div>
@@ -143,23 +160,23 @@
         <div x-show="showRegister" 
              class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
              x-transition>
-            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                <h3 class="text-lg font-semibold mb-4">🚀 Register for Free Access</h3>
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-lg font-semibold mb-4 dark:text-white">🚀 Register for Free Access</h3>
                 <form @submit.prevent="register()">
                     <div class="space-y-4">
                         <input x-model="registerForm.name" 
                                placeholder="Full Name" 
                                required
-                               class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                               class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white">
                         <input x-model="registerForm.email" 
                                placeholder="Email Address" 
                                type="email"
                                required
-                               class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                               class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white">
                         <input x-model="registerForm.company" 
                                placeholder="Company Name (Optional)" 
-                               class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
-                        <div class="text-xs text-gray-500">
+                               class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">
                             Free tier includes 1 grant application per month. Upgrade for unlimited access.
                         </div>
                         <div class="flex space-x-4">
@@ -171,7 +188,7 @@
                             </button>
                             <button @click="showRegister = false" 
                                     type="button"
-                                    class="flex-1 border border-gray-300 py-2 rounded-lg hover:bg-gray-50">
+                                    class="flex-1 border border-gray-300 dark:border-gray-600 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
                                 Cancel
                             </button>
                         </div>
@@ -184,26 +201,26 @@
         <div x-show="upgradeToProModal" 
              class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
              x-transition>
-            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl relative">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl relative">
                 <!-- Accessible Close button -->
                 <button @click="upgradeToProModal = false" aria-label="Close"
-                        class="absolute top-3 right-3 text-gray-500 hover:text-gray-700">
+                        class="absolute top-3 right-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
                     ✖
                 </button>
                 <div class="text-center mb-6">
                     <div class="text-4xl mb-2">🚀</div>
-                    <h3 class="text-2xl font-bold text-gray-800 mb-2">Upgrade to Pro</h3>
-                    <p class="text-gray-600">Unlock unlimited grant applications and AI-powered proposals</p>
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">Upgrade to Pro</h3>
+                    <p class="text-gray-600 dark:text-gray-300">Unlock unlimited grant applications and AI-powered proposals</p>
                 </div>
                 <!-- Error alert for upgrade flow -->
-                <div x-show="upgradeError" role="alert" class="mb-4 p-3 rounded bg-red-50 text-red-700 border border-red-200">
+                <div x-show="upgradeError" role="alert" class="mb-4 p-3 rounded bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 border border-red-200 dark:border-red-700">
                     <strong>Upgrade failed:</strong> <span x-text="upgradeError"></span>
                 </div>
                 
                 <div class="space-y-4 mb-6">
-                    <div class="bg-gray-50 p-4 rounded-lg border">
-                        <h4 class="font-semibold text-gray-800 mb-2">🆓 Free Tier</h4>
-                        <div class="space-y-1 text-sm text-gray-600">
+                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border dark:border-gray-600">
+                        <h4 class="font-semibold text-gray-800 dark:text-white mb-2">🆓 Free Tier</h4>
+                        <div class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
                             <p>• 1 grant application per month</p>
                             <p>• Basic grant search</p>
                             <p>• Limited proposal generation</p>
@@ -212,9 +229,9 @@
                         </div>
                     </div>
                     
-                    <div class="bg-blue-50 bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border-2 border-blue-200">
-                        <h4 class="font-semibold text-blue-800 mb-2">✨ Pro Tier - $99/month</h4>
-                        <div class="space-y-1 text-sm text-blue-700">
+                    <div class="bg-blue-50 dark:bg-blue-900 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900 dark:to-purple-900 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-700">
+                        <h4 class="font-semibold text-blue-800 dark:text-blue-200 mb-2">✨ Pro Tier - $99/month</h4>
+                        <div class="space-y-1 text-sm text-blue-700 dark:text-blue-200">
                             <p>• ✅ <strong>Unlimited</strong> grant applications</p>
                             <p>• ✅ <strong>Advanced</strong> AI proposal generation</p>
                             <p>• ✅ <strong>Priority</strong> customer support</p>
@@ -222,8 +239,8 @@
                             <p>• ✅ <strong>Early access</strong> to new features</p>
                             <p>• ✅ <strong>Dedicated</strong> account <strong>manager</strong></p>
                         </div>
-                        <div class="mt-3 p-2 bg-yellow-100 rounded text-center">
-                            <p class="text-sm font-semibold text-yellow-800">💰 ROI: Avg. $250K+ in grants won</p>
+                        <div class="mt-3 p-2 bg-yellow-100 dark:bg-yellow-900 rounded text-center">
+                            <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-200">💰 ROI: Avg. $250K+ in grants won</p>
                         </div>
                     </div>
                 </div>
@@ -234,12 +251,12 @@
                         🚀 Upgrade Now
                     </button>
                     <button @click="upgradeToProModal = false" 
-                            class="flex-1 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                            class="flex-1 border border-gray-300 dark:border-gray-600 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors dark:text-white">
                         Maybe Later
                     </button>
                 </div>
                 
-                <p class="text-xs text-gray-500 text-center mt-4">
+                <p class="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
                     💳 Secure payment via Stripe • Cancel anytime
                 </p>
             </div>
@@ -249,23 +266,23 @@
         <div x-show="showUpgradePrompt" 
              class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
              x-transition>
-            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
                 <div class="text-center mb-6">
                     <div class="text-4xl mb-2">⚠️</div>
-                    <h3 class="text-xl font-bold text-gray-800 mb-2">Free Limit Reached!</h3>
-                    <p class="text-gray-600">You've used your 1 free grant application this month</p>
-                    <p class="text-sm text-gray-500 mt-1">You've reached your free limit. Please upgrade to continue.</p>
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-2">Free Limit Reached!</h3>
+                    <p class="text-gray-600 dark:text-gray-300">You've used your 1 free grant application this month</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">You've reached your free limit. Please upgrade to continue.</p>
                 </div>
                 
-                <div class="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
-                    <h4 class="font-semibold text-blue-800 mb-2">🚀 Upgrade to Pro for:</h4>
-                    <div class="space-y-1 text-sm text-blue-700">
+                <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg mb-6 border border-blue-200 dark:border-blue-700">
+                    <h4 class="font-semibold text-blue-800 dark:text-blue-200 mb-2">🚀 Upgrade to Pro for:</h4>
+                    <div class="space-y-1 text-sm text-blue-700 dark:text-blue-200">
                         <p>• <strong>Unlimited</strong> grant applications</p>
                         <p>• <strong>Advanced</strong> AI proposal generation</p>
                         <p>• <strong>Priority</strong> support</p>
                     </div>
                     <div class="mt-3 text-center">
-                        <span class="bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full text-sm font-bold">
+                        <span class="bg-yellow-200 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 px-3 py-1 rounded-full text-sm font-bold">
                             Only $99/month
                         </span>
                     </div>
@@ -277,7 +294,7 @@
                         Upgrade Now
                     </button>
                     <button @click="showUpgradePrompt = false" 
-                            class="flex-1 border border-gray-300 py-3 rounded-lg hover:bg-gray-50">
+                            class="flex-1 border border-gray-300 dark:border-gray-600 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
                         Not Now
                     </button>
                 </div>
@@ -288,7 +305,7 @@
         <div x-show="showProposalModal" 
              class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
              x-transition>
-            <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
                 <!-- Modal Header -->
                 <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
                     <div class="flex justify-between items-center">
@@ -307,13 +324,13 @@
                 <!-- Modal Body -->
                 <div class="p-6 overflow-y-auto max-h-[60vh]">
                     <div class="prose max-w-none">
-                        <pre class="whitespace-pre-wrap text-gray-800 font-mono text-sm leading-relaxed bg-gray-50 p-4 rounded-lg border" 
+                        <pre class="whitespace-pre-wrap text-gray-800 dark:text-gray-200 font-mono text-sm leading-relaxed bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border dark:border-gray-600" 
                              x-text="currentProposal?.proposal || currentProposal"></pre>
                     </div>
                 </div>
                 
                 <!-- Modal Footer -->
-                <div class="bg-gray-50 px-6 py-4 border-t">
+                <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t dark:border-gray-600">
                     <div class="flex flex-wrap gap-3 justify-between items-center">
                         <div class="flex flex-wrap gap-3">
                             <button @click="exportProposalAsMarkdown()" 
@@ -327,12 +344,12 @@
                         </div>
                         <div class="flex gap-3">
                             <button @click="showProposalModal = false" 
-                                    class="border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                                    class="border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-white">
                                 Close
                             </button>
                         </div>
                     </div>
-                    <p class="text-xs text-gray-600 mt-3">
+                    <p class="text-xs text-gray-600 dark:text-gray-300 mt-3">
                         💡 <strong>Tip:</strong> This is an AI-generated draft. Review and customize before submission.
                     </p>
                 </div>
@@ -343,7 +360,7 @@
         <div x-show="showGrantDetailsModal" 
              class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
              x-transition>
-            <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
                 <!-- Modal Header -->
                 <div class="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6">
                     <div class="flex justify-between items-center">
@@ -365,60 +382,60 @@
                         <div class="space-y-6">
                             <!-- Grant Title and Basic Info -->
                             <div>
-                                <h4 class="text-xl font-bold text-gray-900 mb-2" x-text="currentGrantDetails.title"></h4>
+                                <h4 class="text-xl font-bold text-gray-900 dark:text-white mb-2" x-text="currentGrantDetails.title"></h4>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                     <div>
-                                        <span class="font-semibold text-gray-700">🏛️ Agency:</span>
-                                        <span x-text="currentGrantDetails.agency" class="ml-2"></span>
+                                        <span class="font-semibold text-gray-700 dark:text-gray-300">🏛️ Agency:</span>
+                                        <span x-text="currentGrantDetails.agency" class="ml-2 dark:text-gray-200"></span>
                                     </div>
                                     <div>
-                                        <span class="font-semibold text-gray-700">📝 Program:</span>
-                                        <span x-text="currentGrantDetails.program" class="ml-2"></span>
+                                        <span class="font-semibold text-gray-700 dark:text-gray-300">📝 Program:</span>
+                                        <span x-text="currentGrantDetails.program" class="ml-2 dark:text-gray-200"></span>
                                     </div>
                                     <div>
-                                        <span class="font-semibold text-gray-700">📅 Deadline:</span>
-                                        <span x-text="formatDate(currentGrantDetails.deadline)" class="ml-2"></span>
+                                        <span class="font-semibold text-gray-700 dark:text-gray-300">📅 Deadline:</span>
+                                        <span x-text="formatDate(currentGrantDetails.deadline)" class="ml-2 dark:text-gray-200"></span>
                                     </div>
                                     <div>
-                                        <span class="font-semibold text-gray-700">💰 Amount:</span>
-                                        <span x-text="currentGrantDetails.amount" class="ml-2 font-bold text-green-600"></span>
+                                        <span class="font-semibold text-gray-700 dark:text-gray-300">💰 Amount:</span>
+                                        <span x-text="currentGrantDetails.amount" class="ml-2 font-bold text-green-600 dark:text-green-400"></span>
                                     </div>
                                 </div>
                             </div>
                             
                             <!-- Description -->
                             <div>
-                                <h5 class="font-semibold text-gray-700 mb-2">📄 Description:</h5>
-                                <p class="text-gray-700 leading-relaxed" x-text="currentGrantDetails.description"></p>
+                                <h5 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">📄 Description:</h5>
+                                <p class="text-gray-700 dark:text-gray-300 leading-relaxed" x-text="currentGrantDetails.description"></p>
                             </div>
                             
                             <!-- Eligibility -->
                             <div>
-                                <h5 class="font-semibold text-gray-700 mb-2">✅ Eligibility:</h5>
-                                <p class="text-gray-700" x-text="currentGrantDetails.eligibility"></p>
+                                <h5 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">✅ Eligibility:</h5>
+                                <p class="text-gray-700 dark:text-gray-300" x-text="currentGrantDetails.eligibility"></p>
                             </div>
                             
                             <!-- Contact Information (if available) -->
                             <template x-if="currentGrantDetails.contact">
                                 <div>
-                                    <h5 class="font-semibold text-gray-700 mb-2">📞 Contact Information:</h5>
-                                    <div class="bg-gray-50 p-4 rounded-lg">
-                                        <p><strong>Name:</strong> <span x-text="currentGrantDetails.contact.name"></span></p>
-                                        <p><strong>Email:</strong> <span x-text="currentGrantDetails.contact.email"></span></p>
-                                        <p><strong>Phone:</strong> <span x-text="currentGrantDetails.contact.phone"></span></p>
+                                    <h5 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">📞 Contact Information:</h5>
+                                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                        <p class="dark:text-gray-200"><strong>Name:</strong> <span x-text="currentGrantDetails.contact.name"></span></p>
+                                        <p class="dark:text-gray-200"><strong>Email:</strong> <span x-text="currentGrantDetails.contact.email"></span></p>
+                                        <p class="dark:text-gray-200"><strong>Phone:</strong> <span x-text="currentGrantDetails.contact.phone"></span></p>
                                     </div>
                                 </div>
                             </template>
                             
                             <!-- Matching Score -->
                             <div>
-                                <h5 class="font-semibold text-gray-700 mb-2">🎯 Match Score:</h5>
+                                <h5 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">🎯 Match Score:</h5>
                                 <div class="flex items-center">
-                                    <div class="w-32 bg-gray-200 rounded-full h-3 mr-3">
+                                    <div class="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-3 mr-3">
                                         <div class="bg-blue-600 h-3 rounded-full transition-all" 
                                              :style="`width: ${(currentGrantDetails.matching_score || 0) * 100}%`"></div>
                                     </div>
-                                    <span class="text-sm font-semibold" 
+                                    <span class="text-sm font-semibold dark:text-gray-200" 
                                           x-text="`${Math.round((currentGrantDetails.matching_score || 0) * 100)}% match`"></span>
                                 </div>
                             </div>
@@ -427,9 +444,9 @@
                 </div>
                 
                 <!-- Modal Footer -->
-                <div class="bg-gray-50 px-6 py-4 border-t">
+                <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t dark:border-gray-600">
                     <div class="flex justify-between items-center">
-                        <p class="text-xs text-gray-600">
+                        <p class="text-xs text-gray-600 dark:text-gray-300">
                             💡 <strong>Tip:</strong> Click "Generate Proposal" to create an AI-powered application for this grant.
                         </p>
                         <div class="flex gap-3">
@@ -440,7 +457,7 @@
                                 </button>
                             </template>
                             <button @click="showGrantDetailsModal = false" 
-                                    class="border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                                    class="border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-white">
                                 Close
                             </button>
                         </div>
@@ -489,7 +506,7 @@
         <div x-show="showErrorModal" 
              class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
              x-transition>
-            <div class="bg-white rounded-lg shadow-2xl max-w-md w-full">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-md w-full">
                 <!-- Modal Header -->
                 <div class="bg-red-600 text-white p-4 rounded-t-lg">
                     <div class="flex justify-between items-center">
@@ -506,11 +523,11 @@
                 
                 <!-- Modal Body -->
                 <div class="p-6">
-                    <p class="text-gray-700" x-text="errorMessage"></p>
+                    <p class="text-gray-700 dark:text-gray-300" x-text="errorMessage"></p>
                 </div>
                 
                 <!-- Modal Footer -->
-                <div class="bg-gray-50 px-6 py-4 rounded-b-lg border-t">
+                <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 rounded-b-lg border-t dark:border-gray-600">
                     <div class="flex justify-end">
                         <button @click="showErrorModal = false" 
                                 class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
@@ -524,31 +541,31 @@
         <!-- Grant Results -->
         <div x-show="grants.length > 0" class="space-y-4">
             <template x-for="grant in grants" :key="grant.id">
-                <div class="grant-card bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow">
+                <div class="grant-card bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex-1">
-                            <h4 class="text-lg font-semibold text-blue-600 mb-1" x-text="grant.title"></h4>
-                            <p class="text-gray-600 font-medium" x-text="grant.agency"></p>
-                            <p class="text-sm text-gray-500" x-text="grant.program"></p>
+                            <h4 class="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-1" x-text="grant.title"></h4>
+                            <p class="text-gray-600 dark:text-gray-300 font-medium" x-text="grant.agency"></p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400" x-text="grant.program"></p>
                         </div>
                         <div class="text-right ml-4">
-                            <p class="text-lg font-bold text-green-600" x-text="grant.amount"></p>
-                            <p class="text-sm text-gray-500">
+                            <p class="text-lg font-bold text-green-600 dark:text-green-400" x-text="grant.amount"></p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
                                 📅 Deadline: <span x-text="formatDate(grant.deadline)"></span>
                             </p>
                             <div class="flex items-center mt-2">
-                                <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                                <div class="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-2">
                                     <div class="bg-blue-600 h-2 rounded-full transition-all" 
                                          :style="`width: ${grant.matching_score * 100}%`"></div>
                                 </div>
-                                <span class="text-xs text-gray-600" 
+                                <span class="text-xs text-gray-600 dark:text-gray-400" 
                                       x-text="`${Math.round(grant.matching_score * 100)}% match`"></span>
                             </div>
                         </div>
                     </div>
                     
-                    <p class="text-gray-700 mb-4" x-text="grant.description"></p>
-                    <p class="text-sm text-gray-600 mb-4">
+                    <p class="text-gray-700 dark:text-gray-300 mb-4" x-text="grant.description"></p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                         <strong>✅ Eligibility:</strong> <span x-text="grant.eligibility"></span>
                     </p>
                     
@@ -562,7 +579,7 @@
                                 class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 transition-colors text-sm">
                             🤖 Generate Proposal
                         </button>
-                        <button class="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50 transition-colors text-sm">
+                        <button class="border border-gray-300 dark:border-gray-600 px-4 py-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm dark:text-white">
                             💾 Save for Later
                         </button>
                     </div>
@@ -573,15 +590,15 @@
         <!-- Loading State -->
         <div x-show="loading" class="text-center py-8">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p class="mt-2 text-gray-600">Loading grant opportunities...</p>
+            <p class="mt-2 text-gray-600 dark:text-gray-400">Loading grant opportunities...</p>
         </div>
 
         <!-- Empty State -->
         <div x-show="!loading && grants.length === 0 && searchPerformed" 
              class="text-center py-12">
-            <div class="text-gray-400 text-6xl mb-4">📋</div>
-            <h3 class="text-lg font-semibold text-gray-600 mb-2">No grants found</h3>
-            <p class="text-gray-500">Try adjusting your search criteria or browse all opportunities.</p>
+            <div class="text-gray-400 dark:text-gray-600 text-6xl mb-4">📋</div>
+            <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">No grants found</h3>
+            <p class="text-gray-500 dark:text-gray-400">Try adjusting your search criteria or browse all opportunities.</p>
         </div>        <!-- Hero Section -->
         <div x-show="!searchPerformed" class="mt-8">
             <section class="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12 rounded-lg mb-12">
@@ -601,54 +618,54 @@
             </section>
 
             <!-- Social Proof Section -->
-            <section class="py-12 bg-gray-50 rounded-lg mb-8">
+            <section class="py-12 bg-gray-50 dark:bg-gray-800 rounded-lg mb-8">
                 <div class="container mx-auto text-center px-6">
-                    <h2 class="text-2xl font-bold mb-8">Trusted by Innovative Companies</h2>
+                    <h2 class="text-2xl font-bold mb-8 dark:text-white">Trusted by Innovative Companies</h2>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="bg-white dark:bg-gray-700 p-6 rounded-lg shadow">
                             <div class="text-3xl mb-2">🚀</div>
-                            <h3 class="font-semibold">TechStartup AI</h3>
-                            <p class="text-gray-600">"Won $250k SBIR in 3 weeks"</p>
+                            <h3 class="font-semibold dark:text-white">TechStartup AI</h3>
+                            <p class="text-gray-600 dark:text-gray-300">"Won $250k SBIR in 3 weeks"</p>
                         </div>
-                        <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="bg-white dark:bg-gray-700 p-6 rounded-lg shadow">
                             <div class="text-3xl mb-2">🛡️</div>
-                            <h3 class="font-semibold">DefenseTech Corp</h3>
-                            <p class="text-gray-600">"Automated our entire grant process"</p>
+                            <h3 class="font-semibold dark:text-white">DefenseTech Corp</h3>
+                            <p class="text-gray-600 dark:text-gray-300">"Automated our entire grant process"</p>
                         </div>
-                        <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="bg-white dark:bg-gray-700 p-6 rounded-lg shadow">
                             <div class="text-3xl mb-2">🔬</div>
-                            <h3 class="font-semibold">Research Institute</h3>
-                            <p class="text-gray-600">"Doubled our funding success rate"</p>
+                            <h3 class="font-semibold dark:text-white">Research Institute</h3>
+                            <p class="text-gray-600 dark:text-gray-300">"Doubled our funding success rate"</p>
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- Features Section -->
-            <h2 id="features" class="text-2xl font-semibold text-center mb-8">Everything You Need to Win Grants</h2>
+            <h2 id="features" class="text-2xl font-semibold text-center mb-8 dark:text-white">Everything You Need to Win Grants</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="text-center p-6 bg-white rounded-lg shadow-sm">
+                <div class="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
                     <div class="text-4xl mb-4">🎯</div>
-                    <h3 class="text-lg font-semibold mb-2">AI-Powered Matching</h3>
-                    <p class="text-gray-600">Automatically match your capabilities to the most relevant federal opportunities.</p>
+                    <h3 class="text-lg font-semibold mb-2 dark:text-white">AI-Powered Matching</h3>
+                    <p class="text-gray-600 dark:text-gray-300">Automatically match your capabilities to the most relevant federal opportunities.</p>
                 </div>
-                <div class="text-center p-6 bg-white rounded-lg shadow-sm">
+                <div class="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
                     <div class="text-4xl mb-4">⚡</div>
-                    <h3 class="text-lg font-semibold mb-2">Proposal Generation</h3>
-                    <p class="text-gray-600">Generate high-quality grant proposals in minutes using our AI assistant.</p>
+                    <h3 class="text-lg font-semibold mb-2 dark:text-white">Proposal Generation</h3>
+                    <p class="text-gray-600 dark:text-gray-300">Generate high-quality grant proposals in minutes using our AI assistant.</p>
                 </div>
-                <div class="text-center p-6 bg-white rounded-lg shadow-sm">
+                <div class="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
                     <div class="text-4xl mb-4">⏱️</div>
-                    <h3 class="text-lg font-semibold mb-2">Time Savings</h3>
-                    <p class="text-gray-600">Save dozens of hours per application with streamlined workflows.</p>
+                    <h3 class="text-lg font-semibold mb-2 dark:text-white">Time Savings</h3>
+                    <p class="text-gray-600 dark:text-gray-300">Save dozens of hours per application with streamlined workflows.</p>
                 </div>
             </div>
 
             <!-- Demo Section -->
-            <section id="demo" class="py-12 bg-white rounded-lg mt-12 shadow-sm">
+            <section id="demo" class="py-12 bg-white dark:bg-gray-800 rounded-lg mt-12 shadow-sm border dark:border-gray-700">
                 <div class="container mx-auto text-center px-6">
-                    <h2 class="text-2xl font-bold mb-4">See It In Action</h2>
-                    <p class="text-gray-600 mb-6">Watch a quick walkthrough of searching grants and generating a proposal.</p>
+                    <h2 class="text-2xl font-bold mb-4 dark:text-white">See It In Action</h2>
+                    <p class="text-gray-600 dark:text-gray-300 mb-6">Watch a quick walkthrough of searching grants and generating a proposal.</p>
                     <div class="w-full">
                         <iframe class="w-full h-64 md:h-96" src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="VoidCat RDC Demo" frameborder="0" allowfullscreen></iframe>
                     </div>
@@ -657,13 +674,13 @@
         </div>
 
         <!-- Footer -->
-        <footer class="mt-12 text-center text-gray-500 text-sm">
+        <footer class="mt-12 text-center text-gray-500 dark:text-gray-400 text-sm">
             <p>&copy; 2025 VoidCat RDC. Federal Grant Automation Platform.</p>
             <p class="mt-1">Helping startups secure federal funding through AI-powered grant discovery and proposal generation.</p>
             <div class="mt-4 flex justify-center space-x-6">
-                <a href="privacy-policy.html" class="text-blue-600 hover:text-blue-800 transition-colors">Privacy Policy</a>
-                <a href="terms-of-service.html" class="text-blue-600 hover:text-blue-800 transition-colors">Terms of Service</a>
-                <a href="mailto:support@voidcat.org" class="text-blue-600 hover:text-blue-800 transition-colors">Support</a>
+                <a href="privacy-policy.html" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">Privacy Policy</a>
+                <a href="terms-of-service.html" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">Terms of Service</a>
+                <a href="mailto:support@voidcat.org" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">Support</a>
             </div>
         </footer>
     </div>
@@ -748,8 +765,13 @@
                 user: null,
                 apiKey: null, // will be initialized async in init()
                 grants: [],
+                darkMode: false,
                 // Async initialization (called automatically by Alpine.js)
                 async init() {
+                    // Initialize dark mode from localStorage
+                    this.darkMode = localStorage.getItem('darkMode') === 'true';
+                    this.applyDarkMode();
+                    
                     // If user has provided email before, use as passphrase. Otherwise, static for demo.
                     let stored = localStorage.getItem('voidcat_api_key');
                     if (stored) {
@@ -761,6 +783,21 @@
                         } catch (e) {
                             console.error("Error decrypting API key from storage", e);
                         }
+                    }
+                },
+                
+                // Dark mode methods
+                toggleDarkMode() {
+                    this.darkMode = !this.darkMode;
+                    localStorage.setItem('darkMode', this.darkMode);
+                    this.applyDarkMode();
+                },
+                
+                applyDarkMode() {
+                    if (this.darkMode) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
                     }
                 },
                 loading: false,
