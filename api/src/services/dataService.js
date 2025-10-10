@@ -163,12 +163,45 @@ export class DataService {
   }
 
   /**
-   * Get mock grant by ID
+   * Get mock grant by ID with enriched details
    * @param {string} grantId - Grant ID to find
-   * @returns {Object|null} Grant object or null if not found
+   * @returns {Object|null} Grant object with detailed information or null if not found
    */
   getMockGrantById(grantId) {
-    return this.mockGrants.find(grant => grant.id === grantId) || null;
+    const grant = this.mockGrants.find(grant => grant.id === grantId);
+    if (!grant) return null;
+    
+    // Enrich grant with detailed fields expected by frontend
+    return {
+      ...grant,
+      full_description: grant.description + ' This opportunity represents a significant funding opportunity for organizations developing cutting-edge technologies. The program seeks to advance the state of the art while addressing critical gaps in current capabilities.',
+      requirements: [
+        'Must be a U.S. small business or eligible organization',
+        'Meet size standards for the program',
+        'Principal investigator time commitment as specified',
+        'Compliance with all federal regulations',
+        'Demonstrated technical capability and relevant experience'
+      ],
+      evaluation_criteria: [
+        'Technical merit and innovation',
+        'Potential for commercialization or impact',
+        'Qualifications of research team',
+        'Feasibility of proposed approach',
+        'Relevance to agency mission and priorities'
+      ],
+      submission_requirements: [
+        'Technical proposal (15-25 pages)',
+        'Budget justification and cost breakdown',
+        'Team qualifications and biosketches',
+        'Letters of support (if applicable)',
+        'Compliance documentation'
+      ],
+      contact: {
+        name: `${grant.agency} Program Officer`,
+        email: `grants@${grant.funding_agency_code?.toLowerCase() || 'federal'}.gov`,
+        phone: '1-800-XXX-XXXX'
+      }
+    };
   }
 
   /**
