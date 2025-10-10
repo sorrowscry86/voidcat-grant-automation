@@ -130,7 +130,7 @@ If issues arise:
 ```bash
 # Revert to previous commit
 git revert HEAD
-git push origin copilot/add-dark-mode-toggle
+git push origin HEAD  # Push to current branch
 ```
 
 ### Partial Rollback
@@ -258,5 +258,5 @@ if (DARK_MODE_ENABLED) {
 ---
 
 *Document Version: 1.0*
-*Created: October 2025*
+*Created: 2025-01-10*
 *Status: Production Ready*

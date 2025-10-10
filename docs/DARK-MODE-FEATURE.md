@@ -183,5 +183,5 @@ Potential improvements:
 
 ---
 
-*Feature implemented: October 2025*
+*Feature implemented: 2025-01-10*
 *Version: 1.2.0*
