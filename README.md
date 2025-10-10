@@ -153,6 +153,8 @@ GET  /api/grants/agency-template            - Agency-specific templates
 ### Quick Links
 
 - **[Complete Documentation](./docs/)** - Organized documentation directory
+- **[Dark Mode Feature](./docs/DARK-MODE-FEATURE.md)** - Dark mode implementation and user guide ✨ NEW
+- **[Visual Improvements](./docs/VISUAL-IMPROVEMENTS.md)** - UI/UX enhancements summary ✨ NEW
 - **[Deployment Guide](./docs/deployment/)** - Production deployment instructions
 - **[Testing Guide](./docs/testing/)** - E2E testing with Playwright
 - **[Security Guide](./docs/security/)** - Environment variables and security
