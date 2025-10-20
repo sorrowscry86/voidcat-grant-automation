@@ -18,7 +18,7 @@
   "author": "VoidCat RDC",
   "license": "MIT",
   "dependencies": {
-    "@playwright/test": "^1.55.0",
+    "@playwright/test": "^1.56.1",
     "hono": "^4.9.7",
     "stripe": "^15.8.0"
   },
