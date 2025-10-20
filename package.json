@@ -30,7 +30,7 @@
   "author": "VoidCat RDC",
   "license": "MIT",
   "devDependencies": {
-    "@playwright/test": "^1.54.2",
+    "@playwright/test": "^1.56.1",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0",
     "wrangler": "^4.28.1"
