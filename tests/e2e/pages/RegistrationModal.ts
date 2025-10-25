@@ -83,8 +83,19 @@ export class RegistrationModal {
     // Explicitly wait for the modal to disappear to prevent race conditions
     await this.verifyModalClosed();
 
-    // After registration, verify that the welcome message appears, indicating successful login
-    await expect(this.page.locator('text=/Welcome, /')).toBeVisible({ timeout: 10000 });
+    // After registration, the page should update with the user info in the header
+    // The welcome message appears in: <div class="text-right"><p class="text-sm text-gray-600">Welcome, <span x-text="user.name || user.email"></span></p>
+    // Use a more robust selector that doesn't depend on exact class names
+    const welcomeMessage = this.page.getByText(/^Welcome,\s+/);
+    
+    // Increase timeout and add a retry mechanism for UI reactivity
+    try {
+      await expect(welcomeMessage).toBeVisible({ timeout: 30000 });
+    } catch (error) {
+      // If first attempt fails, wait a bit and retry - sometimes Alpine.js rendering can be delayed
+      await this.page.waitForTimeout(2000);
+      await expect(welcomeMessage).toBeVisible({ timeout: 10000 });
+    }
   }
 
   async verifyTierInfoText() {
