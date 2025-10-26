@@ -20,7 +20,22 @@ export class AIProposalService {
   async generateProposalWithAI(grantDetails, companyProfile, env, telemetry = null) {
     // Feature flag check
     if (!env.FEATURE_REAL_AI) {
-      return this.generateProposal(grantDetails, companyProfile);
+      console.log('🔄 AIProposalService: FEATURE_REAL_AI disabled - using template generation');
+      if (telemetry) {
+        telemetry.logInfo('AI Feature Disabled - Using Template Generation', {
+          grant_id: grantDetails.id,
+          execution: 'template', // ← Explicit marking per NO SIMULATIONS LAW
+          ai_enabled: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+      const templateProposal = this.generateProposal(grantDetails, companyProfile);
+      // Mark as template-generated, not AI-generated
+      templateProposal.metadata = templateProposal.metadata || {};
+      templateProposal.metadata.ai_enhanced = false;
+      templateProposal.metadata.generation_method = 'template';
+      templateProposal.metadata.execution_type = 'template';
+      return templateProposal;
     }
 
     try {
@@ -115,14 +130,36 @@ export class AIProposalService {
       }
 
       console.log(`✅ AIProposalService: AI proposal completed. Cost: $${this.totalCost.toFixed(4)}`);
+      
+      if (telemetry) {
+        telemetry.logInfo('AI proposal generation completed - REAL execution', {
+          grant_id: grantDetails.id,
+          execution: 'real', // ← REQUIRED marker per NO SIMULATIONS LAW
+          total_cost: this.totalCost,
+          api_calls: this.apiCallLog.length,
+          word_count: proposal.metadata.word_count,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       return proposal;
 
     } catch (error) {
-      console.error('AIProposalService: AI generation failed, falling back to templates:', error);
+      console.error('AIProposalService: AI generation failed:', error);
+      
+      // NO SIMULATIONS LAW: Record FAILURE and THROW - do not fall back to template in production
       if (telemetry) {
-        telemetry.logError('AI proposal generation failed, using fallback', error);
+        telemetry.logError('AI proposal generation FAILED - NO fallback in production', error, {
+          grant_id: grantDetails.id,
+          execution: 'failed', // ← REQUIRED marker per NO SIMULATIONS LAW
+          ai_enabled: env.FEATURE_REAL_AI,
+          error_type: error.name,
+          timestamp: new Date().toISOString()
+        });
       }
-      return this.generateProposal(grantDetails, companyProfile);
+      
+      // Throw the error - caller must handle appropriately
+      throw new Error(`AI proposal generation failed: ${error.message}`);
     }
   }
 

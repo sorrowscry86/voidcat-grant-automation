@@ -53,16 +53,64 @@ grants.get('/search', async (c) => {
       
       // Phase 2A: Use enhanced data fetching with caching and multi-source aggregation
       if (c.env.FEATURE_LIVE_DATA && dataConfig.USE_LIVE_DATA) {
-        // Use Phase 2A enhanced method with KV caching and multi-source
-        fetchResult = await dataService.fetchWithCache(query, agency, c.env, c.get('telemetry'));
+        try {
+          // Use Phase 2A enhanced method with KV caching and multi-source
+          fetchResult = await dataService.fetchWithCache(query, agency, c.env, c.get('telemetry'));
+          
+          // Log successful real data fetch
+          const telemetry = c.get('telemetry');
+          if (telemetry) {
+            telemetry.logInfo('Live data fetch SUCCESS', {
+              execution: 'real',
+              query: query || '',
+              agency: agency || '',
+              count: fetchResult.grants.length,
+              timestamp: new Date().toISOString()
+            });
+          }
+        } catch (liveDataError) {
+          // NO SIMULATIONS LAW: Log failure and return error response
+          console.error('Live data fetch failed:', liveDataError);
+          
+          const telemetry = c.get('telemetry');
+          if (telemetry) {
+            telemetry.logError('Live data fetch FAILED', liveDataError, {
+              execution: 'failed',
+              query: query || '',
+              agency: agency || '',
+              timestamp: new Date().toISOString()
+            });
+          }
+          
+          return c.json({
+            success: false,
+            error: 'Live grant data is temporarily unavailable. Please try again later.',
+            code: 'LIVE_DATA_UNAVAILABLE',
+            message: liveDataError.message,
+            execution_type: 'failed'
+          }, 503);
+        }
       } else {
         // Use mock data only when FEATURE_LIVE_DATA is false or USE_LIVE_DATA is false
+        console.log('Using mock data - FEATURE_LIVE_DATA disabled');
+        
+        const telemetry = c.get('telemetry');
+        if (telemetry) {
+          telemetry.logInfo('Using mock data - live data disabled', {
+            execution: 'mock',
+            query: query || '',
+            agency: agency || '',
+            timestamp: new Date().toISOString()
+          });
+        }
+        
         const mockResult = dataService.getGrants({ query, agency });
         fetchResult = {
           grants: mockResult.grants,
           actualDataSource: 'mock',
           fallbackOccurred: false,
-          error: null
+          error: null,
+          execution_type: 'mock'
         };
       }
       
@@ -72,10 +120,20 @@ grants.get('/search', async (c) => {
       dataSourceError = fetchResult.error;
     } catch (dataError) {
       console.error('Grant data fetch failed:', dataError);
+      
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.logError('Grant data service error', dataError, {
+          execution: 'failed',
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       return c.json({
         success: false,
         error: 'Grant database is temporarily unavailable. Please try again in a few minutes.',
-        code: 'DATA_SOURCE_UNAVAILABLE'
+        code: 'DATA_SOURCE_UNAVAILABLE',
+        execution_type: 'failed'
       }, 503);
     }
     
@@ -324,75 +382,16 @@ grants.post('/generate-proposal', async (c) => {
     const grantAmount = grant ? grant.amount : 'Amount TBD';
     const grantAgency = grant ? grant.agency : 'Federal Agency';
     
-    // Generate mock proposal (in production, this would use AI service)
-    const mockProposal = `# Grant Proposal for ${grantTitle}
-
-## Executive Summary
-This proposal outlines our innovative approach to address the requirements of the ${grantTitle} grant. ${company_info ? `${company_info} brings` : 'Our company brings'} extensive experience in the relevant field and cutting-edge technology solutions.
-
-## Project Description
-We propose to develop innovative solutions that will address the grant requirements through:
-
-### Technical Approach
-- Advanced research methodologies and proven frameworks
-- Cutting-edge technology implementation
-- Comprehensive testing and validation protocols
-- Scalable and sustainable solution architecture
-
-### Key Innovations
-1. **Novel Approach**: Development of innovative solutions that push the boundaries of current technology
-2. **Real-time Implementation**: High-performance processing capabilities for immediate impact
-3. **Secure Architecture**: Industry-standard security protocols and best practices
-
-## Budget Justification
-The requested funding of ${grantAmount} will be allocated across:
-- Personnel (60%): Senior researchers, engineers, and project managers
-- Equipment (25%): Specialized equipment and infrastructure
-- Travel (10%): Collaboration with partners and stakeholders
-- Other Direct Costs (5%): Software licenses, materials, and indirect costs
-
-## Timeline
-**Phase 1 (Months 1-6)**: Research and development of core components
-**Phase 2 (Months 7-12)**: System integration and comprehensive testing
-**Phase 3 (Months 13-18)**: Validation, optimization, and deployment preparation
-
-## Team Qualifications
-Our team consists of experienced professionals with proven track records in:
-- Advanced research and development
-- Technology innovation and implementation
-- ${grantAgency} collaboration and compliance
-- Project management and delivery
-
-## Expected Outcomes
-Upon successful completion, this project will deliver:
-- Fully functional prototype or system
-- Comprehensive technical documentation
-- Training materials and user guides
-- Recommendations for full-scale implementation
-- Measurable impact on the target domain
-
-## Conclusion
-This proposal represents a significant opportunity to advance the field through innovative technology and research. We are committed to delivering exceptional results that exceed expectations and provide lasting value to ${grantAgency} and the broader community.
-
----
-*Generated by VoidCat RDC Grant Automation Platform*
-*Proposal ID: ${crypto.randomUUID()}*
-*Generated: ${new Date().toISOString()}*`;
-
+    // NO SIMULATIONS LAW: This endpoint is DEPRECATED - use /generate-ai-proposal instead
+    // Mock proposal generation violates NO SIMULATIONS LAW
     return c.json({
-      success: true,
-      message: 'Proposal generated successfully',
-      grant_id: grant_id,
-      proposal: mockProposal,
-      word_count: mockProposal.split(' ').length,
-      generated_at: new Date().toISOString(),
-      grant_details: grant ? {
-        title: grant.title,
-        agency: grant.agency,
-        amount: grant.amount,
-        deadline: grant.deadline
-      } : null
-    });
+      success: false,
+      error: 'This endpoint is deprecated. Please use /api/grants/generate-ai-proposal with real AI execution.',
+      code: 'ENDPOINT_DEPRECATED',
+      message: 'VoidCat RDC NO SIMULATIONS LAW: Mock proposal generation is not allowed. Use AI-powered endpoint with FEATURE_REAL_AI=true.',
+      alternative_endpoint: '/api/grants/generate-ai-proposal',
+      required_feature_flag: 'FEATURE_REAL_AI=true'
+    }, 410);
 
   } catch (error) {
     console.error('Proposal generation error:', error);
@@ -728,17 +727,71 @@ grants.post('/generate-ai-proposal', async (c) => {
 
     // Phase 2A: Generate AI-powered proposal with real AI integration
     let proposal;
+    let executionType;
+    
     if (c.env.FEATURE_REAL_AI) {
-      // Use Phase 2A enhanced AI generation with Claude and GPT-4
-      proposal = await aiProposalService.generateProposalWithAI(grant, company_profile, c.env, c.get('telemetry'));
+      try {
+        // Use Phase 2A enhanced AI generation with Claude and GPT-4
+        proposal = await aiProposalService.generateProposalWithAI(grant, company_profile, c.env, c.get('telemetry'));
+        executionType = 'real';
+        
+        // Log successful real AI execution
+        const telemetry = c.get('telemetry');
+        if (telemetry) {
+          telemetry.logInfo('AI proposal generation SUCCESS - REAL execution', {
+            grant_id: grant.id,
+            execution: 'real',
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        // NO SIMULATIONS LAW: Throw error on AI failure in production
+        console.error('AI proposal generation failed:', error);
+        
+        const telemetry = c.get('telemetry');
+        if (telemetry) {
+          telemetry.logError('AI proposal generation FAILED', error, {
+            grant_id: grant.id,
+            execution: 'failed',
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        return c.json({
+          success: false,
+          error: 'AI proposal generation failed. Real AI execution is required in production.',
+          code: 'AI_EXECUTION_FAILED',
+          message: error.message,
+          grant_details: {
+            id: grant.id,
+            title: grant.title,
+            agency: grant.agency
+          }
+        }, 500);
+      }
     } else {
-      // Use template-based generation (fallback)
+      // Template-based generation only allowed in development
+      console.log('⚠️ FEATURE_REAL_AI disabled - using template generation (development only)');
+      
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.logWarning('Using template generation - AI disabled', {
+          grant_id: grant.id,
+          execution: 'template',
+          ai_enabled: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       proposal = await aiProposalService.generateProposal(grant, company_profile, options || {});
+      executionType = 'template';
     }
 
     return c.json({
       success: true,
       proposal: proposal,
+      execution_type: executionType, // ← Explicit marking per NO SIMULATIONS LAW
+      ai_enhanced: c.env.FEATURE_REAL_AI || false,
       grant_details: {
         id: grant.id,
         title: grant.title,
