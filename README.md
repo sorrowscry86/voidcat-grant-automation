@@ -156,6 +156,66 @@ GET  /api/grants/agency-template            - Agency-specific templates
 - **[Testing Guide](./docs/testing/)** - E2E testing with Playwright
 - **[Security Guide](./docs/security/)** - Environment variables and security
 - **[Enhancement Plan](./docs/enhancement/)** - Platform improvements roadmap
+- **[API Startup Scripts](./scripts/API_STARTUP_SCRIPTS.md)** - Robust API startup with timeout handling
+
+---
+
+## 🛠️ Development
+
+### Quick Start - API Development
+
+The platform includes robust helper scripts for API development with automatic timeout handling:
+
+```bash
+# Start API with timeout validation (recommended)
+npm run api:start
+
+# Validate API is working correctly
+npm run api:validate
+
+# Stop API server
+npm run api:stop
+
+# Restart API (stop + start)
+npm run api:restart
+```
+
+### Manual API Startup
+
+```bash
+# Traditional approach (no timeout handling)
+cd api
+npx wrangler dev --local --port 8787
+
+# Start with npm script
+npm start
+```
+
+### API Startup Scripts Features
+
+✅ **Automatic timeout handling** - Never hang on startup  
+✅ **Health check validation** - Ensures API is fully functional  
+✅ **Auto-install dependencies** - Checks and installs if missing  
+✅ **Progress indicators** - Shows elapsed time during startup  
+✅ **Graceful shutdown** - Clean process termination  
+✅ **Comprehensive validation** - Tests all critical endpoints  
+
+**See full documentation**: [API Startup Scripts Guide](./scripts/API_STARTUP_SCRIPTS.md)
+
+### Frontend Development
+
+```bash
+# Serve frontend locally (no build required)
+cd frontend
+python3 -m http.server 3000
+
+# Alternative with npx
+npx serve . -p 3000
+```
+
+The frontend is a single HTML file with Alpine.js and Tailwind CSS loaded via CDN - no build process required.
+
+---
 
 ### Repository Structure
 

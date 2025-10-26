@@ -18,7 +18,11 @@
     "test:edge-ui": "playwright test --grep @edge --ui",
     "test:contracts": "playwright test apiContracts.spec.ts",
     "test:edge-cases": "playwright test edgeCases.spec.ts",
-    "deploy": "./scripts/deploy.sh"
+    "deploy": "./scripts/deploy.sh",
+    "api:start": "./scripts/start-api-with-timeout.sh",
+    "api:stop": "./scripts/stop-api.sh",
+    "api:validate": "./scripts/validate-api.sh",
+    "api:restart": "./scripts/stop-api.sh && ./scripts/start-api-with-timeout.sh"
   },
   "keywords": [
     "grants",
