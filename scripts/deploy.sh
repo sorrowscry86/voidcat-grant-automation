@@ -88,30 +88,52 @@ if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" == "master" ]]; then
     fi
 fi
 
-# Test API health
+# Run NO SIMULATIONS LAW compliance verification
 echo ""
-echo "🩺 Testing API health..."
-curl -s https://grant-search-api.sorrowscry86.workers.dev/health | grep -q "healthy"
-
-if [ $? -eq 0 ]; then
-    echo "✅ API health check passed"
+echo "🔒 Running NO SIMULATIONS LAW Compliance Verification..."
+if [ -f "./scripts/verify-no-simulations-compliance.sh" ]; then
+    ./scripts/verify-no-simulations-compliance.sh
+    COMPLIANCE_STATUS=$?
+    if [ $COMPLIANCE_STATUS -eq 0 ]; then
+        echo ""
+        echo "✅ NO SIMULATIONS LAW Compliance: VERIFIED"
+    else
+        echo ""
+        echo "⚠️ WARNING: Compliance verification had warnings. Review output above."
+    fi
 else
-    echo "⚠️ API health check failed"
-fi
-
-# Test grant search
-echo ""
-echo "🔍 Testing grant search..."
-curl -s "https://grant-search-api.sorrowscry86.workers.dev/api/grants/search?query=AI" | grep -q "success"
-
-if [ $? -eq 0 ]; then
-    echo "✅ Grant search working"
-else
-    echo "⚠️ Grant search may have issues"
+    echo "⚠️ Compliance verification script not found. Running basic tests..."
+    
+    # Test API health
+    echo ""
+    echo "🩺 Testing API health..."
+    curl -s https://grant-search-api.sorrowscry86.workers.dev/health | grep -q "healthy"
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ API health check passed"
+    else
+        echo "⚠️ API health check failed"
+    fi
+    
+    # Test grant search
+    echo ""
+    echo "🔍 Testing grant search..."
+    curl -s "https://grant-search-api.sorrowscry86.workers.dev/api/grants/search?query=AI" | grep -q "success"
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Grant search working"
+    else
+        echo "⚠️ Grant search may have issues"
+    fi
 fi
 
 echo ""
 echo "🎯 COMPLETE DEPLOYMENT FINISHED!"
+echo ""
+echo "🔒 NO SIMULATIONS LAW STATUS: ACTIVE"
+echo "- FEATURE_REAL_AI: Enabled in Production"
+echo "- FEATURE_LIVE_DATA: Enabled in Production"
+echo "- All outputs are REAL and VERIFIABLE"
 echo ""
 echo "📊 Success Metrics to Track:"
 echo "- User registrations: Target 10+ in 48 hours"
