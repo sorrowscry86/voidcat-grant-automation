@@ -10,6 +10,19 @@ export class DataService {
   }
 
   /**
+   * MINOR FIX: Generate unique ID with fallback for environments without crypto API
+   * @returns {string} Random 8-character ID
+   */
+  generateId() {
+    try {
+      return crypto.randomUUID().substring(0, 8);
+    } catch {
+      // Fallback for environments without crypto API
+      return Math.random().toString(36).substring(2, 10);
+    }
+  }
+
+  /**
    * Load mock data from JSON file
    */
   loadMockData() {

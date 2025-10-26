@@ -23,6 +23,19 @@ export class AIProposalService {
       return this.generateProposal(grantDetails, companyProfile);
     }
 
+    // MAJOR FIX: Validate API keys before attempting AI calls
+    if (!env.ANTHROPIC_API_KEY) {
+      const error = new Error('ANTHROPIC_API_KEY not configured. See API_KEYS_CONFIGURATION.md for setup instructions.');
+      if (telemetry) {
+        telemetry.logError('API key validation failed', error, {
+          grant_id: grantDetails.id,
+          execution: 'failed',
+          reason: 'missing_api_key'
+        });
+      }
+      throw error;
+    }
+
     try {
       console.log('🤖 AIProposalService: Starting AI-enhanced proposal generation...');
       if (telemetry) {
