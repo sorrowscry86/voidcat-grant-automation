@@ -4,6 +4,31 @@
 
 With the full rollout of NO SIMULATIONS LAW compliance, production now requires **real API keys** for AI services and external data sources.
 
+## Security Best Practices ⚠️
+
+**BEFORE configuring any secrets, review these security guidelines:**
+
+1. **Terminal Security**
+   - Ensure your terminal is not being screen-shared or recorded
+   - Work in a private, secure environment
+   - Consider clearing command history after: `history -c` or `history -d <line_number>`
+
+2. **Key Handling**
+   - Never commit API keys to git repositories
+   - Never expose keys in logs or error messages
+   - Use `wrangler secret put` which prompts for input (keys not echoed to screen)
+   - Store backup copies in a secure password manager
+
+3. **Network Security**
+   - Use a secure, trusted network connection
+   - Avoid public WiFi when configuring production secrets
+   - Verify you're connecting to authentic Cloudflare services
+
+4. **Access Control**
+   - Only authorized personnel should configure production secrets
+   - Rotate keys periodically per security policy
+   - Revoke old keys immediately after rotation
+
 ## Required Secrets
 
 ### 1. AI API Keys (CRITICAL for FEATURE_REAL_AI=true)

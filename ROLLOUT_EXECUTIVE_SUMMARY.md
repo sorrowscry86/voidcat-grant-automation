@@ -15,9 +15,9 @@ The VoidCat RDC Federal Grant Automation Platform has been successfully prepared
 
 ### What Was Delivered
 
-✅ **Production Feature Flags Enabled**
-- `FEATURE_REAL_AI = true` - Real Claude/GPT-4 execution
-- `FEATURE_LIVE_DATA = true` - Real federal grant data
+✅ **Production Feature Flags Configured for Enablement**
+- `FEATURE_REAL_AI = true` - Configured for real Claude/GPT-4 execution (requires API key configuration)
+- `FEATURE_LIVE_DATA = true` - Configured for real federal grant data
 
 ✅ **Comprehensive Documentation Suite**
 - Full rollout guide (FULL_ROLLOUT_DOCUMENTATION.md)
@@ -89,8 +89,18 @@ All code changes have been implemented and committed. The platform is **ready fo
 ### What's Required Before Going Live
 
 **1. Configure API Keys (5-10 minutes)**
+
+⚠️ **SECURITY WARNING**: 
+- Keep API keys confidential and secure during configuration
+- Keys may appear in command history - consider using `history -d` or input redirection
+- Ensure your terminal is not being screen-shared or recorded
+- Use a secure, private network connection
+
 ```bash
 cd api
+
+# Recommended: Use input redirection to avoid keys in command history
+# You will be prompted to paste your API key (not echoed to screen)
 npx wrangler secret put ANTHROPIC_API_KEY --env production
 npx wrangler secret put STRIPE_SECRET_KEY --env production
 npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env production
