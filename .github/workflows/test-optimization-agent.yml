@@ -1,25 +1,20 @@
 name: "Test Optimization Agent - Target Remaining 7 Failures"
 
 on:
+  # Manual run only; analysis is advisory and not a production gate
   workflow_dispatch:
     inputs:
       target_success_rate:
-        description: 'Target success rate percentage (current: 86%)'
+        description: 'Target success rate percentage (ESTIMATE ONLY)'
         required: false
         default: '90'
         type: string
-  push:
-    branches: [ master ]
-    paths:
-      - 'tests/e2e/**'
-      - '.github/workflows/test-optimization-agent.yml'
 
 jobs:
   analyze-and-optimize-tests:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     
     steps:
       - name: Checkout code
@@ -37,12 +32,12 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Run baseline test analysis
+      - name: Run baseline test analysis (advisory)
         id: baseline
         run: |
-          echo "🎯 ANALYZING CURRENT TEST FAILURES"
-          echo "Current Success Rate: 86% (43/50 tests)"
-          echo "Target: Eliminate remaining 7 failures"
+          echo "🎯 ADVISORY ANALYSIS (ESTIMATES, NOT MEASURED)"
+          echo "Success Rate: <provide actual from CI>"
+          echo "Target: Improve failing categories"
           
           # Run tests and capture detailed failure analysis
           npm test -- --reporter=json > test-results.json || true
@@ -52,9 +47,9 @@ jobs:
           echo "2. Connection timeout issues (2 failures)" 
           echo "3. Navigation element visibility (2 failures)"
 
-      - name: Analyze specific failure patterns
+      - name: Analyze specific failure patterns (advisory)
         run: |
-          echo "⚡ TARGETING SPECIFIC FAILURE CATEGORIES:"
+          echo "⚡ TARGETING FAILURE CATEGORIES (ADVISORY):"
           
           echo "🎯 MODAL TIMING OPTIMIZATION NEEDED:"
           echo "- proposalGeneration.spec.ts: Modal visibility timeouts"
@@ -71,15 +66,14 @@ jobs:
           echo "- responsive.spec.ts: Search result timing"
           echo "Solution: Improved element detection patterns"
 
-      - name: Generate optimization recommendations
+      - name: Generate optimization recommendations (advisory)
         run: |
           echo "🚀 GITHUB AGENT OPTIMIZATION RECOMMENDATIONS:"
           
           cat << 'EOF' > OPTIMIZATION_STRATEGY.md
           # 🎯 Test Optimization Strategy - Target 90%+ Success Rate
           
-          ## Current Status: 86% Success Rate (43/50 tests)
-          ## Target: 90%+ Success Rate (45+ tests)
+          ## Note: Advisory analysis; replace with real metrics from CI before acting
           
           ### 🔧 PRIORITY OPTIMIZATIONS:
           
@@ -134,12 +128,8 @@ jobs:
           await page.getByRole('link', { name: 'Features' }).click();
           ```
           
-          ### 🎯 EXPECTED IMPACT:
-          - Modal fixes: +3 tests = 89% success rate
-          - Connection fixes: +2 tests = 93% success rate  
-          - Navigation fixes: +2 tests = 97% success rate
-          
-          **TOTAL POTENTIAL**: 97% success rate (48.5/50 tests)
+          ### 🎯 EXPECTED IMPACT (ESTIMATE):
+          - Replace with measured deltas from CI runs
           EOF
 
       - name: Display optimization strategy

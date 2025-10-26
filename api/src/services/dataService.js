@@ -715,7 +715,7 @@ export class DataService {
         return true;
       })
       .map(opp => ({
-        id: opp.opportunity_id || opp.id || `SBIR-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`,
+        id: opp.opportunity_id || opp.id || `SBIR-${Date.now()}-${this.generateId()}`,
         title: opp.title || opp.opportunity_title || 'SBIR/STTR Opportunity',
         agency: opp.agency || opp.funding_agency || 'SBIR Agency',
         program: opp.program || opp.solicitation_topic || 'SBIR/STTR',
@@ -1079,7 +1079,7 @@ export class DataService {
    */
   transformLiveGrantData(opportunitiesRaw, query) {
     return opportunitiesRaw.map(grant => ({
-      id: grant.opportunityId || grant.id || `LIVE-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`,
+      id: grant.opportunityId || grant.id || `LIVE-${Date.now()}-${this.generateId()}`,
       title: grant.opportunityTitle || grant.title || 'Federal Grant Opportunity',
       agency: grant.agencyName || grant.agency || 'Federal Agency',
       program: grant.opportunityCategory || grant.program || 'Federal Program',
