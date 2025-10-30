@@ -10,6 +10,19 @@ export class DataService {
   }
 
   /**
+   * MINOR FIX: Generate unique ID with fallback for environments without crypto API
+   * @returns {string} Random 8-character ID
+   */
+  generateId() {
+    try {
+      return crypto.randomUUID().substring(0, 8);
+    } catch {
+      // Fallback for environments without crypto API
+      return Math.random().toString(36).substring(2, 10);
+    }
+  }
+
+  /**
    * Load mock data from JSON file
    */
   loadMockData() {
@@ -538,11 +551,20 @@ export class DataService {
       };
       
     } catch (error) {
-      console.error('DataService: Cache operation failed, falling back to direct fetch:', error);
+      console.error('DataService: Cache operation failed:', error);
+      
+      // NO SIMULATIONS LAW: Log failure and throw - do not silently fallback
       if (telemetry) {
-        telemetry.logError('Cache operation failed', error);
+        telemetry.logError('Cache operation FAILED - throwing error per NO SIMULATIONS LAW', error, {
+          operation: 'fetchWithCache',
+          execution: 'failed',
+          query: query || '',
+          agency: agency || '',
+          timestamp: new Date().toISOString()
+        });
       }
-      return await this.fetchLiveGrantData(query, agency, telemetry);
+      
+      throw new Error(`Live data fetch failed: ${error.message}`);
     }
   }
 
@@ -606,17 +628,23 @@ export class DataService {
       }
     }
 
-    // If no live data was fetched, fallback to mock
+    // If no live data was fetched, behavior depends on environment
     if (allGrants.length === 0) {
-      console.log('🔄 DataService: No live data available, using mock fallback');
-      const mockResult = this.getGrants({ query, agency });
-      return {
-        grants: mockResult.grants,
-        actualDataSource: 'mock',
-        fallbackOccurred: true,
-        sources: ['mock'],
-        error: hasErrors ? 'All external sources failed' : null
-      };
+      console.error('DataService: All live data sources failed');
+      
+      if (telemetry) {
+        telemetry.logError('All external data sources FAILED', new Error('All sources failed'), {
+          execution: 'failed',
+          sources_attempted: ['grants.gov', 'sbir.gov'],
+          query: query || '',
+          agency: agency || '',
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      // NO SIMULATIONS LAW: In production with FEATURE_LIVE_DATA=true, throw error
+      // Only fall back to mock in development/testing environments
+      throw new Error('All external grant data sources failed. Live data unavailable.');
     }
 
     // Merge and deduplicate results
@@ -702,7 +730,7 @@ export class DataService {
         return true;
       })
       .map(opp => ({
-        id: opp.opportunity_id || opp.id || `SBIR-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`,
+        id: opp.opportunity_id || opp.id || `SBIR-${Date.now()}-${this.generateId()}`,
         title: opp.title || opp.opportunity_title || 'SBIR/STTR Opportunity',
         agency: opp.agency || opp.funding_agency || 'SBIR Agency',
         program: opp.program || opp.solicitation_topic || 'SBIR/STTR',
@@ -1017,43 +1045,48 @@ export class DataService {
         return result;
         
       } catch (error) {
-        console.error('DataService: Live data fetch failed, falling back to mock data:', {
+        console.error('DataService: Live data fetch FAILED:', {
           error: error.message,
           query,
           agency,
           timestamp: new Date().toISOString()
         });
         
+        // NO SIMULATIONS LAW: Log failure and throw - no silent mock fallback in production
         if (telemetry) {
-          telemetry.logError('Live data fetch failed, using fallback', error, {
+          telemetry.logError('Live data fetch FAILED - throwing error per NO SIMULATIONS LAW', error, {
+            execution: 'failed',
             query: query || '',
             agency: agency || '',
-            fallback_enabled: dataConfig.FALLBACK_TO_MOCK
+            use_live_data: dataConfig.USE_LIVE_DATA,
+            timestamp: new Date().toISOString()
           });
         }
         
-        if (dataConfig.FALLBACK_TO_MOCK) {
-          const mockResult = this.getGrants({ query, agency });
-          
-          result.grants = mockResult.grants;
-          result.actualDataSource = 'mock';
-          result.fallbackOccurred = true;
-          result.error = error.message;
-          return result;
-        } else {
-          result.error = error.message;
-          return result;
-        }
+        throw new Error(`Live grant data fetch failed: ${error.message}`);
       }
     }
     
+    // Live data disabled - using mock data for development/testing
     if (dataConfig.FALLBACK_TO_MOCK) {
-      console.log('DataService: Using mock data (live data disabled)');
+      console.log('DataService: Using mock data (FEATURE_LIVE_DATA=false)');
+      
+      if (telemetry) {
+        telemetry.logInfo('Using mock data - live data disabled', {
+          execution: 'mock',
+          query: query || '',
+          agency: agency || '',
+          use_live_data: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       const mockResult = this.getGrants({ query, agency });
       
       result.grants = mockResult.grants;
       result.actualDataSource = 'mock';
       result.fallbackOccurred = false;
+      result.execution_type = 'mock';
       return result;
     } else {
       result.error = 'Live data is disabled and fallback to mock data is not allowed';
@@ -1066,7 +1099,7 @@ export class DataService {
    */
   transformLiveGrantData(opportunitiesRaw, query) {
     return opportunitiesRaw.map(grant => ({
-      id: grant.opportunityId || grant.id || `LIVE-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`,
+      id: grant.opportunityId || grant.id || `LIVE-${Date.now()}-${this.generateId()}`,
       title: grant.opportunityTitle || grant.title || 'Federal Grant Opportunity',
       agency: grant.agencyName || grant.agency || 'Federal Agency',
       program: grant.opportunityCategory || grant.program || 'Federal Program',

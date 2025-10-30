@@ -272,7 +272,7 @@ export class JWTService {
    * Generate secure API key for backward compatibility
    */
   generateApiKey() {
-    return crypto.randomUUID();
+    try { return crypto.randomUUID(); } catch { return `key_${Math.random().toString(36).slice(2)}_${Date.now()}`; }
   }
 
   /**

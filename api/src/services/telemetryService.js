@@ -17,7 +17,7 @@ export class TelemetryService {
    */
   createMiddleware() {
     return async (c, next) => {
-      const requestId = crypto.randomUUID();
+      const requestId = (() => { try { return crypto.randomUUID(); } catch { return `req-${Math.random().toString(36).slice(2, 10)}-${Date.now()}`; } })();
       const startTime = Date.now();
       
       // Attach telemetry instance to context
@@ -72,7 +72,7 @@ export class TelemetryService {
         user_agent: userAgent,
         client_ip: ip
       },
-      request_id: crypto.randomUUID()
+      request_id: (() => { try { return crypto.randomUUID(); } catch { return `req-${Math.random().toString(36).slice(2, 10)}-${Date.now()}`; } })()
     });
 
     console.log(JSON.stringify(logEntry));

@@ -2,6 +2,20 @@
 
 AI-powered federal grant discovery and proposal automation platform built with Cloudflare Workers API and static frontend.
 
+## 🔒 NO SIMULATIONS LAW - PRODUCTION ACTIVE
+
+**Status**: ✅ **COMPLIANT** - Full rollout complete (October 26, 2025)
+
+This platform operates under **100% REAL OUTPUT ONLY** mandate:
+- ✅ Real AI execution via Claude/GPT-4 APIs (`FEATURE_REAL_AI = true`)
+- ✅ Real federal grant data from live sources (`FEATURE_LIVE_DATA = true`)
+- ✅ Zero tolerance for simulated outputs in production
+- ✅ All responses include transparent execution type markers
+
+See [NO_SIMULATIONS_LAW_COMPLIANCE_REPORT.md](./NO_SIMULATIONS_LAW_COMPLIANCE_REPORT.md) and [FULL_ROLLOUT_DOCUMENTATION.md](./FULL_ROLLOUT_DOCUMENTATION.md) for details.
+
+---
+
 ## 🚀 Features
 
 - Federal grant search and discovery

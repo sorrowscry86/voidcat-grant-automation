@@ -53,16 +53,64 @@ grants.get('/search', async (c) => {
       
       // Phase 2A: Use enhanced data fetching with caching and multi-source aggregation
       if (c.env.FEATURE_LIVE_DATA && dataConfig.USE_LIVE_DATA) {
-        // Use Phase 2A enhanced method with KV caching and multi-source
-        fetchResult = await dataService.fetchWithCache(query, agency, c.env, c.get('telemetry'));
+        try {
+          // Use Phase 2A enhanced method with KV caching and multi-source
+          fetchResult = await dataService.fetchWithCache(query, agency, c.env, c.get('telemetry'));
+          
+          // Log successful real data fetch
+          const telemetry = c.get('telemetry');
+          if (telemetry) {
+            telemetry.logInfo('Live data fetch SUCCESS', {
+              execution: 'real',
+              query: query || '',
+              agency: agency || '',
+              count: fetchResult.grants.length,
+              timestamp: new Date().toISOString()
+            });
+          }
+        } catch (liveDataError) {
+          // NO SIMULATIONS LAW: Log failure and return error response
+          console.error('Live data fetch failed:', liveDataError);
+          
+          const telemetry = c.get('telemetry');
+          if (telemetry) {
+            telemetry.logError('Live data fetch FAILED', liveDataError, {
+              execution: 'failed',
+              query: query || '',
+              agency: agency || '',
+              timestamp: new Date().toISOString()
+            });
+          }
+          
+          return c.json({
+            success: false,
+            error: 'Live grant data is temporarily unavailable. Please try again later.',
+            code: 'LIVE_DATA_UNAVAILABLE',
+            message: liveDataError.message,
+            execution_type: 'failed'
+          }, 503);
+        }
       } else {
         // Use mock data only when FEATURE_LIVE_DATA is false or USE_LIVE_DATA is false
+        console.log('Using mock data - FEATURE_LIVE_DATA disabled');
+        
+        const telemetry = c.get('telemetry');
+        if (telemetry) {
+          telemetry.logInfo('Using mock data - live data disabled', {
+            execution: 'mock',
+            query: query || '',
+            agency: agency || '',
+            timestamp: new Date().toISOString()
+          });
+        }
+        
         const mockResult = dataService.getGrants({ query, agency });
         fetchResult = {
           grants: mockResult.grants,
           actualDataSource: 'mock',
           fallbackOccurred: false,
-          error: null
+          error: null,
+          execution_type: 'mock'
         };
       }
       
@@ -72,10 +120,20 @@ grants.get('/search', async (c) => {
       dataSourceError = fetchResult.error;
     } catch (dataError) {
       console.error('Grant data fetch failed:', dataError);
+      
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.logError('Grant data service error', dataError, {
+          execution: 'failed',
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       return c.json({
         success: false,
         error: 'Grant database is temporarily unavailable. Please try again in a few minutes.',
-        code: 'DATA_SOURCE_UNAVAILABLE'
+        code: 'DATA_SOURCE_UNAVAILABLE',
+        execution_type: 'failed'
       }, 503);
     }
     
@@ -161,7 +219,7 @@ grants.get('/search', async (c) => {
 grants.get('/stats', async (c) => {
   try {
     // Get DataService instance from factory (uses default config)
-    const dataService = await dataServiceFactory.getInstance();
+    const dataService = await dataServiceFactory.getInstance({});
     const stats = dataService.getStatistics();
     
     return c.json({
@@ -206,7 +264,7 @@ grants.get('/:id', async (c) => {
     
     // Try to find grant in mock data using DataService
     // Get DataService instance from factory (uses default config)
-    const dataService = await dataServiceFactory.getInstance();
+    const dataService = await dataServiceFactory.getInstance({});
     const mockGrant = dataService.getMockGrantById(grantId);
     
     if (mockGrant) {
@@ -317,7 +375,7 @@ grants.post('/generate-proposal', async (c) => {
     
     // Get grant details for proposal context
     // Get DataService instance from factory (uses default config)
-    const dataService = await dataServiceFactory.getInstance();
+    const dataService = await dataServiceFactory.getInstance({});
     const grant = dataService.getMockGrantById(grant_id);
     
     const grantTitle = grant ? grant.title : 'Federal Grant Opportunity';
@@ -325,6 +383,11 @@ grants.post('/generate-proposal', async (c) => {
     const grantAgency = grant ? grant.agency : 'Federal Agency';
     
     // Generate mock proposal (in production, this would use AI service)
+    // Safe ID generator (avoids hard dependency on crypto.randomUUID)
+    const safeId = () => {
+      try { return crypto.randomUUID(); } catch { return `id-${Math.random().toString(36).slice(2, 10)}-${Date.now()}`; }
+    };
+
     const mockProposal = `# Grant Proposal for ${grantTitle}
 
 ## Executive Summary
@@ -376,30 +439,38 @@ This proposal represents a significant opportunity to advance the field through 
 
 ---
 *Generated by VoidCat RDC Grant Automation Platform*
-*Proposal ID: ${crypto.randomUUID()}*
+*Proposal ID: ${safeId()}*
 *Generated: ${new Date().toISOString()}*`;
 
     return c.json({
-      success: true,
-      message: 'Proposal generated successfully',
-      grant_id: grant_id,
-      proposal: mockProposal,
-      word_count: mockProposal.split(' ').length,
-      generated_at: new Date().toISOString(),
-      grant_details: grant ? {
-        title: grant.title,
-        agency: grant.agency,
-        amount: grant.amount,
-        deadline: grant.deadline
-      } : null
-    });
+      success: false,
+      error: 'This endpoint is deprecated. Please use /api/grants/generate-ai-proposal with real AI execution.',
+      code: 'ENDPOINT_DEPRECATED',
+      message: 'VoidCat RDC NO SIMULATIONS LAW: Mock proposal generation is not allowed. Use AI-powered endpoint with FEATURE_REAL_AI=true.',
+      alternative_endpoint: '/api/grants/generate-ai-proposal',
+      required_feature_flag: 'FEATURE_REAL_AI=true'
+    }, 410);
 
   } catch (error) {
-    console.error('Proposal generation error:', error);
+    // Correlate and sanitize error for client; log full details for ops
+    const getRequestId = () => {
+      try { return c.get('requestId') || crypto.randomUUID(); } catch { return `req-${Math.random().toString(36).slice(2, 10)}-${Date.now()}`; }
+    };
+    const requestId = getRequestId();
+
+    const telemetry = c.get('telemetry');
+    if (telemetry) {
+      telemetry.logError('Proposal generation error', error, { request_id: requestId, route: 'POST /api/grants/generate-proposal' });
+    } else {
+      console.error('Proposal generation error:', { message: error?.message, stack: error?.stack, requestId });
+    }
+
+    // Do not expose internal error details to clients
     return c.json({
       success: false,
       error: 'Proposal generation service encountered an unexpected error. Please try again.',
-      code: 'PROPOSAL_GENERATION_ERROR'
+      code: 'PROPOSAL_GENERATION_ERROR',
+      correlation_id: requestId
     }, 500);
   }
 });
@@ -451,7 +522,8 @@ grants.post('/analyze-match', async (c) => {
     }
 
     // Get grant details
-    // Use module-level dataService
+    // Get DataService instance from factory
+    const dataService = await dataServiceFactory.getInstance({});
     const grant = dataService.getMockGrantById(grant_id);
 
     if (!grant) {
@@ -501,7 +573,8 @@ grants.post('/application-timeline', async (c) => {
     }
 
     // Get grant details
-    // Use module-level dataService
+    // Get DataService instance from factory
+    const dataService = await dataServiceFactory.getInstance({});
     const grant = dataService.getMockGrantById(grant_id);
 
     if (!grant) {
@@ -541,7 +614,8 @@ grants.get('/strategic-calendar', async (c) => {
     const { max_concurrent } = c.req.query();
     
     // Get all grants
-    // Use module-level dataService
+    // Get DataService instance from factory
+    const dataService = await dataServiceFactory.getInstance({});
     const allGrants = dataService.getGrants({ limit: 100 });
 
     // Generate strategic calendar
@@ -711,7 +785,8 @@ grants.post('/generate-ai-proposal', async (c) => {
     }
 
     // Get grant details
-    // Use module-level dataService
+    // Get DataService instance from factory
+    const dataService = await dataServiceFactory.getInstance({});
     const grant = dataService.getMockGrantById(grant_id);
 
     if (!grant) {
@@ -724,17 +799,71 @@ grants.post('/generate-ai-proposal', async (c) => {
 
     // Phase 2A: Generate AI-powered proposal with real AI integration
     let proposal;
+    let executionType;
+    
     if (c.env.FEATURE_REAL_AI) {
-      // Use Phase 2A enhanced AI generation with Claude and GPT-4
-      proposal = await aiProposalService.generateProposalWithAI(grant, company_profile, c.env, c.get('telemetry'));
+      try {
+        // Use Phase 2A enhanced AI generation with Claude and GPT-4
+        proposal = await aiProposalService.generateProposalWithAI(grant, company_profile, c.env, c.get('telemetry'));
+        executionType = 'real';
+        
+        // Log successful real AI execution
+        const telemetry = c.get('telemetry');
+        if (telemetry) {
+          telemetry.logInfo('AI proposal generation SUCCESS - REAL execution', {
+            grant_id: grant.id,
+            execution: 'real',
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        // NO SIMULATIONS LAW: Throw error on AI failure in production
+        console.error('AI proposal generation failed:', error);
+        
+        const telemetry = c.get('telemetry');
+        if (telemetry) {
+          telemetry.logError('AI proposal generation FAILED', error, {
+            grant_id: grant.id,
+            execution: 'failed',
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        return c.json({
+          success: false,
+          error: 'AI proposal generation failed. Real AI execution is required in production.',
+          code: 'AI_EXECUTION_FAILED',
+          message: error.message,
+          grant_details: {
+            id: grant.id,
+            title: grant.title,
+            agency: grant.agency
+          }
+        }, 500);
+      }
     } else {
-      // Use template-based generation (fallback)
+      // Template-based generation only allowed in development
+      console.log('⚠️ FEATURE_REAL_AI disabled - using template generation (development only)');
+      
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.logWarning('Using template generation - AI disabled', {
+          grant_id: grant.id,
+          execution: 'template',
+          ai_enabled: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       proposal = await aiProposalService.generateProposal(grant, company_profile, options || {});
+      executionType = 'template';
     }
 
     return c.json({
       success: true,
       proposal: proposal,
+      execution_type: executionType, // ← Explicit marking per NO SIMULATIONS LAW
+      ai_enhanced: c.env.FEATURE_REAL_AI || false,
       grant_details: {
         id: grant.id,
         title: grant.title,

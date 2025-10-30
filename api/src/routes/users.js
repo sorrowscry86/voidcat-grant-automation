@@ -53,8 +53,8 @@ users.post('/register', async (c) => {
       }, 400);
     }
     
-    // Generate API key
-    const apiKey = crypto.randomUUID();
+    // Generate API key with safe fallback
+    const apiKey = (() => { try { return crypto.randomUUID(); } catch { return `key_${Math.random().toString(36).slice(2)}_${Date.now()}`; } })();
     
     try {
       const db = await getDB(c.env);

@@ -1,0 +1,101 @@
+name: AI PR Review (Claude)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: Claude Review
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.draft == false }}
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: Check required secret
+        if: ${{ env.ANTHROPIC_API_KEY == '' || env.ANTHROPIC_API_KEY == null }}
+        run: |
+          echo "ANTHROPIC_API_KEY secret is not set; skipping Claude review." 
+          echo "Set repository secret ANTHROPIC_API_KEY to enable this workflow."
+          exit 0
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute PR diff
+        shell: bash
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git diff --unified=0 --no-color "origin/${{ github.base_ref }}...HEAD" > diff.patch || true
+          echo "Diff size:" $(wc -c < diff.patch)
+          # Truncate diff to ~120k chars to keep request size reasonable
+          head -c 120000 diff.patch > diff.truncated.patch || true
+
+      - name: Prepare prompt
+        id: prep
+        shell: bash
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          URL="${{ github.event.pull_request.html_url }}"
+          AUTHOR="${{ github.event.pull_request.user.login }}"
+          BASE="${{ github.base_ref }}"
+          HEADBR="${{ github.head_ref }}"
+          {
+            echo "SYSTEM: You are a senior code reviewer. Be concise, concrete, and actionable. Classify issues as Critical/Major/Minor/Enhancement. Include file:line anchors when possible. Recommend tests."
+            echo "---"
+            echo "PR: $TITLE"
+            echo "URL: $URL"
+            echo "Author: @$AUTHOR"
+            echo "Base: $BASE  ←  Head: $HEADBR"
+            echo "Changed diff (truncated):"
+            echo '```diff'
+            cat diff.truncated.patch || true
+            echo '```'
+          } > prompt.txt
+          echo "prompt_path=prompt.txt" >> $GITHUB_OUTPUT
+
+      - name: Run Claude 3.5 Sonnet
+        id: claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        shell: bash
+        run: |
+          BODY=$(jq -Rs --arg sys "You are an expert code reviewer for a production web app. Provide: 1) Summary, 2) Key findings with severity, 3) Recommendations, 4) Quick diff suggestions if trivial. Prefer concrete pointers (files/lines). Keep under 7000 chars." '{
+            model: "claude-3-5-sonnet-20240620",
+            max_tokens: 4000,
+            temperature: 0.2,
+            system: $sys,
+            messages: [ { role: "user", content: . } ]
+          }' < "${{ steps.prep.outputs.prompt_path }}")
+
+          RESP=$(curl -sS https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$BODY")
+
+          echo "$RESP" > claude.raw.json
+          # Extract text safely
+          TEXT=$(jq -r '.content[0].text // .content[0].contents[0].text // "(no content)"' claude.raw.json)
+          echo "$TEXT" > claude.review.md
+
+      - name: Post PR comment
+        if: ${{ success() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('claude.review.md', 'utf8');
+            const header = `🤖 Claude PR Review (automated)\n\n`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: header + body
+            });
