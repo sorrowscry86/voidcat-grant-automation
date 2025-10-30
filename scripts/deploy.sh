@@ -77,14 +77,20 @@ fi
 if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" == "master" ]]; then
     echo "Pushing changes to trigger frontend deployment..."
     git add .
-    git commit -m "Deploy: API and frontend updates $(date '+%Y-%m-%d %H:%M:%S')" --allow-empty
-    git push origin $(git branch --show-current)
     
-    if [ $? -eq 0 ]; then
-        echo "✅ Frontend deployment triggered via GitHub Actions"
-        echo "🌐 Frontend will be live at: https://$(git config user.name).github.io/voidcat-grant-automation"
+    # MINOR FIX: Only commit if there are actual changes (avoid empty commits)
+    if ! git diff-index --quiet HEAD --; then
+      git commit -m "Deploy: API and frontend updates $(date '+%Y-%m-%d %H:%M:%S')"
+      git push origin $(git branch --show-current)
+    
+      if [ $? -eq 0 ]; then
+          echo "✅ Frontend deployment triggered via GitHub Actions"
+          echo "🌐 Frontend will be live at: https://$(git config user.name).github.io/voidcat-grant-automation"
+      else
+          echo "❌ Failed to push changes for frontend deployment"
+      fi
     else
-        echo "❌ Failed to push changes for frontend deployment"
+      echo "⚠️ No changes to commit - skipping commit step"
     fi
 fi
 
