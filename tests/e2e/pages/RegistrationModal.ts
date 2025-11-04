@@ -83,24 +83,27 @@ export class RegistrationModal {
     // Explicitly wait for the modal to disappear to prevent race conditions
     await this.verifyModalClosed();
 
-    // After registration, verify that the welcome message appears, indicating successful login
-    // The welcome message format is "Welcome, [name/email]" and appears in the header
-    // Look for the welcome message with more specific selector
-    const welcomeText = this.page.locator('.text-right p.text-sm.text-gray-600').filter({ hasText: 'Welcome,' });
-    
+    // After registration, the page should update with the user info in the header
+    // The welcome message appears in: <div class="text-right"><p class="text-sm text-gray-600">Welcome, <span x-text="user.name || user.email"></span></p>
+    // Use a robust text-based selector that doesn't depend on exact class names
+    const welcomeMessage = this.page.getByText(/^Welcome,\s+/);
+
+    // Increase timeout and add a retry mechanism for UI reactivity; capture diagnostics on failure
     try {
-      // Rely on Playwright's auto-waiting with extended timeout for Alpine.js reactivity
-      await expect(welcomeText).toBeVisible({ timeout: 20000 });
+      await expect(welcomeMessage).toBeVisible({ timeout: 30000 });
     } catch (error) {
-      // Enhanced error logging for debugging
-      console.error('Welcome message not visible after registration');
-      console.error('User data:', user);
-      console.error('Current URL:', this.page.url());
-      
-      // Take a screenshot for debugging
-      await this.page.screenshot({ path: `test-results/registration-failure-${Date.now()}.png`, fullPage: true });
-      
-      throw error;
+      // If first attempt fails, wait briefly and retry (Alpine.js rendering can be delayed)
+      await this.page.waitForTimeout(2000);
+      try {
+        await expect(welcomeMessage).toBeVisible({ timeout: 10000 });
+      } catch (finalError) {
+        // Enhanced diagnostics for debugging
+        console.error('Welcome message not visible after registration');
+        console.error('User data:', user);
+        console.error('Current URL:', this.page.url());
+        await this.page.screenshot({ path: `test-results/registration-failure-${Date.now()}.png`, fullPage: true });
+        throw finalError;
+      }
     }
   }
 

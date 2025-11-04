@@ -20,7 +20,35 @@ export class AIProposalService {
   async generateProposalWithAI(grantDetails, companyProfile, env, telemetry = null) {
     // Feature flag check
     if (!env.FEATURE_REAL_AI) {
-      return this.generateProposal(grantDetails, companyProfile);
+      console.log('🔄 AIProposalService: FEATURE_REAL_AI disabled - using template generation');
+      if (telemetry) {
+        telemetry.logInfo('AI Feature Disabled - Using Template Generation', {
+          grant_id: grantDetails.id,
+          execution: 'template', // ← Explicit marking per NO SIMULATIONS LAW
+          ai_enabled: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+      const templateProposal = this.generateProposal(grantDetails, companyProfile);
+      // Mark as template-generated, not AI-generated
+      templateProposal.metadata = templateProposal.metadata || {};
+      templateProposal.metadata.ai_enhanced = false;
+      templateProposal.metadata.generation_method = 'template';
+      templateProposal.metadata.execution_type = 'template';
+      return templateProposal;
+    }
+
+    // MAJOR FIX: Validate API keys before attempting AI calls
+    if (!env.ANTHROPIC_API_KEY) {
+      const error = new Error('ANTHROPIC_API_KEY not configured. See API_KEYS_CONFIGURATION.md for setup instructions.');
+      if (telemetry) {
+        telemetry.logError('API key validation failed', error, {
+          grant_id: grantDetails.id,
+          execution: 'failed',
+          reason: 'missing_api_key'
+        });
+      }
+      throw error;
     }
 
     try {
@@ -115,14 +143,36 @@ export class AIProposalService {
       }
 
       console.log(`✅ AIProposalService: AI proposal completed. Cost: $${this.totalCost.toFixed(4)}`);
+      
+      if (telemetry) {
+        telemetry.logInfo('AI proposal generation completed - REAL execution', {
+          grant_id: grantDetails.id,
+          execution: 'real', // ← REQUIRED marker per NO SIMULATIONS LAW
+          total_cost: this.totalCost,
+          api_calls: this.apiCallLog.length,
+          word_count: proposal.metadata.word_count,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       return proposal;
 
     } catch (error) {
-      console.error('AIProposalService: AI generation failed, falling back to templates:', error);
+      console.error('AIProposalService: AI generation failed:', error);
+      
+      // NO SIMULATIONS LAW: Record FAILURE and THROW - do not fall back to template in production
       if (telemetry) {
-        telemetry.logError('AI proposal generation failed, using fallback', error);
+        telemetry.logError('AI proposal generation FAILED - NO fallback in production', error, {
+          grant_id: grantDetails.id,
+          execution: 'failed', // ← REQUIRED marker per NO SIMULATIONS LAW
+          ai_enabled: env.FEATURE_REAL_AI,
+          error_type: error.name,
+          timestamp: new Date().toISOString()
+        });
       }
-      return this.generateProposal(grantDetails, companyProfile);
+      
+      // Throw the error - caller must handle appropriately
+      throw new Error(`AI proposal generation failed: ${error.message}`);
     }
   }
 
@@ -167,7 +217,7 @@ export class AIProposalService {
       const cost = this.trackCost('claude', {
         input_tokens: usage.input_tokens || 0,
         output_tokens: usage.output_tokens || 0
-      });
+      }, options.env);
 
       this.apiCallLog.push({
         model: 'claude-3-5-sonnet',
@@ -229,7 +279,7 @@ export class AIProposalService {
       const cost = this.trackCost('gpt4', {
         prompt_tokens: usage.prompt_tokens || 0,
         completion_tokens: usage.completion_tokens || 0
-      });
+      }, options.env);
 
       this.apiCallLog.push({
         model: 'gpt-4-turbo',
@@ -257,18 +307,27 @@ export class AIProposalService {
    * @param {Object} usage - Token usage data
    * @returns {number} Cost in USD
    */
-  trackCost(model, usage) {
+  trackCost(model, usage, env = {}) {
     let cost = 0;
     
     if (model === 'claude') {
-      // Claude 3.5 Sonnet pricing (as of Oct 2025)
-      const inputCost = (usage.input_tokens || 0) * 0.003 / 1000; // $3 per 1M input tokens
-      const outputCost = (usage.output_tokens || 0) * 0.015 / 1000; // $15 per 1M output tokens
+      // Claude 3.5 Sonnet pricing
+      // Defaults reflect public pricing as of 2025-10; override via environment for agility
+      // Sources:
+      // - https://docs.anthropic.com/en/docs/about-claude/models#pricing
+      const claudeInputPerMTok = parseFloat(env.CLAUDE_INPUT_USD_PER_MTOKEN || "3");
+      const claudeOutputPerMTok = parseFloat(env.CLAUDE_OUTPUT_USD_PER_MTOKEN || "15");
+      const inputCost = (usage.input_tokens || 0) * (claudeInputPerMTok / 1000_000);
+      const outputCost = (usage.output_tokens || 0) * (claudeOutputPerMTok / 1000_000);
       cost = inputCost + outputCost;
     } else if (model === 'gpt4') {
-      // GPT-4 Turbo pricing (as of Oct 2025)
-      const promptCost = (usage.prompt_tokens || 0) * 0.01 / 1000; // $10 per 1M prompt tokens
-      const completionCost = (usage.completion_tokens || 0) * 0.03 / 1000; // $30 per 1M completion tokens
+      // GPT-4 Turbo pricing
+      // Defaults reflect public pricing as of 2025-10; override via environment
+      // Source: https://openai.com/api/pricing
+      const gpt4PromptPerMTok = parseFloat(env.GPT4_PROMPT_USD_PER_MTOKEN || "10");
+      const gpt4CompletionPerMTok = parseFloat(env.GPT4_COMPLETION_USD_PER_MTOKEN || "30");
+      const promptCost = (usage.prompt_tokens || 0) * (gpt4PromptPerMTok / 1000_000);
+      const completionCost = (usage.completion_tokens || 0) * (gpt4CompletionPerMTok / 1000_000);
       cost = promptCost + completionCost;
     }
     
@@ -310,7 +369,7 @@ Please generate a concise, compelling executive summary (300-500 words) that:
 Use professional, confident language appropriate for federal grant proposals.`;
 
     try {
-      const result = await this.callClaudeAPI(prompt, env.ANTHROPIC_API_KEY);
+      const result = await this.callClaudeAPI(prompt, env.ANTHROPIC_API_KEY, { env });
       return result.content;
     } catch (error) {
       console.warn('Claude API failed for executive summary, using template fallback:', error);
@@ -354,7 +413,7 @@ Generate a comprehensive technical approach (800-1200 words) that includes:
 Use technical language appropriate for ${grant.agency} evaluators while remaining clear and compelling.`;
 
     try {
-      const result = await this.callClaudeAPI(prompt, env.ANTHROPIC_API_KEY, { maxTokens: 6144 });
+      const result = await this.callClaudeAPI(prompt, env.ANTHROPIC_API_KEY, { maxTokens: 6144, env });
       return result.content;
     } catch (error) {
       console.warn('Claude API failed for technical approach, using template fallback:', error);
@@ -390,7 +449,7 @@ Generate a compelling innovation section (400-600 words) that:
 Emphasize breakthrough potential and transformative impact. Use confident, forward-looking language.`;
 
     try {
-      const result = await this.callClaudeAPI(prompt, env.ANTHROPIC_API_KEY);
+      const result = await this.callClaudeAPI(prompt, env.ANTHROPIC_API_KEY, { env });
       return result.content;
     } catch (error) {
       console.warn('Claude API failed for innovation section, using template fallback:', error);
@@ -434,7 +493,7 @@ ${template.key_focus.includes('Dual-use') ? 'Emphasize dual-use applications for
 Use business-oriented language with specific, quantifiable projections where possible.`;
 
     try {
-      const result = await this.callGPT4API(prompt, env.OPENAI_API_KEY, { maxTokens: 5120 });
+      const result = await this.callGPT4API(prompt, env.OPENAI_API_KEY, { maxTokens: 5120, env });
       return result.content;
     } catch (error) {
       console.warn('GPT-4 API failed for commercial potential, using template fallback:', error);
@@ -489,7 +548,7 @@ Generate a comprehensive budget narrative (400-600 words) that includes:
 Provide specific dollar amounts, justify major expenses, and demonstrate cost-effectiveness. Use professional financial language appropriate for federal contracting.`;
 
     try {
-      const result = await this.callGPT4API(prompt, env.OPENAI_API_KEY);
+      const result = await this.callGPT4API(prompt, env.OPENAI_API_KEY, { env });
       return result.content;
     } catch (error) {
       console.warn('GPT-4 API failed for budget narrative, using template fallback:', error);

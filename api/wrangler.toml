@@ -29,11 +29,11 @@ bucket_name = "voidcat-assets"
 [env.production]
 name = "grant-search-api"
 
-# Production feature flags - Enable after staging validation
+# Production feature flags - ENABLED for NO SIMULATIONS LAW compliance
 [env.production.vars]
 ENVIRONMENT = "production"
-FEATURE_LIVE_DATA = false
-FEATURE_REAL_AI = false
+FEATURE_LIVE_DATA = true
+FEATURE_REAL_AI = true
 
 # Phase 2A: Staging Environment for Testing
 [env.staging]
