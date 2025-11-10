@@ -12,7 +12,7 @@ export class ConfigService {
   getDataConfig() {
     return {
       USE_LIVE_DATA: this.getBooleanConfig('USE_LIVE_DATA', true),
-      FALLBACK_TO_MOCK: this.getBooleanConfig('FALLBACK_TO_MOCK', true),
+      FALLBACK_TO_MOCK: false, // PRODUCTION MODE: No mock data fallback allowed
       LIVE_DATA_TIMEOUT: this.getNumberConfig('LIVE_DATA_TIMEOUT', 15000),
       LIVE_DATA_SOURCES: {
         GRANTS_GOV_API: this.getStringConfig('GRANTS_GOV_API_URL', 'https://api.grants.gov/v1/api/search2'),
