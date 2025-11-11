@@ -621,11 +621,11 @@ grants.post('/generate-ai-proposal', async (c) => {
     // User should get grant details from search results first
     const grant = {
       id: grant_id,
-      title: requestData.grant_title || 'Federal Grant Opportunity',
-      agency: requestData.grant_agency || 'Federal Agency',
-      description: requestData.grant_description || 'Grant opportunity description not provided',
-      amount: requestData.grant_amount || 'Amount TBD',
-      deadline: requestData.grant_deadline || '2025-12-31'
+      title: requestData.grant_title,
+      agency: requestData.grant_agency,
+      description: requestData.grant_description,
+      amount: requestData.grant_amount,
+      deadline: requestData.grant_deadline
     };
 
     if (!requestData.grant_title || !requestData.grant_agency) {
