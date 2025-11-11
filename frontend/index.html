@@ -587,10 +587,36 @@
             </template>
         </div>
 
+        <!-- API Connection Error Banner -->
+        <div x-show="apiConnectionError && usingDemoData"
+             class="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 rounded">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <span class="text-yellow-400 text-2xl">⚠️</span>
+                </div>
+                <div class="ml-3 flex-1">
+                    <h3 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                        API Connection Issue
+                    </h3>
+                    <div class="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
+                        <p x-text="apiConnectionError"></p>
+                        <p class="mt-2">The grant database is temporarily unavailable. You're seeing limited demo data. Please try refreshing the page in a few moments to access live federal grant data.</p>
+                    </div>
+                    <div class="mt-3">
+                        <button @click="searchGrants(); apiConnectionError = null"
+                                class="text-sm font-medium text-yellow-800 dark:text-yellow-200 underline hover:text-yellow-900 dark:hover:text-yellow-100">
+                            Retry Connection
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Loading State -->
         <div x-show="loading" class="text-center py-8">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p class="mt-2 text-gray-600 dark:text-gray-400">Loading grant opportunities...</p>
+            <p class="mt-2 text-gray-600 dark:text-gray-400">Connecting to grant database...</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-500">Loading live federal grant opportunities</p>
         </div>
 
         <!-- Empty State -->
@@ -807,6 +833,7 @@
                 upgradeToProModal: false,
                 showUpgradePrompt: false,
                 usingDemoData: false,
+                apiConnectionError: null, // Store API connection error message
                 upgradeError: '',
                 menuOpen: false,
                 
@@ -1047,15 +1074,27 @@
                         if (data.success && data.grants) {
                             this.grants = data.grants;
                             this.usingDemoData = false;
+                            this.apiConnectionError = null; // Clear any previous errors
                             console.log('✅ Found grants from API:', data.grants.length);
+
+                            // Show success notification if previously had errors
+                            if (this.apiConnectionError) {
+                                this.showNotification('success', `Connected! Found ${data.grants.length} live grant opportunities.`);
+                            }
                         } else {
                             console.error('❌ Search failed:', data.error);
-                            throw new Error('API returned unsuccessful response');
+                            throw new Error(data.error || 'API returned unsuccessful response');
                         }
                     } catch (error) {
                         console.error('❌ Search error:', error.message);
                         console.log('🔄 Falling back to demo data due to API connectivity issues');
-                        
+
+                        // Store error message for user display
+                        this.apiConnectionError = `Unable to connect to grant database: ${error.message}. Showing limited demo data.`;
+
+                        // Show notification about API connection issue
+                        this.showNotification('warning', 'API connection failed. Showing demo data only. Please try again later.');
+
                         // Apply filters to demo data if any
                         let filteredGrants = [...this.demoGrants];
                         
