@@ -51,67 +51,43 @@ grants.get('/search', async (c) => {
       const dataService = await dataServiceFactory.getInstance({ live_data: dataConfig });
       let fetchResult;
       
-      // Phase 2A: Use enhanced data fetching with caching and multi-source aggregation
-      if (c.env.FEATURE_LIVE_DATA && dataConfig.USE_LIVE_DATA) {
-        try {
-          // Use Phase 2A enhanced method with KV caching and multi-source
-          fetchResult = await dataService.fetchWithCache(query, agency, c.env, c.get('telemetry'));
-          
-          // Log successful real data fetch
-          const telemetry = c.get('telemetry');
-          if (telemetry) {
-            telemetry.logInfo('Live data fetch SUCCESS', {
-              execution: 'real',
-              query: query || '',
-              agency: agency || '',
-              count: fetchResult.grants.length,
-              timestamp: new Date().toISOString()
-            });
-          }
-        } catch (liveDataError) {
-          // NO SIMULATIONS LAW: Log failure and return error response
-          console.error('Live data fetch failed:', liveDataError);
-          
-          const telemetry = c.get('telemetry');
-          if (telemetry) {
-            telemetry.logError('Live data fetch FAILED', liveDataError, {
-              execution: 'failed',
-              query: query || '',
-              agency: agency || '',
-              timestamp: new Date().toISOString()
-            });
-          }
-          
-          return c.json({
-            success: false,
-            error: 'Live grant data is temporarily unavailable. Please try again later.',
-            code: 'LIVE_DATA_UNAVAILABLE',
-            message: liveDataError.message,
-            execution_type: 'failed'
-          }, 503);
-        }
-      } else {
-        // Use mock data only when FEATURE_LIVE_DATA is false or USE_LIVE_DATA is false
-        console.log('Using mock data - FEATURE_LIVE_DATA disabled');
-        
+      // PRODUCTION MODE: Use enhanced data fetching with caching and multi-source aggregation
+      try {
+        // Use Phase 2A enhanced method with KV caching and multi-source
+        fetchResult = await dataService.fetchWithCache(query, agency, c.env, c.get('telemetry'));
+
+        // Log successful real data fetch
         const telemetry = c.get('telemetry');
         if (telemetry) {
-          telemetry.logInfo('Using mock data - live data disabled', {
-            execution: 'mock',
+          telemetry.logInfo('Live data fetch SUCCESS', {
+            execution: 'real',
+            query: query || '',
+            agency: agency || '',
+            count: fetchResult.grants.length,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (liveDataError) {
+        // NO SIMULATIONS LAW: Log failure and return error response
+        console.error('Live data fetch failed:', liveDataError);
+
+        const telemetry = c.get('telemetry');
+        if (telemetry) {
+          telemetry.logError('Live data fetch FAILED', liveDataError, {
+            execution: 'failed',
             query: query || '',
             agency: agency || '',
             timestamp: new Date().toISOString()
           });
         }
-        
-        const mockResult = dataService.getGrants({ query, agency });
-        fetchResult = {
-          grants: mockResult.grants,
-          actualDataSource: 'mock',
-          fallbackOccurred: false,
-          error: null,
-          execution_type: 'mock'
-        };
+
+        return c.json({
+          success: false,
+          error: 'Live grant data is temporarily unavailable. Please try again later.',
+          code: 'LIVE_DATA_UNAVAILABLE',
+          message: liveDataError.message,
+          execution_type: 'failed'
+        }, 503);
       }
       
       filteredGrants = fetchResult.grants;
@@ -138,45 +114,21 @@ grants.get('/search', async (c) => {
     }
     
     try {
-      // If we got mock data, apply additional filters using DataService
-      if (actualDataSource === 'mock') {
-        // Get DataService instance from factory (reuses existing instance)
-        const dataService = await dataServiceFactory.getInstance({ live_data: dataConfig });
-        const searchOptions = {
-          query,
-          agency,
-          deadline,
-          program,
-          opportunityType
-        };
-        
-        // Parse amount filter if provided
-        if (amount) {
-          const amountNum = parseInt(amount.replace(/[$,]/g, ''), 10);
-          if (!isNaN(amountNum)) {
-            searchOptions.maxAmount = amountNum;
-          }
+      // Apply basic filters to live data
+      if (deadline) {
+        const targetDate = new Date(deadline);
+        if (isNaN(targetDate.getTime())) {
+          return c.json({
+            success: false,
+            error: 'Invalid deadline format. Please use YYYY-MM-DD format.',
+            code: 'INVALID_DATE_FORMAT'
+          }, 400);
         }
-        
-        const mockResult = dataService.getGrants(searchOptions);
-        filteredGrants = mockResult.grants;
-      } else {
-        // Apply basic filters to live data
-        if (deadline) {
-          const targetDate = new Date(deadline);
-          if (isNaN(targetDate.getTime())) {
-            return c.json({
-              success: false,
-              error: 'Invalid deadline format. Please use YYYY-MM-DD format.',
-              code: 'INVALID_DATE_FORMAT'
-            }, 400);
-          }
-          
-          filteredGrants = filteredGrants.filter(grant => {
-            const grantDeadline = new Date(grant.deadline);
-            return grantDeadline <= targetDate;
-          });
-        }
+
+        filteredGrants = filteredGrants.filter(grant => {
+          const grantDeadline = new Date(grant.deadline);
+          return grantDeadline <= targetDate;
+        });
       }
 
       // Track grant search metrics
@@ -218,15 +170,19 @@ grants.get('/search', async (c) => {
 // Get grant statistics endpoint (must be before /:id route)
 grants.get('/stats', async (c) => {
   try {
-    // Get DataService instance from factory (uses default config)
-    const dataService = await dataServiceFactory.getInstance({});
-    const stats = dataService.getStatistics();
-    
+    const telemetry = c.get('telemetry');
+    if (telemetry) {
+      telemetry.logError('Grant statistics not available', new Error('Feature requires live data aggregation'), {
+        execution: 'failed',
+        timestamp: new Date().toISOString()
+      });
+    }
+
     return c.json({
-      success: true,
-      statistics: stats,
-      timestamp: new Date().toISOString()
-    });
+      success: false,
+      error: 'Grant statistics are not available. This feature requires live data aggregation.',
+      code: 'FEATURE_NOT_AVAILABLE'
+    }, 501);
   } catch (error) {
     console.error('Grant statistics error:', error);
     return c.json({
@@ -262,25 +218,20 @@ grants.get('/:id', async (c) => {
       }, 400);
     }
     
-    // Try to find grant in mock data using DataService
-    // Get DataService instance from factory (uses default config)
-    const dataService = await dataServiceFactory.getInstance({});
-    const mockGrant = dataService.getMockGrantById(grantId);
-    
-    if (mockGrant) {
-      return c.json({
-        success: true,
-        grant: mockGrant,
-        data_source: 'mock',
+    // In production mode, grant details must be fetched from live sources
+    const telemetry = c.get('telemetry');
+    if (telemetry) {
+      telemetry.logInfo('Grant details request', {
+        grant_id: grantId,
         timestamp: new Date().toISOString()
       });
     }
-    
+
     return c.json({
       success: false,
-      error: 'Grant not found',
-      message: 'The requested grant ID was not found in our database. Please check the ID and try again.',
-      code: 'GRANT_NOT_FOUND'
+      error: 'Grant details not available',
+      message: 'Grant details are only available through live grant search. Please use the /api/grants/search endpoint to find and view grants.',
+      code: 'FEATURE_REQUIRES_SEARCH'
     }, 404);
 
   } catch (error) {
@@ -373,80 +324,12 @@ grants.post('/generate-proposal', async (c) => {
       }, 400);
     }
     
-    // Get grant details for proposal context
-    // Get DataService instance from factory (uses default config)
-    const dataService = await dataServiceFactory.getInstance({});
-    const grant = dataService.getMockGrantById(grant_id);
-    
-    const grantTitle = grant ? grant.title : 'Federal Grant Opportunity';
-    const grantAmount = grant ? grant.amount : 'Amount TBD';
-    const grantAgency = grant ? grant.agency : 'Federal Agency';
-    
-    // Generate mock proposal (in production, this would use AI service)
-    // Safe ID generator (avoids hard dependency on crypto.randomUUID)
-    const safeId = () => {
-      try { return crypto.randomUUID(); } catch { return `id-${Math.random().toString(36).slice(2, 10)}-${Date.now()}`; }
-    };
-
-    const mockProposal = `# Grant Proposal for ${grantTitle}
-
-## Executive Summary
-This proposal outlines our innovative approach to address the requirements of the ${grantTitle} grant. ${company_info ? `${company_info} brings` : 'Our company brings'} extensive experience in the relevant field and cutting-edge technology solutions.
-
-## Project Description
-We propose to develop innovative solutions that will address the grant requirements through:
-
-### Technical Approach
-- Advanced research methodologies and proven frameworks
-- Cutting-edge technology implementation
-- Comprehensive testing and validation protocols
-- Scalable and sustainable solution architecture
-
-### Key Innovations
-1. **Novel Approach**: Development of innovative solutions that push the boundaries of current technology
-2. **Real-time Implementation**: High-performance processing capabilities for immediate impact
-3. **Secure Architecture**: Industry-standard security protocols and best practices
-
-## Budget Justification
-The requested funding of ${grantAmount} will be allocated across:
-- Personnel (60%): Senior researchers, engineers, and project managers
-- Equipment (25%): Specialized equipment and infrastructure
-- Travel (10%): Collaboration with partners and stakeholders
-- Other Direct Costs (5%): Software licenses, materials, and indirect costs
-
-## Timeline
-**Phase 1 (Months 1-6)**: Research and development of core components
-**Phase 2 (Months 7-12)**: System integration and comprehensive testing
-**Phase 3 (Months 13-18)**: Validation, optimization, and deployment preparation
-
-## Team Qualifications
-Our team consists of experienced professionals with proven track records in:
-- Advanced research and development
-- Technology innovation and implementation
-- ${grantAgency} collaboration and compliance
-- Project management and delivery
-
-## Expected Outcomes
-Upon successful completion, this project will deliver:
-- Fully functional prototype or system
-- Comprehensive technical documentation
-- Training materials and user guides
-- Recommendations for full-scale implementation
-- Measurable impact on the target domain
-
-## Conclusion
-This proposal represents a significant opportunity to advance the field through innovative technology and research. We are committed to delivering exceptional results that exceed expectations and provide lasting value to ${grantAgency} and the broader community.
-
----
-*Generated by VoidCat RDC Grant Automation Platform*
-*Proposal ID: ${safeId()}*
-*Generated: ${new Date().toISOString()}*`;
-
+    // NO SIMULATIONS LAW: Mock proposals are not allowed
     return c.json({
       success: false,
       error: 'This endpoint is deprecated. Please use /api/grants/generate-ai-proposal with real AI execution.',
       code: 'ENDPOINT_DEPRECATED',
-      message: 'VoidCat RDC NO SIMULATIONS LAW: Mock proposal generation is not allowed. Use AI-powered endpoint with FEATURE_REAL_AI=true.',
+      message: 'NO SIMULATIONS LAW: Mock proposal generation is not allowed. Use AI-powered endpoint with FEATURE_REAL_AI=true.',
       alternative_endpoint: '/api/grants/generate-ai-proposal',
       required_feature_flag: 'FEATURE_REAL_AI=true'
     }, 410);
@@ -521,33 +404,13 @@ grants.post('/analyze-match', async (c) => {
       }, 400);
     }
 
-    // Get grant details
-    // Get DataService instance from factory
-    const dataService = await dataServiceFactory.getInstance({});
-    const grant = dataService.getMockGrantById(grant_id);
-
-    if (!grant) {
-      return c.json({
-        success: false,
-        error: 'Grant not found',
-        code: 'GRANT_NOT_FOUND'
-      }, 404);
-    }
-
-    // Perform semantic analysis
-    // Use module-level semanticAnalysisService
-    const analysis = semanticAnalysisService.calculateMatchingScore(company_profile, grant);
-
+    // Production mode: semantic analysis requires live grant data
     return c.json({
-      success: true,
-      grant_id: grant_id,
-      matching_analysis: analysis,
-      grant_details: {
-        title: grant.title,
-        agency: grant.agency,
-        deadline: grant.deadline
-      }
-    });
+      success: false,
+      error: 'Semantic analysis not available',
+      message: 'This feature requires integration with live grant search results. Please perform a grant search first to access matching analysis.',
+      code: 'FEATURE_REQUIRES_LIVE_DATA'
+    }, 501);
   } catch (error) {
     console.error('Semantic analysis error:', error);
     return c.json({
@@ -572,32 +435,13 @@ grants.post('/application-timeline', async (c) => {
       }, 400);
     }
 
-    // Get grant details
-    // Get DataService instance from factory
-    const dataService = await dataServiceFactory.getInstance({});
-    const grant = dataService.getMockGrantById(grant_id);
-
-    if (!grant) {
-      return c.json({
-        success: false,
-        error: 'Grant not found',
-        code: 'GRANT_NOT_FOUND'
-      }, 404);
-    }
-
-    // Generate timeline
-    // Use module-level deadlineTrackingService
-    const timeline = deadlineTrackingService.generateApplicationTimeline(grant, { buffer_days });
-
+    // Production mode: timeline generation requires live grant data
     return c.json({
-      success: true,
-      grant_id: grant_id,
-      timeline: timeline,
-      grant_details: {
-        title: grant.title,
-        deadline: grant.deadline
-      }
-    });
+      success: false,
+      error: 'Timeline generation not available',
+      message: 'This feature requires integration with live grant search results. Please perform a grant search first to access timeline generation.',
+      code: 'FEATURE_REQUIRES_LIVE_DATA'
+    }, 501);
   } catch (error) {
     console.error('Timeline generation error:', error);
     return c.json({
@@ -613,24 +457,13 @@ grants.get('/strategic-calendar', async (c) => {
   try {
     const { max_concurrent } = c.req.query();
     
-    // Get all grants
-    // Get DataService instance from factory
-    const dataService = await dataServiceFactory.getInstance({});
-    const allGrants = dataService.getGrants({ limit: 100 });
-
-    // Generate strategic calendar
-    // Use module-level deadlineTrackingService
-    const calendar = deadlineTrackingService.generateStrategicCalendar(
-      allGrants.grants,
-      { 
-        max_concurrent_proposals: parseInt(max_concurrent) || 3 
-      }
-    );
-
+    // Production mode: strategic calendar requires live grant data
     return c.json({
-      success: true,
-      calendar: calendar
-    });
+      success: false,
+      error: 'Strategic calendar not available',
+      message: 'This feature requires integration with live grant search results. Please perform a grant search first to access strategic calendar generation.',
+      code: 'FEATURE_REQUIRES_LIVE_DATA'
+    }, 501);
   } catch (error) {
     console.error('Strategic calendar error:', error);
     return c.json({
@@ -784,17 +617,24 @@ grants.post('/generate-ai-proposal', async (c) => {
       }, 400);
     }
 
-    // Get grant details
-    // Get DataService instance from factory
-    const dataService = await dataServiceFactory.getInstance({});
-    const grant = dataService.getMockGrantById(grant_id);
+    // Production mode: Grant details must be provided in request
+    // User should get grant details from search results first
+    const grant = {
+      id: grant_id,
+      title: requestData.grant_title,
+      agency: requestData.grant_agency,
+      description: requestData.grant_description,
+      amount: requestData.grant_amount,
+      deadline: requestData.grant_deadline
+    };
 
-    if (!grant) {
+    if (!requestData.grant_title || !requestData.grant_agency) {
       return c.json({
         success: false,
-        error: 'Grant not found',
-        code: 'GRANT_NOT_FOUND'
-      }, 404);
+        error: 'Grant details required',
+        message: 'Please provide grant_title and grant_agency from your search results. Other fields (grant_description, grant_amount, grant_deadline) are recommended.',
+        code: 'MISSING_GRANT_DETAILS'
+      }, 400);
     }
 
     // Phase 2A: Generate AI-powered proposal with real AI integration
