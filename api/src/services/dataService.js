@@ -27,11 +27,41 @@ export class DataService {
    */
   parseAmount(amountStr) {
     if (!amountStr || typeof amountStr !== 'string') return null;
-    
+
     // Remove $ and commas, handle ranges by taking the first number
     const cleaned = amountStr.replace(/[$,]/g, '').split('-')[0].trim();
     const parsed = parseInt(cleaned, 10);
     return isNaN(parsed) ? null : parsed;
+  }
+
+  /**
+   * Parse date string with robust error handling
+   * @param {string} dateString - Date string to parse
+   * @returns {Date|null} Parsed date or null if unparseable
+   */
+  parseDate(dateString) {
+    if (!dateString) return null;
+
+    // Handle non-string inputs
+    if (typeof dateString !== 'string') {
+      if (dateString instanceof Date) {
+        return isNaN(dateString.getTime()) ? null : dateString;
+      }
+      return null;
+    }
+
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid (not NaN)
+      if (isNaN(date.getTime())) {
+        console.warn(`Invalid date format: ${dateString}`);
+        return null;
+      }
+      return date;
+    } catch (e) {
+      console.warn(`Date parsing error for: ${dateString}`, e);
+      return null;
+    }
   }
 
 
@@ -42,22 +72,33 @@ export class DataService {
    * @returns {number} Matching score between 0 and 1
    */
   calculateMatchingScore(grant, query) {
-    if (!query || !query.trim()) return 0.75; // Default score for no query
-    
+    // Handle null or undefined grant
+    if (!grant) return 0;
+
+    // Default score for no query
+    if (!query || typeof query !== 'string' || !query.trim()) return 0.75;
+
     const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 0);
-    const grantText = `${grant.title || ''} ${grant.description || ''} ${grant.agency || ''} ${grant.program || ''}`.toLowerCase();
-    
+
+    // Safely build grant text with null checks
+    const grantText = [
+      grant?.title || '',
+      grant?.description || '',
+      grant?.agency || '',
+      grant?.program || ''
+    ].join(' ').toLowerCase();
+
     let matches = 0;
     let totalScore = 0;
-    
+
     searchTerms.forEach(term => {
       // Title matches get higher weight
-      if (grant.title && grant.title.toLowerCase().includes(term)) {
+      if (grant?.title && typeof grant.title === 'string' && grant.title.toLowerCase().includes(term)) {
         matches++;
         totalScore += 0.4;
       }
       // Description matches
-      else if (grant.description && grant.description.toLowerCase().includes(term)) {
+      else if (grant?.description && typeof grant.description === 'string' && grant.description.toLowerCase().includes(term)) {
         matches++;
         totalScore += 0.3;
       }
@@ -67,16 +108,21 @@ export class DataService {
         totalScore += 0.2;
       }
       // Tag matches
-      else if (grant.tags && grant.tags.some(tag => tag.toLowerCase().includes(term))) {
-        matches++;
-        totalScore += 0.3;
+      else if (grant?.tags && Array.isArray(grant.tags)) {
+        const hasTagMatch = grant.tags.some(tag =>
+          tag && typeof tag === 'string' && tag.toLowerCase().includes(term)
+        );
+        if (hasTagMatch) {
+          matches++;
+          totalScore += 0.3;
+        }
       }
     });
-    
+
     const baseScore = matches / searchTerms.length;
     const weightedScore = totalScore / searchTerms.length;
     const finalScore = (baseScore * 0.6) + (weightedScore * 0.4);
-    
+
     return Math.min(0.95, Math.max(0.1, finalScore));
   }
 
@@ -84,36 +130,105 @@ export class DataService {
   /**
    * Validate grant data structure
    * @param {Object} grant - Grant object to validate
-   * @returns {Object} Validation result
+   * @returns {Object} Validation result with detailed errors
    */
   validateGrant(grant) {
     const errors = [];
+    const warnings = [];
+
+    // Check if grant object exists
+    if (!grant || typeof grant !== 'object') {
+      errors.push('Grant must be a valid object');
+      return { valid: false, errors, warnings };
+    }
+
+    // Validate required fields
     const requiredFields = ['id', 'title', 'agency', 'program', 'deadline', 'amount', 'description'];
-    
+
     requiredFields.forEach(field => {
-      if (!grant[field]) {
+      if (!grant[field] || (typeof grant[field] === 'string' && grant[field].trim() === '')) {
         errors.push(`Missing required field: ${field}`);
       }
     });
 
-    // Validate date format
+    // Validate field types
+    if (grant.id && typeof grant.id !== 'string') {
+      errors.push('Field "id" must be a string');
+    }
+
+    if (grant.title && typeof grant.title !== 'string') {
+      errors.push('Field "title" must be a string');
+    }
+
+    if (grant.agency && typeof grant.agency !== 'string') {
+      errors.push('Field "agency" must be a string');
+    }
+
+    if (grant.program && typeof grant.program !== 'string') {
+      errors.push('Field "program" must be a string');
+    }
+
+    if (grant.description && typeof grant.description !== 'string') {
+      errors.push('Field "description" must be a string');
+    }
+
+    // Validate date format using robust parseDate
     if (grant.deadline) {
-      const date = new Date(grant.deadline);
-      if (isNaN(date.getTime())) {
+      const parsedDate = this.parseDate(grant.deadline);
+      if (!parsedDate) {
         errors.push('Invalid deadline date format');
       }
     }
 
     // Validate matching score
-    if (grant.matching_score !== undefined) {
-      if (typeof grant.matching_score !== 'number' || grant.matching_score < 0 || grant.matching_score > 1) {
-        errors.push('Invalid matching_score: must be a number between 0 and 1');
+    if (grant.matching_score !== undefined && grant.matching_score !== null) {
+      if (typeof grant.matching_score !== 'number') {
+        errors.push('Field "matching_score" must be a number');
+      } else if (grant.matching_score < 0 || grant.matching_score > 1) {
+        errors.push('Field "matching_score" must be between 0 and 1');
+      }
+    }
+
+    // Validate tags (optional but must be array if present)
+    if (grant.tags !== undefined && grant.tags !== null) {
+      if (!Array.isArray(grant.tags)) {
+        errors.push('Field "tags" must be an array');
+      } else {
+        grant.tags.forEach((tag, index) => {
+          if (typeof tag !== 'string') {
+            warnings.push(`Tag at index ${index} is not a string`);
+          }
+        });
+      }
+    }
+
+    // Validate eligibility (optional but must be string if present)
+    if (grant.eligibility !== undefined && grant.eligibility !== null) {
+      if (typeof grant.eligibility !== 'string') {
+        warnings.push('Field "eligibility" should be a string');
+      }
+    }
+
+    // Validate data_source (optional but must be string if present)
+    if (grant.data_source !== undefined && grant.data_source !== null) {
+      if (typeof grant.data_source !== 'string') {
+        warnings.push('Field "data_source" should be a string');
+      }
+    }
+
+    // Validate amount format (optional validation for common patterns)
+    if (grant.amount && typeof grant.amount === 'string') {
+      // Check if it's parseable as amount
+      const parsedAmount = this.parseAmount(grant.amount);
+      if (parsedAmount === null && !grant.amount.toLowerCase().includes('tbd')) {
+        warnings.push('Amount format may not be parseable');
       }
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
+      warnings
     };
   }
 
