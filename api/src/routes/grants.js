@@ -116,18 +116,32 @@ grants.get('/search', async (c) => {
     try {
       // Apply basic filters to live data
       if (deadline) {
+        // Use robust date parsing
         const targetDate = new Date(deadline);
         if (isNaN(targetDate.getTime())) {
           return c.json({
             success: false,
-            error: 'Invalid deadline format. Please use YYYY-MM-DD format.',
+            error: 'Invalid deadline format. Please use a valid date format (e.g., YYYY-MM-DD).',
             code: 'INVALID_DATE_FORMAT'
           }, 400);
         }
 
+        // Filter grants with safe date parsing
         filteredGrants = filteredGrants.filter(grant => {
-          const grantDeadline = new Date(grant.deadline);
-          return grantDeadline <= targetDate;
+          if (!grant.deadline) return false;
+
+          try {
+            const grantDeadline = new Date(grant.deadline);
+            // Skip grants with invalid deadline dates
+            if (isNaN(grantDeadline.getTime())) {
+              console.warn(`Grant ${grant.id} has invalid deadline: ${grant.deadline}`);
+              return false;
+            }
+            return grantDeadline <= targetDate;
+          } catch (e) {
+            console.warn(`Error parsing deadline for grant ${grant.id}:`, e);
+            return false;
+          }
         });
       }
 

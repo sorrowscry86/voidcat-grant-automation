@@ -95,6 +95,60 @@ export function serviceUnavailable(service, message = null) {
 }
 
 /**
+ * Create a not found error response
+ * @param {string} resource - Resource type that was not found
+ * @param {string} identifier - Optional identifier
+ * @returns {Response} JSON response
+ */
+export function notFound(resource, identifier = null) {
+  const message = identifier
+    ? `${resource} with identifier '${identifier}' was not found.`
+    : `${resource} not found.`;
+  return error(message, 'NOT_FOUND', 404, identifier ? { identifier } : {});
+}
+
+/**
+ * Create an unauthorized error response
+ * @param {string} message - Optional custom message
+ * @returns {Response} JSON response
+ */
+export function unauthorized(message = 'Authentication required. Please provide valid credentials.') {
+  return error(message, 'UNAUTHORIZED', 401);
+}
+
+/**
+ * Create a forbidden error response
+ * @param {string} message - Optional custom message
+ * @returns {Response} JSON response
+ */
+export function forbidden(message = 'You do not have permission to access this resource.') {
+  return error(message, 'FORBIDDEN', 403);
+}
+
+/**
+ * Create an internal server error response
+ * @param {string} correlationId - Correlation ID for error tracking
+ * @param {string} message - Optional custom message
+ * @returns {Response} JSON response
+ */
+export function internalError(correlationId, message = 'An unexpected error occurred. Please try again later.') {
+  return error(message, 'INTERNAL_SERVER_ERROR', 500, {
+    correlation_id: correlationId
+  });
+}
+
+/**
+ * Create a bad request error response
+ * @param {string} message - Error message
+ * @param {string} code - Specific error code
+ * @param {Object} additional - Additional error data
+ * @returns {Response} JSON response
+ */
+export function badRequest(message, code = 'BAD_REQUEST', additional = {}) {
+  return error(message, code, 400, additional);
+}
+
+/**
  * Create a consistent API response (Tier 4 enhancement)
  * @param {Object} c - Hono context
  * @param {boolean} success - Success status
@@ -211,6 +265,11 @@ export default {
   validationError,
   rateLimitError,
   serviceUnavailable,
+  notFound,
+  unauthorized,
+  forbidden,
+  internalError,
+  badRequest,
   createResponse,
   validateInput
 };
