@@ -67,27 +67,34 @@ jobs:
           npx wrangler deploy --env production
 
       - name: Sync Stripe secrets to Cloudflare (optional)
-        # Always run - internal checks will skip if secrets not set
-        if: always()
+        # Only run if deployment succeeded
+        if: success()
         working-directory: ./api
         shell: bash
         run: |
+          echo "Syncing Stripe secrets to Cloudflare Worker..."
+          
+          # Wait a moment for deployment to fully propagate
+          sleep 5
+          
           if [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ]; then 
             echo "Setting STRIPE_SECRET_KEY..."
-            echo "${{ secrets.STRIPE_SECRET_KEY }}" | npx wrangler secret put STRIPE_SECRET_KEY --env production
+            echo "${{ secrets.STRIPE_SECRET_KEY }}" | npx wrangler secret put STRIPE_SECRET_KEY --env production || echo "⚠️ Warning: Failed to set STRIPE_SECRET_KEY"
           fi
           if [ -n "${{ secrets.STRIPE_PUBLISHABLE_KEY }}" ]; then 
             echo "Setting STRIPE_PUBLISHABLE_KEY..."
-            echo "${{ secrets.STRIPE_PUBLISHABLE_KEY }}" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env production
+            echo "${{ secrets.STRIPE_PUBLISHABLE_KEY }}" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env production || echo "⚠️ Warning: Failed to set STRIPE_PUBLISHABLE_KEY"
           fi
           if [ -n "${{ secrets.STRIPE_PRICE_ID }}" ]; then 
             echo "Setting STRIPE_PRICE_ID..."
-            echo "${{ secrets.STRIPE_PRICE_ID }}" | npx wrangler secret put STRIPE_PRICE_ID --env production
+            echo "${{ secrets.STRIPE_PRICE_ID }}" | npx wrangler secret put STRIPE_PRICE_ID --env production || echo "⚠️ Warning: Failed to set STRIPE_PRICE_ID"
           fi
           if [ -n "${{ secrets.STRIPE_WEBHOOK_SECRET }}" ]; then 
             echo "Setting STRIPE_WEBHOOK_SECRET..."
-            echo "${{ secrets.STRIPE_WEBHOOK_SECRET }}" | npx wrangler secret put STRIPE_WEBHOOK_SECRET --env production
+            echo "${{ secrets.STRIPE_WEBHOOK_SECRET }}" | npx wrangler secret put STRIPE_WEBHOOK_SECRET --env production || echo "⚠️ Warning: Failed to set STRIPE_WEBHOOK_SECRET"
           fi
+          
+          echo "✅ Stripe secrets sync completed"
 
       - name: Verify Deployment
         run: |

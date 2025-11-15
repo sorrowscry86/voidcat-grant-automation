@@ -7,6 +7,7 @@ import { bearerAuth } from 'hono/bearer-auth';
 import GrantIngestionService from '../services/grantIngestionService.js';
 import { TelemetryService } from '../services/telemetryService.js';
 import { initializeSchema } from '../db/connection.js';
+import { GRANTS_SCHEMA_SQL } from '../db/grants-schema.js';
 
 const app = new Hono();
 
@@ -36,9 +37,8 @@ app.post('/grants/init-schema', async (c) => {
   try {
     const db = c.env.VOIDCAT_DB;
     
-    // Read and execute schema SQL
-    const schemaSQL = await import('../db/grants-schema.sql?raw');
-    const statements = schemaSQL.default.split(';').filter(s => s.trim());
+    // Execute schema SQL statements
+    const statements = GRANTS_SCHEMA_SQL.split(';').filter(s => s.trim());
     
     for (const statement of statements) {
       if (statement.trim()) {
