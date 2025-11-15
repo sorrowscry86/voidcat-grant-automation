@@ -15,6 +15,7 @@ import grantsRoutes from './routes/grants.js';
 import usersRoutes from './routes/users.js';
 import authRoutes from './routes/auth.js'; // New: JWT authentication routes
 import dashboardRoutes from './routes/dashboard.js'; // New: Metrics dashboard routes
+import adminRoutes from './routes/admin.js'; // Database population management
 
 // Initialize Hono app
 const app = new Hono();
@@ -66,6 +67,7 @@ app.route('/api/grants', grantsRoutes);
 app.route('/api/users', usersRoutes);
 app.route('/api/auth', authRoutes); // New: JWT authentication routes
 app.route('/api/dashboard', dashboardRoutes); // New: Metrics dashboard routes
+app.route('/api/admin', adminRoutes); // Database population management
 
 // Stripe endpoints (keeping in main file for now as they require complex setup)
 app.post('/api/stripe/create-checkout', async (c) => {
@@ -258,4 +260,20 @@ app.get('/', async (c) => {
   });
 });
 
-export default app;
+// Scheduled worker for automated grant database refresh (daily at 2 AM UTC)
+export default {
+  fetch: app.fetch,
+  async scheduled(event, env, ctx) {
+    try {
+      console.log('🕐 Scheduled grant ingestion triggered at:', new Date().toISOString());
+      
+      const { handleScheduledIngestion } = await import('./workers/grantIngestionWorker.js');
+      await handleScheduledIngestion(env);
+      
+      console.log('✅ Scheduled grant ingestion completed successfully');
+    } catch (error) {
+      console.error('❌ Scheduled grant ingestion failed:', error);
+      // Don't throw - log and continue
+    }
+  }
+};
