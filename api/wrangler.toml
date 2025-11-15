@@ -4,8 +4,8 @@ compatibility_date = "2024-01-01"
 
 # Phase 2A Feature Flags - Production Reality Integration
 [vars]
-FEATURE_LIVE_DATA = false  # Enable in staging first, then production
-FEATURE_REAL_AI = false    # Enable in staging first, then production
+FEATURE_LIVE_DATA = true  # ENABLED: Live grant data from public APIs (no keys required)
+FEATURE_REAL_AI = true    # ENABLED: Real AI for proposal generation
 
 # Bindings for local development
 [[d1_databases]]
