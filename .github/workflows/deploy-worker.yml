@@ -67,8 +67,8 @@ jobs:
           npx wrangler deploy --env production
 
       - name: Sync Stripe secrets to Cloudflare (optional)
-        # Read secrets directly to avoid exposing at job-level env
-        if: ${{ secrets.STRIPE_SECRET_KEY || secrets.STRIPE_PUBLISHABLE_KEY || secrets.STRIPE_PRICE_ID || secrets.STRIPE_WEBHOOK_SECRET }}
+        # Always run - internal checks will skip if secrets not set
+        if: always()
         working-directory: ./api
         shell: bash
         run: |
