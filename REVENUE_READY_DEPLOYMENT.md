@@ -56,7 +56,7 @@ This PR fixes the GitHub Actions workflow and enables live features:
 # View the PR link from git push output, then merge via GitHub UI
 # OR merge locally:
 git checkout main
-git merge claude/investigate-search-population-011TGjnZnbuLwsjSzLxRVoAz
+git merge <your-branch-name>
 git push origin main
 ```
 
