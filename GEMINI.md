@@ -21,6 +21,7 @@ The backend is managed by Wrangler.
 
 - **Dependencies:** Navigate to the `/api` directory and run `npm install`.
 - **Deployment:** To deploy the API to the Cloudflare `production` environment, run the following command from the `/api` directory:
+
   ```bash
   npx wrangler deploy --env production
   ```
@@ -34,18 +35,25 @@ The frontend is a static HTML file and does not have a build step. It can be ser
 The project uses Playwright for end-to-end tests.
 
 - **Install Playwright browsers:**
+
   ```bash
   npx playwright install
   ```
+
 - **Run all tests:**
+
   ```bash
   npm test
   ```
+
 - **Run tests with UI:**
+
   ```bash
   npm run test:ui
   ```
+
 - **View test report:**
+
   ```bash
   npm run test:report
   ```

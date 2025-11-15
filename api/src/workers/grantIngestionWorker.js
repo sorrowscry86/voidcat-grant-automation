@@ -10,9 +10,9 @@ import { TelemetryService } from '../services/telemetryService.js';
  * Scheduled to run daily to refresh grant data from federal sources
  * 
  * Cron schedule (set in wrangler.toml):
- * - Daily at 2 AM UTC: "0 2 * * *"
- * - Every 6 hours: "0 */6 * * *"
- * - Every 12 hours: "0 */12 * * *"
+ * - Daily at 2 AM UTC: 0 2 * * *
+ * - Every 6 hours: 0 *&#47;6 * * *
+ * - Every 12 hours: 0 *&#47;12 * * *
  * 
  * @param {Event} event - Cloudflare scheduled event
  * @param {Object} env - Environment bindings
