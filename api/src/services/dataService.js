@@ -1,5 +1,7 @@
 // Data Service for VoidCat Grant Automation Platform
 // Manages live grant data from federal sources with caching and multi-source aggregation
+import { XMLParser } from 'fast-xml-parser';
+import { unzipSync, strFromU8 } from 'fflate';
 
 export class DataService {
   constructor(config = {}) {
@@ -302,7 +304,7 @@ export class DataService {
       console.error('DataService: Cache operation failed:', error);
       
       // NO SIMULATIONS LAW: Log failure and throw - do not silently fallback
-      if (telemetry) {
+      if (telemetry?.logError) {
         telemetry.logError('Cache operation FAILED - throwing error per NO SIMULATIONS LAW', error, {
           operation: 'fetchWithCache',
           execution: 'failed',
@@ -349,7 +351,7 @@ export class DataService {
     } catch (error) {
       console.warn('⚠️ DataService: SAM.gov fetch failed:', error.message || error);
       errors.push({ source: 'sam.gov', error: error.message || String(error) });
-      if (telemetry) telemetry.logWarning('SAM.gov fetch failed', { error: error.message || String(error) });
+      if (telemetry?.logWarning) telemetry.logWarning('SAM.gov fetch failed', { error: error.message || String(error) });
     }
 
     // Source 2: Grants.gov
@@ -369,7 +371,7 @@ export class DataService {
     } catch (error) {
       console.warn('⚠️ DataService: Grants.gov fetch failed:', error.message || error);
       errors.push({ source: 'grants.gov', error: error.message || String(error) });
-      if (telemetry) telemetry.logWarning('Grants.gov fetch failed', { error: error.message || String(error) });
+      if (telemetry?.logWarning) telemetry.logWarning('Grants.gov fetch failed', { error: error.message || String(error) });
     }
 
     // Source 3: SBIR.gov (may be down)
@@ -389,22 +391,38 @@ export class DataService {
     } catch (error) {
       console.warn('⚠️ DataService: SBIR.gov fetch failed:', error.message || error);
       errors.push({ source: 'sbir.gov', error: error.message || String(error) });
-      if (telemetry) telemetry.logWarning('SBIR.gov fetch failed', { error: error.message || String(error) });
+      if (telemetry?.logWarning) telemetry.logWarning('SBIR.gov fetch failed', { error: error.message || String(error) });
     }
 
     if (allGrants.length === 0) {
-      console.error('DataService: All live data sources failed');
-      if (telemetry) {
-        telemetry.logError('All external data sources FAILED', new Error('All sources failed'), {
-          execution: 'failed',
-          sources_attempted: ['sam.gov', 'grants.gov', 'sbir.gov'],
-          errors,
-          query: query || '',
-          agency: agency || '',
-          timestamp: new Date().toISOString()
-        });
+      // Try XML fallback (Grants.gov daily ZIP/XML extract)
+      try {
+        console.log('🔄 DataService: Attempting Grants.gov XML fallback...');
+        const xmlResult = await this.fetchFromGrantsGovXml(query, agency);
+        if (xmlResult.grants && xmlResult.grants.length > 0) {
+          allGrants.push(...xmlResult.grants);
+          sources.push('grants.gov-xml');
+          console.log(`✅ DataService: Grants.gov XML fallback returned ${xmlResult.grants.length} grants`);
+        }
+      } catch (xmlErr) {
+        console.warn('⚠️ DataService: Grants.gov XML fallback failed:', xmlErr.message || xmlErr);
+        errors.push({ source: 'grants.gov-xml', error: xmlErr.message || String(xmlErr) });
       }
-      throw new Error('All external grant data sources failed. Live data unavailable.');
+
+      if (allGrants.length === 0) {
+        console.error('DataService: All live data sources failed, including XML fallback');
+        if (telemetry?.logError) {
+          telemetry.logError('All external data sources FAILED', new Error('All sources failed'), {
+            execution: 'failed',
+            sources_attempted: ['sam.gov', 'grants.gov', 'sbir.gov', 'grants.gov-xml'],
+            errors,
+            query: query || '',
+            agency: agency || '',
+            timestamp: new Date().toISOString()
+          });
+        }
+        throw new Error('All external grant data sources failed. Live data unavailable.');
+      }
     }
 
     const deduplicatedGrants = this.mergeAndDeduplicate(allGrants, query);
@@ -428,7 +446,7 @@ export class DataService {
   async fetchFromSbirGov(query, agency) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
+
     try {
       const response = await fetch('https://www.sbir.gov/api/opportunities.json', {
         method: 'GET',
@@ -438,118 +456,116 @@ export class DataService {
           'Accept': 'application/json'
         }
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!response.ok) {
         throw new Error(`SBIR API returned ${response.status}: ${response.statusText}`);
       }
-    }
 
-    /**
-     * Fetch from SAM.gov Opportunities v2 API
-     * Requires SAM API key configured as secret
-     */
-    async fetchFromSamGov(query, agency) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-      try {
-        const now = new Date();
-        const from = new Date(now);
-        from.setDate(from.getDate() - 300); // within 1-year window; choose ~10 months
-
-        const params = new URLSearchParams();
-        // api_key is required
-        const samKey = (typeof env !== 'undefined' && env.SAM_API_KEY) ? env.SAM_API_KEY : (typeof SAM_API_KEY !== 'undefined' ? SAM_API_KEY : '');
-        if (!samKey) throw new Error('SAM_API_KEY is not configured');
-        params.set('api_key', samKey);
-
-        params.set('postedFrom', this.formatDateMMDDYYYY(from));
-        params.set('postedTo', this.formatDateMMDDYYYY(now));
-        params.set('limit', '100');
-        params.set('offset', '0');
-        if (query && query.trim()) params.set('title', query.trim());
-        if (agency && agency.trim()) params.set('deptname', agency.trim());
-
-        const url = `https://api.sam.gov/opportunities/v2/search?${params.toString()}`;
-        const response = await fetch(url, {
-          method: 'GET',
-          signal: controller.signal,
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'VoidCat Grant Search API/1.0'
-          }
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`SAM.gov API returned ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        const items = Array.isArray(data?.opportunitiesData) ? data.opportunitiesData : [];
-        const transformedGrants = this.transformSamData(items, query, agency);
-
-        return {
-          grants: transformedGrants,
-          source: 'sam.gov',
-          raw_count: items.length
-        };
-      } catch (error) {
-        clearTimeout(timeoutId);
-        throw new Error(`SAM.gov fetch failed: ${error.message}`);
-      }
-    }
-
-    /**
-     * Transform SAM.gov data to internal format
-     */
-    transformSamData(items, query, agency) {
-      if (!Array.isArray(items)) return [];
-      return items.map(item => {
-        const title = (item && (item.title || item.solicitationNumber)) || 'Federal Opportunity';
-        const department = item?.department || item?.subTier || 'Federal Agency';
-        const program = item?.baseType || item?.type || 'Federal Program';
-        const deadline = item?.responseDeadLine || item?.archiveDate || item?.postedDate || '2025-12-31';
-        const description = typeof item?.description === 'string' ? item.description : (title || 'Federal funding opportunity');
-        const grant = {
-          id: item?.noticeId || `SAM-${Date.now()}-${this.generateId()}`,
-          title,
-          agency: department,
-          program,
-          deadline,
-          amount: 'Amount TBD',
-          description,
-          eligibility: 'See opportunity details for eligibility requirements',
-          data_source: 'sam.gov'
-        };
-        grant.matching_score = this.calculateMatchingScore(grant, query);
-        return grant;
-      });
-    }
-      
       const data = await response.json();
       const opportunities = data.opportunities || data.results || data || [];
-      
+
       if (!Array.isArray(opportunities)) {
         console.warn('SBIR API returned unexpected format');
         return { grants: [] };
       }
-      
+
       const transformedGrants = this.transformSbirData(opportunities, query, agency);
-      
+
       return {
         grants: transformedGrants,
         source: 'sbir.gov',
         raw_count: opportunities.length
       };
-      
     } catch (error) {
       clearTimeout(timeoutId);
       throw new Error(`SBIR.gov fetch failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Fetch from SAM.gov Opportunities v2 API
+   * Requires SAM API key configured as secret
+   */
+  async fetchFromSamGov(query, agency) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const now = new Date();
+      const from = new Date(now);
+      from.setDate(from.getDate() - 300); // within 1-year window; choose ~10 months
+
+      const params = new URLSearchParams();
+      // api_key is required
+      const samKey = (typeof env !== 'undefined' && env.SAM_API_KEY) ? env.SAM_API_KEY : (typeof SAM_API_KEY !== 'undefined' ? SAM_API_KEY : '');
+      if (!samKey) throw new Error('SAM_API_KEY is not configured');
+      params.set('api_key', samKey);
+
+      params.set('postedFrom', this.formatDateMMDDYYYY(from));
+      params.set('postedTo', this.formatDateMMDDYYYY(now));
+      params.set('limit', '100');
+      params.set('offset', '0');
+      if (query && query.trim()) params.set('title', query.trim());
+      if (agency && agency.trim()) params.set('deptname', agency.trim());
+
+      const url = `https://api.sam.gov/opportunities/v2/search?${params.toString()}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'VoidCat Grant Search API/1.0'
+        }
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`SAM.gov API returned ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const items = Array.isArray(data?.opportunitiesData) ? data.opportunitiesData : [];
+      const transformedGrants = this.transformSamData(items, query, agency);
+
+      return {
+        grants: transformedGrants,
+        source: 'sam.gov',
+        raw_count: items.length
+      };
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw new Error(`SAM.gov fetch failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Transform SAM.gov data to internal format
+   */
+  transformSamData(items, query, agency) {
+    if (!Array.isArray(items)) return [];
+    return items.map(item => {
+      const title = (item && (item.title || item.solicitationNumber)) || 'Federal Opportunity';
+      const department = item?.department || item?.subTier || 'Federal Agency';
+      const program = item?.baseType || item?.type || 'Federal Program';
+      const deadline = item?.responseDeadLine || item?.archiveDate || item?.postedDate || '2025-12-31';
+      const description = typeof item?.description === 'string' ? item.description : (title || 'Federal funding opportunity');
+      const grant = {
+        id: item?.noticeId || `SAM-${Date.now()}-${this.generateId()}`,
+        title,
+        agency: department,
+        program,
+        deadline,
+        amount: 'Amount TBD',
+        description,
+        eligibility: 'See opportunity details for eligibility requirements',
+        data_source: 'sam.gov'
+      };
+      grant.matching_score = this.calculateMatchingScore(grant, query);
+      return grant;
+    });
   }
 
   /**
@@ -695,6 +711,100 @@ export class DataService {
   }
 
   /**
+   * Fetch and parse Grants.gov Daily XML ZIP extract
+   * URL can be overridden via env.GRANTS_GOV_DAILY_XML_URL
+   */
+  async fetchFromGrantsGovXml(query, agency) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    try {
+      const xmlUrl = (typeof env !== 'undefined' && env.GRANTS_GOV_DAILY_XML_URL)
+        ? env.GRANTS_GOV_DAILY_XML_URL
+        : 'https://www.grants.gov/grantsws/rest/opportunities/search/download?format=xml';
+
+      const res = await fetch(xmlUrl, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: { 'User-Agent': 'VoidCat Grant Search API/1.0' }
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`XML extract returned ${res.status}: ${res.statusText}`);
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      let xmlText = '';
+      if (contentType.includes('zip') || xmlUrl.toLowerCase().endsWith('.zip')) {
+        const arrBuf = new Uint8Array(await res.arrayBuffer());
+        const files = unzipSync(arrBuf);
+        const xmlEntryName = Object.keys(files).find(n => n.toLowerCase().endsWith('.xml')) || Object.keys(files)[0];
+        if (!xmlEntryName) throw new Error('ZIP did not contain any XML files');
+        xmlText = strFromU8(files[xmlEntryName]);
+      } else {
+        xmlText = await res.text();
+      }
+
+      if (!xmlText || typeof xmlText !== 'string') throw new Error('Empty XML content');
+
+      const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', allowBooleanAttributes: true });
+      const parsed = parser.parse(xmlText);
+
+      // Attempt to locate opportunities array in common schemas
+      let items = [];
+      if (Array.isArray(parsed?.opportunities?.opportunity)) {
+        items = parsed.opportunities.opportunity;
+      } else if (Array.isArray(parsed?.opportunityList?.opportunity)) {
+        items = parsed.opportunityList.opportunity;
+      } else if (Array.isArray(parsed?.Opps?.Opp)) {
+        items = parsed.Opps.Opp;
+      } else if (Array.isArray(parsed)) {
+        items = parsed;
+      }
+
+      if (!Array.isArray(items)) items = [];
+
+      const grants = items.map(item => {
+        const title = item?.opportunityTitle || item?.title || item?.OpportunityTitle || 'Federal Opportunity';
+        const agencyName = item?.agency || item?.agencyName || item?.Agency || 'Federal Agency';
+        const program = item?.opportunityCategory || item?.OpportunityCategory || item?.program || 'Federal Program';
+        const deadline = item?.closeDate || item?.CloseDate || item?.ResponseDate || item?.dueDate || '2025-12-31';
+        const description = item?.description || item?.Synopsis || item?.Summary || title;
+        const id = item?.opportunityNumber || item?.opportunityId || item?.id || `GOVXML-${Date.now()}-${this.generateId()}`;
+        const grant = {
+          id,
+          title,
+          agency: agencyName,
+          program,
+          deadline,
+          amount: 'Amount TBD',
+          description,
+          eligibility: 'See opportunity details for eligibility requirements',
+          data_source: 'grants.gov-xml'
+        };
+        grant.matching_score = this.calculateMatchingScore(grant, query);
+        return grant;
+      });
+
+      // Optional filtering by query/agency to reduce noise
+      const filtered = grants.filter(g => {
+        const okAgency = !agency || (g.agency || '').toLowerCase().includes((agency || '').toLowerCase());
+        if (!okAgency) return false;
+        if (!query) return true;
+        const q = (query || '').toLowerCase();
+        return (g.title || '').toLowerCase().includes(q) || (g.description || '').toLowerCase().includes(q);
+      });
+
+      return { grants: filtered, source: 'grants.gov-xml', raw_count: grants.length };
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw new Error(`Grants.gov XML fallback failed: ${error.message}`);
+    }
+  }
+
+  /**
    * Phase 2A: Retry wrapper with exponential backoff
    * @param {Function} operation - Async operation to retry
    * @param {number} maxRetries - Maximum retry attempts
@@ -708,7 +818,7 @@ export class DataService {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const result = await operation();
-        if (attempt > 1 && telemetry) {
+        if (attempt > 1 && telemetry?.logInfo) {
           telemetry.logInfo('Retry successful', { attempt, maxRetries });
         }
         return result;
@@ -723,7 +833,7 @@ export class DataService {
         const delay = initialDelay * Math.pow(2, attempt - 1); // Exponential backoff
         console.log(`DataService: Attempt ${attempt} failed, retrying in ${delay}ms...`);
         
-        if (telemetry) {
+        if (telemetry?.logWarning) {
           telemetry.logWarning('Retry attempt', { attempt, maxRetries, delay, error: error.message });
         }
         
@@ -830,7 +940,7 @@ export class DataService {
         };
         
         console.log(`🔍 DataService: Attempting live data fetch from grants.gov API...`);
-        if (telemetry) {
+        if (telemetry?.logInfo) {
           telemetry.logInfo('Live data fetch attempt', {
             endpoint: dataConfig.LIVE_DATA_SOURCES.GRANTS_GOV_API,
             query: query || '',
@@ -875,7 +985,7 @@ export class DataService {
         const transformedGrants = this.transformLiveGrantData(opportunitiesRaw, query);
         
         console.log(`✅ DataService: Live data fetch successful: ${transformedGrants.length} grants`);
-        if (telemetry) {
+        if (telemetry?.logInfo) {
           telemetry.logInfo('Live data fetch successful', {
             grants_count: transformedGrants.length,
             raw_data_length: opportunitiesRaw.length,
@@ -897,7 +1007,7 @@ export class DataService {
         });
         
         // NO SIMULATIONS LAW: Log failure and throw - no silent mock fallback in production
-        if (telemetry) {
+        if (telemetry?.logError) {
           telemetry.logError('Live data fetch FAILED - throwing error per NO SIMULATIONS LAW', error, {
             execution: 'failed',
             query: query || '',
@@ -914,7 +1024,7 @@ export class DataService {
     // Live data disabled - return error
     console.error('DataService: Live data is disabled');
 
-    if (telemetry) {
+    if (telemetry?.logError) {
       telemetry.logError('Live data is disabled', new Error('FEATURE_LIVE_DATA is false'), {
         execution: 'failed',
         query: query || '',
