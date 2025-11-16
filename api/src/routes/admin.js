@@ -3,7 +3,6 @@
 // NO SIMULATIONS LAW: Real operations only - actual database modifications
 
 import { Hono } from 'hono';
-import { bearerAuth } from 'hono/bearer-auth';
 import GrantIngestionService from '../services/grantIngestionService.js';
 import { TelemetryService } from '../services/telemetryService.js';
 import { initializeSchema } from '../db/connection.js';
@@ -14,28 +13,51 @@ const app = new Hono();
 // ============================================
 // SECURITY: Admin Authentication Middleware
 // ============================================
-const adminAuth = bearerAuth({
-  token: async (c) => {
-    const adminToken = c.env.ADMIN_TOKEN;
-    const authHeader = c.req.header('Authorization');
-    const providedToken = authHeader?.replace('Bearer ', '');
+// Custom middleware to handle admin authentication with environment variable
+const adminAuth = async (c, next) => {
+  const adminToken = c.env.ADMIN_TOKEN;
+  const authHeader = c.req.header('Authorization');
+  const providedToken = authHeader?.replace('Bearer ', '').trim();
 
-    console.log('[Admin Auth] Checking credentials...');
-    console.log('[Admin Auth] Has ADMIN_TOKEN env:', !!adminToken);
-    console.log('[Admin Auth] Token length:', adminToken?.length || 0);
-    console.log('[Admin Auth] Has Authorization header:', !!authHeader);
-    console.log('[Admin Auth] Provided token length:', providedToken?.length || 0);
-    console.log('[Admin Auth] Tokens match:', adminToken === providedToken);
+  console.log('[Admin Auth] Checking credentials...');
+  console.log('[Admin Auth] Has ADMIN_TOKEN env:', !!adminToken);
+  console.log('[Admin Auth] Token length:', adminToken?.length || 0);
+  console.log('[Admin Auth] Has Authorization header:', !!authHeader);
+  console.log('[Admin Auth] Provided token length:', providedToken?.length || 0);
+  console.log('[Admin Auth] Tokens match:', adminToken === providedToken);
 
-    if (!adminToken || adminToken === 'change-me-in-production') {
-      console.error('[Admin] SECURITY ALERT: ADMIN_TOKEN not configured!');
-      return null;
-    }
-    return adminToken;
-  },
-  invalidMessage: 'Invalid admin credentials',
-  unauthorizedMessage: 'Admin authentication required. Provide valid Bearer token.'
-});
+  // Check if ADMIN_TOKEN is configured
+  if (!adminToken || adminToken === 'change-me-in-production') {
+    console.error('[Admin] SECURITY ALERT: ADMIN_TOKEN not configured!');
+    return c.json({
+      success: false,
+      error: 'Admin authentication not configured',
+      code: 'AUTH_NOT_CONFIGURED'
+    }, 500);
+  }
+
+  // Check if Authorization header is present
+  if (!authHeader || !providedToken) {
+    return c.json({
+      success: false,
+      error: 'Admin authentication required. Provide valid Bearer token.',
+      code: 'AUTH_REQUIRED'
+    }, 401);
+  }
+
+  // Verify token matches
+  if (adminToken !== providedToken) {
+    console.warn('[Admin Auth] Token mismatch - authentication failed');
+    return c.json({
+      success: false,
+      error: 'Invalid admin credentials',
+      code: 'INVALID_CREDENTIALS'
+    }, 401);
+  }
+
+  console.log('[Admin Auth] Authentication successful');
+  await next();
+};
 
 app.use('/*', adminAuth);
 

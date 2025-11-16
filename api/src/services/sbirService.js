@@ -5,7 +5,7 @@
 export class SbirService {
   constructor() {
     // SBIR.gov API endpoint (public access)
-    this.apiBaseUrl = 'https://www.sbir.gov/api/opportunities.json';
+    this.apiBaseUrl = 'https://api.www.sbir.gov/public/api/solicitations';
   }
 
   /**
@@ -19,7 +19,7 @@ export class SbirService {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     // SBIR.gov public API with search parameters
-    const searchUrl = `${this.apiBaseUrl}?keyword=${encodeURIComponent(query || 'technology')}`;
+    const searchUrl = `${this.apiBaseUrl}?keyword=${encodeURIComponent(query || 'technology')}&rows=50`;
 
     const started = Date.now();
     try {
@@ -41,8 +41,9 @@ export class SbirService {
       }
 
       const data = await res.json();
-      const opportunities = Array.isArray(data) ? data : (data.opportunities || []);
-      
+      // SBIR API returns {result: [...], total: N} structure
+      const opportunities = Array.isArray(data) ? data : (data.result || data.opportunities || []);
+
       if (!Array.isArray(opportunities)) {
         return [];
       }

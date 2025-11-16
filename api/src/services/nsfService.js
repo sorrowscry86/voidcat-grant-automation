@@ -8,21 +8,37 @@ export default class NsfService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const url = `https://api.nsf.gov/services/v1/awards.json?keyword=${encodeURIComponent(query || "")}\u0026printFields=award\u005BawardID,title,abstractText,agency,awardEffectiveDate,expirationDate,fundsObligatedAmt,programElement\u005D`;
+    // Properly construct the URL with correct encoding
+    const printFields = 'award[awardID,title,abstractText,agency,awardEffectiveDate,expirationDate,fundsObligatedAmt,programElement]';
+    const params = new URLSearchParams({
+      keyword: query || '',
+      printFields: printFields,
+      rpp: '25'
+    });
+    const url = `https://api.nsf.gov/services/v1/awards.json?${params.toString()}`;
 
     const started = Date.now();
     try {
-      const res = await fetch(url, { method: 'GET', signal: controller.signal, headers: { 'User-Agent': 'VoidCat Grant Search API/1.0', 'Accept': 'application/json' } });
+      const res = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'VoidCat Grant Search API/1.0',
+          'Accept': 'application/json'
+        }
+      });
       clearTimeout(timeoutId);
 
       if (!res.ok) {
-        throw new Error(`NSF API returned ${res.status}: ${res.statusText}`);
+        console.warn(`NSF API returned ${res.status}: ${res.statusText}`);
+        // Return empty array on error instead of throwing
+        return [];
       }
 
       const json = await res.json();
       const items = (json.response && json.response.award) ? json.response.award : [];
       if (!Array.isArray(items)) {
-        return { grants: [], source: 'nsf.gov-awards', raw_count: 0 };
+        return [];
       }
 
       const transformed = this.transform(items, query, agencyFilter);
@@ -31,13 +47,16 @@ export default class NsfService {
         telemetry.trackDataSourceFetch('nsf.gov-awards', true, Date.now() - started, transformed.length);
       }
 
-      return { grants: transformed, source: 'nsf.gov-awards', raw_count: items.length };
+      // Return array directly to match ingestion service expectations
+      return transformed;
     } catch (error) {
       clearTimeout(timeoutId);
       if (telemetry && typeof telemetry.trackDataSourceFetch === 'function') {
         telemetry.trackDataSourceFetch('nsf.gov-awards', false, Date.now() - started, 0, error.message);
       }
-      throw new Error(`NSF awards fetch failed: ${error.message}`);
+      // Return empty array on error instead of throwing
+      console.error(`NSF awards fetch failed: ${error.message}`);
+      return [];
     }
   }
 
