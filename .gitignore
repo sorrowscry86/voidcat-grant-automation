@@ -12,9 +12,13 @@ yarn-error.log
 # Ignore everything in node_modules except package-lock.json
 node_modules/*
 !node_modules/package-lock.json
+# Ignore npm cache files in node_modules
+node_modules/.package-lock.json
 # Ignore everything in api/node_modules except package-lock.json
 api/node_modules/*
 !api/node_modules/package-lock.json
+# Ignore npm cache files in api/node_modules
+api/node_modules/.package-lock.json
 # Ignore everything in node_modules/.bin except playwright
 node_modules/.bin/*
 !node_modules/.bin/playwright

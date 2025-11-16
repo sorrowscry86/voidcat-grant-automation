@@ -95,10 +95,50 @@ export class TelemetryService {
       request_id: requestId,
       performance: {
         slow_request: duration > 1000
+      },
+      endpoint_identifier: this.identifyEndpoint(method, path),
+      feature_flags: {
+        live_data: this.env.FEATURE_LIVE_DATA || false,
+        real_ai: this.env.FEATURE_REAL_AI || false
       }
     });
 
     console.log(JSON.stringify(logEntry));
+  }
+
+  /**
+   * Identify endpoint by method and path for better tracking
+   */
+  identifyEndpoint(method, path) {
+    const routes = [
+      { pattern: /^\/health$/, name: 'health_check' },
+      { pattern: /^\/health\/detailed$/, name: 'health_detailed' },
+      { pattern: /^\/api\/grants\/search/, name: 'grants_search' },
+      { pattern: /^\/api\/grants\/federal-agencies/, name: 'federal_agencies_list' },
+      { pattern: /^\/api\/grants\/validate-eligibility/, name: 'compliance_validate_eligibility' },
+      { pattern: /^\/api\/grants\/generate-budget-justification/, name: 'compliance_budget_justification' },
+      { pattern: /^\/api\/grants\/generate-ai-proposal/, name: 'ai_proposal_generation' },
+      { pattern: /^\/api\/grants\/generate-proposal/, name: 'proposal_generation' },
+      { pattern: /^\/api\/grants\/stats/, name: 'grants_stats' },
+      { pattern: /^\/api\/grants\/[^\/]+$/, name: 'grants_get_by_id' },
+      { pattern: /^\/api\/users\/register/, name: 'user_registration' },
+      { pattern: /^\/api\/users\/me/, name: 'user_profile' },
+      { pattern: /^\/api\/auth\/login/, name: 'auth_login' },
+      { pattern: /^\/api\/auth\/refresh/, name: 'auth_refresh_token' },
+      { pattern: /^\/api\/dashboard\/metrics/, name: 'dashboard_metrics' },
+      { pattern: /^\/api\/admin\/populate-database/, name: 'admin_db_populate' },
+      { pattern: /^\/api\/stripe\/create-checkout/, name: 'stripe_checkout' },
+      { pattern: /^\/api\/stripe\/webhook/, name: 'stripe_webhook' },
+      { pattern: /^\/$/, name: 'root_info' }
+    ];
+
+    for (const route of routes) {
+      if (route.pattern.test(path)) {
+        return `${method.toUpperCase()}_${route.name}`;
+      }
+    }
+
+    return `${method.toUpperCase()}_unknown_${path.replace(/\//g, '_')}`;
   }
 
   /**

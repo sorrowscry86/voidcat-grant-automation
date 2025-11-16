@@ -66,28 +66,46 @@ jobs:
         run: |
           npx wrangler deploy --env production
 
-      - name: Sync Stripe secrets to Cloudflare (optional)
-        # Always run - internal checks will skip if secrets not set
-        if: always()
+      - name: Sync secrets to Cloudflare (optional)
+        # Only run if deployment succeeded
+        if: success()
         working-directory: ./api
         shell: bash
         run: |
-          if [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ]; then 
+          echo "Syncing secrets to Cloudflare Worker..."
+
+          # Wait a moment for deployment to fully propagate
+          sleep 5
+
+          # Sync Stripe secrets
+          if [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ]; then
             echo "Setting STRIPE_SECRET_KEY..."
-            echo "${{ secrets.STRIPE_SECRET_KEY }}" | npx wrangler secret put STRIPE_SECRET_KEY --env production
+            echo "${{ secrets.STRIPE_SECRET_KEY }}" | npx wrangler secret put STRIPE_SECRET_KEY --env production || echo "⚠️ Warning: Failed to set STRIPE_SECRET_KEY"
           fi
-          if [ -n "${{ secrets.STRIPE_PUBLISHABLE_KEY }}" ]; then 
+          if [ -n "${{ secrets.STRIPE_PUBLISHABLE_KEY }}" ]; then
             echo "Setting STRIPE_PUBLISHABLE_KEY..."
-            echo "${{ secrets.STRIPE_PUBLISHABLE_KEY }}" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env production
+            echo "${{ secrets.STRIPE_PUBLISHABLE_KEY }}" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env production || echo "⚠️ Warning: Failed to set STRIPE_PUBLISHABLE_KEY"
           fi
-          if [ -n "${{ secrets.STRIPE_PRICE_ID }}" ]; then 
+          if [ -n "${{ secrets.STRIPE_PRICE_ID }}" ]; then
             echo "Setting STRIPE_PRICE_ID..."
-            echo "${{ secrets.STRIPE_PRICE_ID }}" | npx wrangler secret put STRIPE_PRICE_ID --env production
+            echo "${{ secrets.STRIPE_PRICE_ID }}" | npx wrangler secret put STRIPE_PRICE_ID --env production || echo "⚠️ Warning: Failed to set STRIPE_PRICE_ID"
           fi
-          if [ -n "${{ secrets.STRIPE_WEBHOOK_SECRET }}" ]; then 
+          if [ -n "${{ secrets.STRIPE_WEBHOOK_SECRET }}" ]; then
             echo "Setting STRIPE_WEBHOOK_SECRET..."
-            echo "${{ secrets.STRIPE_WEBHOOK_SECRET }}" | npx wrangler secret put STRIPE_WEBHOOK_SECRET --env production
+            echo "${{ secrets.STRIPE_WEBHOOK_SECRET }}" | npx wrangler secret put STRIPE_WEBHOOK_SECRET --env production || echo "⚠️ Warning: Failed to set STRIPE_WEBHOOK_SECRET"
           fi
+
+          # Sync AI API keys for FEATURE_REAL_AI
+          if [ -n "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            echo "Setting ANTHROPIC_API_KEY..."
+            echo "${{ secrets.ANTHROPIC_API_KEY }}" | npx wrangler secret put ANTHROPIC_API_KEY --env production || echo "⚠️ Warning: Failed to set ANTHROPIC_API_KEY"
+          fi
+          if [ -n "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "Setting OPENAI_API_KEY..."
+            echo "${{ secrets.OPENAI_API_KEY }}" | npx wrangler secret put OPENAI_API_KEY --env production || echo "⚠️ Warning: Failed to set OPENAI_API_KEY"
+          fi
+
+          echo "✅ Secrets sync completed"
 
       - name: Verify Deployment
         run: |
