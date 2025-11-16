@@ -1,10 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { HomePage } from './pages/HomePage';
+import { mockGrantSearchAPI, mockGrantSearchAPIEmpty, mockGrantSearchAPIFailure } from './utils/apiMockHelpers';
 
 let homePage: HomePage;
 
 test.describe('Grant Search Functionality', () => {
   test.beforeEach(async ({ page }) => {
+    // Setup API mocking before navigating to the page
+    await mockGrantSearchAPI(page);
+    
     homePage = new HomePage(page);
     await homePage.goto();
     await homePage.waitForPageLoad();
@@ -101,6 +105,59 @@ test.describe('Grant Search Functionality', () => {
       
       // Should show either results or empty state
       await homePage.verifySearchResults();
+    });
+  });
+
+  test.describe('Search Results Display', () => {
+    test('should display grant cards with correct data', async () => {
+      await homePage.searchFor('AI');
+      await homePage.waitForSearchResults();
+      
+      // Verify grant cards are present
+      const grantCards = await homePage.page.locator('.grant-card').count();
+      expect(grantCards).toBeGreaterThan(0);
+      
+      // Verify first grant card has expected content
+      const firstCard = homePage.page.locator('.grant-card').first();
+      await expect(firstCard).toContainText('AI Research Grant');
+      await expect(firstCard).toContainText('National Science Foundation');
+    });
+
+    test('should display empty state when no results', async ({ page }) => {
+      // Mock empty results
+      await mockGrantSearchAPIEmpty(page);
+      
+      await homePage.searchFor('nonexistent grant');
+      await homePage.waitForSearchResults();
+      
+      // Verify empty state is shown
+      await homePage.verifyEmptyState();
+    });
+
+    test('should show error message when API fails', async ({ page }) => {
+      // Mock API failure
+      await mockGrantSearchAPIFailure(page);
+      
+      await homePage.searchFor('AI');
+      await homePage.waitForSearchResults();
+      
+      // Should show error notification
+      const errorMessage = page.getByText(/temporarily unavailable/i);
+      await expect(errorMessage).toBeVisible({ timeout: 10000 });
+    });
+  });
+
+  test.describe('Search Persistence', () => {
+    test('should maintain search parameters after search', async () => {
+      const searchTerm = 'defense technology';
+      const agency = 'Department of Defense';
+      
+      await homePage.searchFor(searchTerm, agency);
+      await homePage.waitForSearchResults();
+      
+      // Verify values are maintained
+      await expect(homePage.searchInput).toHaveValue(searchTerm);
+      await expect(homePage.agencySelect).toHaveValue('defense');
     });
   });
 });
