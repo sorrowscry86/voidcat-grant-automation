@@ -17,6 +17,16 @@ const app = new Hono();
 const adminAuth = bearerAuth({
   token: async (c) => {
     const adminToken = c.env.ADMIN_TOKEN;
+    const authHeader = c.req.header('Authorization');
+    const providedToken = authHeader?.replace('Bearer ', '');
+
+    console.log('[Admin Auth] Checking credentials...');
+    console.log('[Admin Auth] Has ADMIN_TOKEN env:', !!adminToken);
+    console.log('[Admin Auth] Token length:', adminToken?.length || 0);
+    console.log('[Admin Auth] Has Authorization header:', !!authHeader);
+    console.log('[Admin Auth] Provided token length:', providedToken?.length || 0);
+    console.log('[Admin Auth] Tokens match:', adminToken === providedToken);
+
     if (!adminToken || adminToken === 'change-me-in-production') {
       console.error('[Admin] SECURITY ALERT: ADMIN_TOKEN not configured!');
       return null;
@@ -36,22 +46,70 @@ app.use('/*', adminAuth);
 app.post('/grants/init-schema', async (c) => {
   try {
     const db = c.env.VOIDCAT_DB;
-    
-    // Execute schema SQL statements from canonical JS export
-    const statements = GRANTS_SCHEMA_SQL.split(';').filter(s => s.trim());
-    
-    for (const statement of statements) {
-      if (statement.trim()) {
-        await db.prepare(statement).run();
+
+    // Split SQL properly - triggers contain semicolons, need smarter parsing
+    const statements = [];
+    let current = '';
+    let inTrigger = false;
+
+    for (const line of GRANTS_SCHEMA_SQL.split('\n')) {
+      const trimmed = line.trim();
+
+      // Skip pure comment lines
+      if (trimmed.startsWith('--')) {
+        continue;
+      }
+
+      if (trimmed.startsWith('CREATE TRIGGER') || trimmed.startsWith('CREATE TABLE') ||
+          trimmed.startsWith('CREATE VIRTUAL TABLE') || trimmed.startsWith('CREATE INDEX')) {
+        if (current.trim()) {
+          statements.push(current.trim());
+        }
+        current = line + '\n';
+        if (trimmed.startsWith('CREATE TRIGGER')) {
+          inTrigger = true;
+        }
+      } else if (trimmed.length > 0) {
+        current += line + '\n';
+        if (inTrigger && trimmed === 'END;') {
+          statements.push(current.trim());
+          current = '';
+          inTrigger = false;
+        } else if (!inTrigger && trimmed.endsWith(';')) {
+          statements.push(current.trim());
+          current = '';
+        }
       }
     }
-    
+
+    if (current.trim() && current.trim().length > 5) {
+      statements.push(current.trim());
+    }
+
+    // Execute each statement
+    console.log(`[Admin] Parsed ${statements.length} SQL statements`);
+    for (let i = 0; i < statements.length; i++) {
+      const statement = statements[i];
+      if (statement && statement.length > 5 && !statement.startsWith('--')) {
+        console.log(`[Admin] Executing statement ${i + 1}/${statements.length}: ${statement.substring(0, 50)}...`);
+        try {
+          await db.prepare(statement).run();
+        } catch (err) {
+          console.error(`[Admin] Statement ${i + 1} failed:`, err.message);
+          console.error(`[Admin] Failed statement:`, statement);
+          throw err;
+        }
+      } else {
+        console.log(`[Admin] Skipping empty/comment statement ${i + 1}`);
+      }
+    }
+
     return c.json({
       success: true,
       message: 'Grants database schema initialized successfully',
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('[Admin] Schema initialization failed:', error);
     return c.json({

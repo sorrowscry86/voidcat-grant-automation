@@ -3,7 +3,7 @@
 import { Hono } from 'hono';
 import RateLimiter from '../services/rateLimiter.js';
 import ConfigService from '../services/configService.js';
-import dataServiceFactory from '../services/dataServiceFactory.js';
+import DatabaseGrantService from '../services/databaseGrantService.js';
 import FederalAgencyService from '../services/federalAgencyService.js';
 import SemanticAnalysisService from '../services/semanticAnalysisService.js';
 import DeadlineTrackingService from '../services/deadlineTrackingService.js';
@@ -40,135 +40,56 @@ grants.get('/search', async (c) => {
       }, 400);
     }
     
-    // Use DataService for both live and mock data
-    let filteredGrants;
-    let actualDataSource;
-    let fallbackOccurred;
-    let dataSourceError;
-    
     try {
-      // Get DataService instance from factory with proper configuration
-      const dataService = await dataServiceFactory.getInstance({ live_data: dataConfig });
-      let fetchResult;
-      
-      // PRODUCTION MODE: Use enhanced data fetching with caching and multi-source aggregation
-      try {
-        // Use Phase 2A enhanced method with KV caching and multi-source
-        fetchResult = await dataService.fetchWithCache(query, agency, c.env, c.get('telemetry'));
+        // Get DataService instance from D1 binding
+        const dbService = new DatabaseGrantService(c.env.VOIDCAT_DB);
 
-        // Log successful real data fetch
-        const telemetry = c.get('telemetry');
-        if (telemetry) {
-          telemetry.logInfo('Live data fetch SUCCESS', {
-            execution: 'real',
-            query: query || '',
-            agency: agency || '',
-            count: fetchResult.grants.length,
-            timestamp: new Date().toISOString()
-          });
-        }
-      } catch (liveDataError) {
-        // NO SIMULATIONS LAW: Log failure and return error response
-        console.error('Live data fetch failed:', liveDataError);
+        // Perform database search with filters
+        const results = await dbService.searchGrants(query, {
+            agency: agency,
+            status: 'active',
+            limit: 50,
+            offset: 0,
+            sortBy: 'matching_score',
+            sortOrder: 'DESC'
+        });
+
+        // Get total count
+        const totalCount = results.length;
 
         const telemetry = c.get('telemetry');
         if (telemetry) {
-          telemetry.logError('Live data fetch FAILED', liveDataError, {
-            execution: 'failed',
-            query: query || '',
-            agency: agency || '',
-            timestamp: new Date().toISOString()
-          });
+            telemetry.trackGrantSearch(query, agency, results.length, 'database', false);
         }
 
         return c.json({
-          success: false,
-          error: 'Live grant data is temporarily unavailable. Please try again later.',
-          code: 'LIVE_DATA_UNAVAILABLE',
-          message: liveDataError.message,
-          execution_type: 'failed'
-        }, 503);
-      }
-      
-      filteredGrants = fetchResult.grants;
-      actualDataSource = fetchResult.actualDataSource;
-      fallbackOccurred = fetchResult.fallbackOccurred;
-      dataSourceError = fetchResult.error;
-    } catch (dataError) {
-      console.error('Grant data fetch failed:', dataError);
-      
-      const telemetry = c.get('telemetry');
-      if (telemetry) {
-        telemetry.logError('Grant data service error', dataError, {
-          execution: 'failed',
-          timestamp: new Date().toISOString()
+            success: true,
+            count: totalCount,
+            grants: results,
+            data_source: 'database', // Correctly reports 'database'
+            fallback_occurred: false,
+            execution_type: 'database', // A new, accurate execution type
+            timestamp: new Date().toISOString(),
+            live_data_ready: true,
+            search_params: { query, agency, deadline, amount, program, opportunityType }
         });
-      }
-      
-      return c.json({
-        success: false,
-        error: 'Grant database is temporarily unavailable. Please try again in a few minutes.',
-        code: 'DATA_SOURCE_UNAVAILABLE',
-        execution_type: 'failed'
-      }, 503);
-    }
-    
-    try {
-      // Apply basic filters to live data
-      if (deadline) {
-        // Use robust date parsing
-        const targetDate = new Date(deadline);
-        if (isNaN(targetDate.getTime())) {
-          return c.json({
-            success: false,
-            error: 'Invalid deadline format. Please use a valid date format (e.g., YYYY-MM-DD).',
-            code: 'INVALID_DATE_FORMAT'
-          }, 400);
+
+    } catch (error) {
+        console.error('Database search failed:', error);
+        const telemetry = c.get('telemetry');
+        if (telemetry) {
+            telemetry.logError('Database search FAILED', error, {
+                execution: 'failed',
+                query: query || '',
+                agency: agency || '',
+            });
         }
-
-        // Filter grants with safe date parsing
-        filteredGrants = filteredGrants.filter(grant => {
-          if (!grant.deadline) return false;
-
-          try {
-            const grantDeadline = new Date(grant.deadline);
-            // Skip grants with invalid deadline dates
-            if (isNaN(grantDeadline.getTime())) {
-              console.warn(`Grant ${grant.id} has invalid deadline: ${grant.deadline}`);
-              return false;
-            }
-            return grantDeadline <= targetDate;
-          } catch (e) {
-            console.warn(`Error parsing deadline for grant ${grant.id}:`, e);
-            return false;
-          }
-        });
-      }
-
-      // Track grant search metrics
-      const telemetry = c.get('telemetry');
-      if (telemetry) {
-        telemetry.trackGrantSearch(query, agency, filteredGrants.length, actualDataSource, fallbackOccurred);
-      }
-
-      return c.json({
-        success: true,
-        count: filteredGrants.length,
-        grants: filteredGrants,
-        data_source: actualDataSource,
-        fallback_occurred: fallbackOccurred,
-        timestamp: new Date().toISOString(),
-        live_data_ready: dataConfig.USE_LIVE_DATA,
-        search_params: { query, agency, deadline, amount, program, opportunityType },
-        ...(fallbackOccurred && dataSourceError && { fallback_reason: dataSourceError })
-      });
-    } catch (filterError) {
-      console.error('Grant filtering failed:', filterError);
-      return c.json({
-        success: false,
-        error: 'Error processing search results. Please try again.',
-        code: 'SEARCH_PROCESSING_ERROR'
-      }, 500);
+        return c.json({
+            success: false,
+            error: 'Grant search service is temporarily unavailable.',
+            code: 'DATABASE_SEARCH_ERROR',
+            execution_type: 'failed'
+        }, 503);
     }
 
   } catch (error) {
