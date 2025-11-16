@@ -146,6 +146,10 @@ GRANTS_GOV_API_URL="https://api.grants.gov/v1/api/search2"
 SBIR_API_URL="https://www.sbir.gov/api/opportunities.json"
 NSF_API_URL="https://www.nsf.gov/awardsearch/download.jsp"
 
+# SAM.gov Opportunities API (Public API with key)
+# Register for a free API key at SAM.gov → Account Details
+SAM_API_KEY="your_sam_gov_api_key"
+
 # Live data timeout in milliseconds
 LIVE_DATA_TIMEOUT="15000"
 ```

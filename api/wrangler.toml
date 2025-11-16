@@ -78,6 +78,10 @@ bucket_name = "voidcat-assets"
 # OPENAI_API_KEY = "sk-proj-..." # Set via: wrangler secret put OPENAI_API_KEY
 # These are configured by scripts/setup-phase2a.sh
 
+# Federal Data Sources - Secrets (Set via Cloudflare secrets)
+# SAM_API_KEY = "<your_sam_gov_api_key>" # Set via: wrangler secret put SAM_API_KEY
+# Note: SAM.gov Opportunities v2 API requires an API key and a postedFrom/postedTo date range.
+
 # Legacy variable names (supported for backward compatibility):
 # STRIPE_SK = "sk_live_..." # Fallback for STRIPE_SECRET_KEY
 # STRIPE_PUBLIC_KEY = "pk_live_..." # Fallback for STRIPE_PUBLISHABLE_KEY
