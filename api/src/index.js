@@ -267,7 +267,9 @@ export default {
     try {
       console.log('🕐 Scheduled grant ingestion triggered at:', new Date().toISOString());
       
-      const { handleScheduledIngestion } = await import('./workers/grantIngestionWorker.js');
+      // Use dynamic concatenation to avoid bundler including the worker at build-time
+      const workerPath = './workers/' + 'grantIngestionWorker.js';
+      const { handleScheduledIngestion } = await import(workerPath);
       await handleScheduledIngestion(env);
       
       console.log('✅ Scheduled grant ingestion completed successfully');

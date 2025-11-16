@@ -37,7 +37,7 @@ app.post('/grants/init-schema', async (c) => {
   try {
     const db = c.env.VOIDCAT_DB;
     
-    // Execute schema SQL statements
+    // Execute schema SQL statements from canonical JS export
     const statements = GRANTS_SCHEMA_SQL.split(';').filter(s => s.trim());
     
     for (const statement of statements) {
