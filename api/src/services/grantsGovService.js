@@ -4,8 +4,8 @@
 
 export class GrantsGovService {
   constructor() {
-    // Grants.gov API endpoint (public access)
-    this.apiBaseUrl = 'https://www.grants.gov/grantsws/rest/opportunities/search';
+    // Grants.gov API endpoint (new search2 API - requires POST)
+    this.apiBaseUrl = 'https://api.grants.gov/v1/api/search2';
   }
 
   /**
@@ -18,20 +18,23 @@ export class GrantsGovService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    // Grants.gov public search endpoint
-    const searchUrl = `${this.apiBaseUrl}?keyword=${encodeURIComponent(query || 'technology')}`;
-
     const started = Date.now();
     try {
-      const res = await fetch(searchUrl, {
-        method: 'GET',
+      // Grants.gov search2 API requires POST with JSON body
+      const res = await fetch(this.apiBaseUrl, {
+        method: 'POST',
         signal: controller.signal,
         headers: {
           'User-Agent': 'VoidCat Grant Search API/1.0',
-          'Accept': 'application/json'
-        }
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          keyword: query || 'technology',
+          oppStatuses: ['posted', 'forecasted']
+        })
       });
-      
+
       clearTimeout(timeoutId);
 
       if (!res.ok) {
@@ -41,8 +44,9 @@ export class GrantsGovService {
       }
 
       const data = await res.json();
-      const opportunities = data.opportunitySearchResult?.opportunities || [];
-      
+      // The search2 API returns opportunities in a different structure
+      const opportunities = data.oppHits || [];
+
       if (!Array.isArray(opportunities)) {
         return [];
       }
