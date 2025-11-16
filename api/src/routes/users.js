@@ -148,25 +148,13 @@ users.post('/register', async (c) => {
         timestamp: new Date().toISOString()
       });
       
-      // For production, return proper error instead of demo mode
-      if (c.env.ENVIRONMENT === 'production') {
-        return c.json({
-          success: false,
-          error: 'Registration service is temporarily unavailable. Please try again in a few minutes.',
-          message: 'If this problem persists, please contact support',
-          code: 'REGISTRATION_SERVICE_ERROR'
-        }, 503);
-      }
-      
-      // Demo mode fallback only for development
-      console.warn('Using demo mode fallback - this should not happen in production');
+      // NO SIMULATIONS LAW: Return proper error response, no demo mode fallback
       return c.json({
-        success: true,
-        message: 'User registered successfully (demo mode)',
-        api_key: apiKey,
-        subscription_tier: 'free',
-        demo_mode: true
-      });
+        success: false,
+        error: 'Registration service is temporarily unavailable. Please try again in a few minutes.',
+        message: 'If this problem persists, please contact support',
+        code: 'REGISTRATION_SERVICE_ERROR'
+      }, 503);
     }
 
   } catch (error) {
@@ -226,29 +214,13 @@ users.get('/me', async (c) => {
         timestamp: new Date().toISOString()
       });
       
-      // For production, return proper error instead of demo mode
-      if (c.env.ENVIRONMENT === 'production') {
-        return c.json({
-          success: false,
-          error: 'Authentication service is temporarily unavailable. Please try again in a few minutes.',
-          message: 'If this problem persists, please contact support',
-          code: 'AUTH_SERVICE_UNAVAILABLE'
-        }, 503);
-      }
-      
-      // Demo mode fallback only for development
-      console.warn('Using demo mode fallback for authentication');
+      // NO SIMULATIONS LAW: Return proper error response, no demo mode fallback
       return c.json({
-        success: true,
-        user: {
-          id: 1,
-          email: 'demo@voidcat.com',
-          subscription_tier: 'free',
-          usage_count: 0,
-          created_at: new Date().toISOString()
-        },
-        demo_mode: true
-      });
+        success: false,
+        error: 'Authentication service is temporarily unavailable. Please try again in a few minutes.',
+        message: 'If this problem persists, please contact support',
+        code: 'AUTH_SERVICE_UNAVAILABLE'
+      }, 503);
     }
 
   } catch (error) {
