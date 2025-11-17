@@ -3,7 +3,7 @@
 import { Hono } from 'hono';
 import EmailService from '../services/emailService.js';
 import { getDB, initializeSchema } from '../db/connection.js';
-
+import crypto from 'crypto';
 const users = new Hono();
 
 // Database initialization flag to prevent multiple schema initializations
@@ -54,7 +54,14 @@ users.post('/register', async (c) => {
     }
     
     // Generate API key with safe fallback
-    const apiKey = (() => { try { return crypto.randomUUID(); } catch { return `key_${Math.random().toString(36).slice(2)}_${Date.now()}`; } })();
+    const apiKey = (() => { 
+      try { 
+        return crypto.randomUUID(); 
+      } catch { 
+        // Secure fallback: generate 32 bytes (256 bits) and hex-encode
+        return `key_${crypto.randomBytes(32).toString('hex')}_${Date.now()}`;
+      } 
+    })();
     
     try {
       const db = await getDB(c.env);
