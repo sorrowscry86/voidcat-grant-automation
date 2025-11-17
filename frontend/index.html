@@ -131,10 +131,10 @@
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 mb-8">
             <h2 class="text-xl font-semibold mb-4 dark:text-white">🔍 Search Grant Opportunities</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <input x-model="searchQuery" 
+          <input x-model="searchQuery"
               placeholder="Search keywords (AI, defense, energy...)" aria-label="Search keywords"
                        class="border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:text-white">
-                <select x-model="selectedAgency" 
+                <select x-model="selectedAgency"
                         class="border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white">
                     <option value="">All Agencies</option>
                     <option value="defense">Department of Defense</option>
@@ -143,15 +143,24 @@
                     <option value="darpa">DARPA</option>
                     <option value="nasa">NASA</option>
                 </select>
-                <button @click="searchGrants()" 
+                <button @click="searchGrants()"
                         :disabled="loading"
                         class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
                     <span x-show="!loading">Search Grants</span>
                     <span x-show="loading">Searching...</span>
                 </button>
             </div>
-            <div x-show="grants.length > 0" class="text-sm text-gray-600 dark:text-gray-300">
-                Found <span x-text="grants.length"></span> matching opportunities
+            <div class="flex items-center justify-between">
+                <div x-show="grants.length > 0" class="text-sm text-gray-600 dark:text-gray-300">
+                    Found <span x-text="grants.length"></span> matching opportunities
+                </div>
+                <div x-show="savedGrants.length > 0" class="flex items-center gap-2">
+                    <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 cursor-pointer">
+                        <input type="checkbox" x-model="showOnlySaved"
+                               class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <span>Show only saved grants (<span x-text="savedGrants.length"></span>)</span>
+                    </label>
+                </div>
             </div>
         </div>        <!-- Registration Modal -->
         <div x-show="showRegister" 
@@ -537,7 +546,7 @@
 
         <!-- Grant Results -->
         <div x-show="grants.length > 0" class="space-y-4">
-            <template x-for="grant in grants" :key="grant.id">
+            <template x-for="grant in filteredGrants" :key="grant.id">
                 <div class="grant-card bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex-1">
@@ -567,17 +576,19 @@
                     </p>
                     
                     <div class="flex flex-wrap gap-3">
-                        <button @click="viewGrant(grant.id)" 
+                        <button @click="viewGrant(grant.id)"
                                 class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm">
                             📋 View Details
                         </button>
-                        <button @click="generateProposal(grant.id)" 
+                        <button @click="generateProposal(grant.id)"
                                 :disabled="!user"
                                 class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 transition-colors text-sm">
                             🤖 Generate Proposal
                         </button>
-                        <button class="border border-gray-300 dark:border-gray-600 px-4 py-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm dark:text-white">
-                            💾 Save for Later
+                        <button @click="toggleSaveGrant(grant.id)"
+                                :class="isSaved(grant.id) ? 'bg-yellow-500 text-white hover:bg-yellow-600' : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white'"
+                                class="px-4 py-2 rounded transition-colors text-sm">
+                            <span x-text="isSaved(grant.id) ? '⭐ Saved' : '💾 Save for Later'"></span>
                         </button>
                     </div>
                 </div>
@@ -756,19 +767,34 @@
 
         // ... (crypto helpers above) ...
 
+        // Constants
+        const MIN_VALID_YEAR = 2024;
+
         function grantApp() {
             return {
                 // State
                 user: null,
                 apiKey: null, // will be initialized async in init()
                 grants: [],
+                savedGrants: [],
                 darkMode: false,
                 // Async initialization (called automatically by Alpine.js)
                 async init() {
                     // Initialize dark mode from localStorage
                     this.darkMode = localStorage.getItem('darkMode') === 'true';
                     this.applyDarkMode();
-                    
+
+                    // Load saved grants from localStorage
+                    const savedGrantsData = localStorage.getItem('voidcat_saved_grants');
+                    if (savedGrantsData) {
+                        try {
+                            this.savedGrants = JSON.parse(savedGrantsData);
+                        } catch (e) {
+                            console.error('Error loading saved grants:', e);
+                            this.savedGrants = [];
+                        }
+                    }
+
                     // If user has provided email before, use as passphrase. Otherwise, static for demo.
                     let stored = localStorage.getItem('voidcat_api_key');
                     if (stored) {
@@ -822,6 +848,7 @@
                 // Form data
                 searchQuery: '',
                 selectedAgency: '',
+                showOnlySaved: false,
                 
                 registerForm: {
                     name: '',
@@ -1014,42 +1041,15 @@
                 },
 
                 // View grant details
-                async viewGrant(grantId) {
-                    try {
-                        const response = await fetch(`${this.apiBase}/api/grants/${grantId}`);
-                        const data = await response.json();
-                        
-                        if (data.success) {
-                            const grant = data.grant;
-                            const details = `
-📋 Grant Details: ${grant.title}
+                viewGrant(grantId) {
+                    // Find grant in local grants array
+                    const grant = this.grants.find(g => g.id === grantId);
 
-🏛️ Agency: ${grant.agency}
-💰 Amount: ${grant.amount}
-📅 Deadline: ${this.formatDate(grant.deadline)}
-
-📝 Description:
-${grant.full_description}
-
-✅ Requirements:
-${grant.requirements.map(r => '• ' + r).join('\n')}
-
-⚖️ Evaluation Criteria:
-${grant.evaluation_criteria.map(c => '• ' + c).join('\n')}
-
-📄 Submission Requirements:
-${grant.submission_requirements.map(s => '• ' + s).join('\n')}
-
-📞 Contact:
-${grant.contact.name}
-${grant.contact.email}
-${grant.contact.phone}
-                            `;
-                            this.showGrantDetails(grant);
-                        }
-                    } catch (error) {
-                        console.error('Error viewing grant:', error);
-                        this.showError('Error loading grant details. Please try again.');
+                    if (grant) {
+                        // Show grant details modal with the grant data
+                        this.showGrantDetails(grant);
+                    } else {
+                        this.showError('Grant not found. Please search again.');
                     }
                 },
 
@@ -1225,7 +1225,7 @@ Note: This is an AI-generated draft. Review and customize before submission.
                 // Copy proposal to clipboard
                 async copyProposalToClipboard() {
                     if (!this.currentProposal) return;
-                    
+
                     try {
                         const content = this.currentProposal.proposal || this.currentProposal;
                         await navigator.clipboard.writeText(content);
@@ -1235,9 +1235,48 @@ Note: This is an AI-generated draft. Review and customize before submission.
                     }
                 },
 
+                // Save for Later functionality
+                toggleSaveGrant(grantId) {
+                    const index = this.savedGrants.indexOf(grantId);
+
+                    if (index > -1) {
+                        // Grant is already saved, remove it
+                        this.savedGrants.splice(index, 1);
+                        this.showNotification('Grant removed from saved list', 'info');
+                    } else {
+                        // Save the grant
+                        this.savedGrants.push(grantId);
+                        this.showNotification('Grant saved for later! 💾', 'success');
+                    }
+
+                    // Persist to localStorage
+                    localStorage.setItem('voidcat_saved_grants', JSON.stringify(this.savedGrants));
+                },
+
+                isSaved(grantId) {
+                    return this.savedGrants.includes(grantId);
+                },
+
+                // Computed property for filtered grants
+                get filteredGrants() {
+                    if (this.showOnlySaved) {
+                        return this.grants.filter(grant => this.isSaved(grant.id));
+                    }
+                    return this.grants;
+                },
+
                 // Utilities
                 formatDate(dateString) {
-                    return new Date(dateString).toLocaleDateString('en-US', {
+                    if (!dateString) return 'TBD';
+
+                    const date = new Date(dateString);
+
+                    // Check if date is valid and not the Unix epoch (1969-12-31)
+                    if (isNaN(date.getTime()) || date.getFullYear() < MIN_VALID_YEAR) {
+                        return 'TBD';
+                    }
+
+                    return date.toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric'
