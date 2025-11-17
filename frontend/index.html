@@ -546,7 +546,7 @@
 
         <!-- Grant Results -->
         <div x-show="grants.length > 0" class="space-y-4">
-            <template x-for="grant in (showOnlySaved ? grants.filter(g => isSaved(g.id)) : grants)" :key="grant.id">
+            <template x-for="grant in filteredGrants" :key="grant.id">
                 <div class="grant-card bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex-1">
@@ -766,6 +766,9 @@
         }
 
         // ... (crypto helpers above) ...
+
+        // Constants
+        const MIN_VALID_YEAR = 2024;
 
         function grantApp() {
             return {
@@ -1254,6 +1257,14 @@ Note: This is an AI-generated draft. Review and customize before submission.
                     return this.savedGrants.includes(grantId);
                 },
 
+                // Computed property for filtered grants
+                get filteredGrants() {
+                    if (this.showOnlySaved) {
+                        return this.grants.filter(grant => this.isSaved(grant.id));
+                    }
+                    return this.grants;
+                },
+
                 // Utilities
                 formatDate(dateString) {
                     if (!dateString) return 'TBD';
@@ -1261,7 +1272,7 @@ Note: This is an AI-generated draft. Review and customize before submission.
                     const date = new Date(dateString);
 
                     // Check if date is valid and not the Unix epoch (1969-12-31)
-                    if (isNaN(date.getTime()) || date.getFullYear() < 2024) {
+                    if (isNaN(date.getTime()) || date.getFullYear() < MIN_VALID_YEAR) {
                         return 'TBD';
                     }
 
