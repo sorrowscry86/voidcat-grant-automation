@@ -1,0 +1,1292 @@
+openapi: 3.0.3
+info:
+  title: VoidCat Grant Automation Platform API
+  version: 2.0.0
+  description: |
+    Federal grant discovery and proposal automation platform powered by AI.
+
+    ## Features
+    - Real-time grant search across federal databases (Grants.gov, SBIR.gov, NSF.gov)
+    - AI-powered proposal generation (Claude 3.5 Sonnet & GPT-4)
+    - Semantic matching and scoring
+    - Application timeline management
+    - Compliance validation
+    - Budget justification generation
+
+    ## NO SIMULATIONS LAW Compliance
+    All AI-powered endpoints return **real AI output only** when `FEATURE_REAL_AI=true`.
+    Template/mock responses are explicitly marked with `execution_type: "template"`.
+
+    ## Authentication
+    - **Bearer Token**: Required for user endpoints (JWT)
+    - **Admin Token**: Required for admin endpoints (ADMIN_TOKEN env var)
+    - **Public**: Health and some grant search endpoints
+
+  contact:
+    name: VoidCat RDC Support
+    email: support@voidcat-rdc.com
+
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://grant-search-api.sorrowscry86.workers.dev
+    description: Production API (Cloudflare Workers)
+  - url: http://localhost:8787
+    description: Local development
+
+tags:
+  - name: Health
+    description: API health and status monitoring
+  - name: Grants
+    description: Grant search, discovery, and proposal generation
+  - name: Auth
+    description: User authentication and session management
+  - name: Users
+    description: User profile and account management
+  - name: Dashboard
+    description: Admin analytics and metrics (requires admin auth)
+  - name: Admin
+    description: Administrative operations (requires admin auth)
+  - name: Stripe
+    description: Payment processing and subscriptions
+
+security:
+  - BearerAuth: []
+  - AdminAuth: []
+
+paths:
+  # ==========================================
+  # HEALTH ENDPOINTS
+  # ==========================================
+  /health:
+    get:
+      tags: [Health]
+      summary: Basic health check
+      description: Quick health status for load balancers and monitoring
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                    example: "2.0.0"
+              example:
+                status: healthy
+                timestamp: "2025-11-17T10:30:00.000Z"
+                version: "2.0.0"
+
+  /health/detailed:
+    get:
+      tags: [Health]
+      summary: Detailed health check
+      description: Comprehensive health status including database connectivity
+      operationId: getDetailedHealth
+      security: []
+      responses:
+        '200':
+          description: Detailed health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedHealth'
+
+  # ==========================================
+  # GRANTS ENDPOINTS
+  # ==========================================
+  /api/grants/search:
+    get:
+      tags: [Grants]
+      summary: Search federal grants
+      description: |
+        Search grants from D1 database using full-text search with FTS5 indexes.
+        Supports keyword matching, filtering by agency, and semantic scoring.
+      operationId: searchGrants
+      security: []
+      parameters:
+        - name: query
+          in: query
+          description: Search keywords (max 500 characters)
+          required: false
+          schema:
+            type: string
+            maxLength: 500
+            example: "AI research machine learning"
+        - name: agency
+          in: query
+          description: Filter by federal agency
+          required: false
+          schema:
+            type: string
+            enum: [NSF, DOD, DOE, NASA, NIH, USDA]
+            example: "NSF"
+        - name: limit
+          in: query
+          description: Number of results to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Pagination offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrantSearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/grants/stats:
+    get:
+      tags: [Grants]
+      summary: Get grant statistics
+      description: Aggregate statistics on available grants
+      operationId: getGrantStats
+      security: []
+      responses:
+        '200':
+          description: Grant statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  total_grants:
+                    type: integer
+                  by_agency:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  by_status:
+                    type: object
+                    additionalProperties:
+                      type: integer
+
+  /api/grants/{id}:
+    get:
+      tags: [Grants]
+      summary: Get grant by ID
+      description: Retrieve detailed information about a specific grant
+      operationId: getGrantById
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Grant ID or external opportunity number
+          schema:
+            type: string
+            example: "GRANTS-2025-001"
+      responses:
+        '200':
+          description: Grant details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrantDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/grants/generate-proposal:
+    post:
+      tags: [Grants]
+      summary: Generate grant proposal (template-based)
+      description: |
+        **DEPRECATED**: Use `/api/grants/generate-ai-proposal` instead.
+        This endpoint is deprecated per NO SIMULATIONS LAW compliance.
+      operationId: generateProposal
+      deprecated: true
+      security: []
+      responses:
+        '410':
+          description: Endpoint deprecated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                  code:
+                    type: string
+                    example: "ENDPOINT_DEPRECATED"
+                  alternative_endpoint:
+                    type: string
+                    example: "/api/grants/generate-ai-proposal"
+
+  /api/grants/generate-ai-proposal:
+    post:
+      tags: [Grants]
+      summary: Generate AI-powered grant proposal
+      description: |
+        Generate comprehensive grant proposal using Claude 3.5 Sonnet or GPT-4.
+        Requires `FEATURE_REAL_AI=true` in production.
+
+        **NO SIMULATIONS LAW**: Returns real AI output or error. No mock/template data in production.
+      operationId: generateAIProposal
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIProposalRequest'
+      responses:
+        '200':
+          description: AI-generated proposal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIProposalResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          description: AI generation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                  code:
+                    type: string
+                    example: "AI_EXECUTION_FAILED"
+                  message:
+                    type: string
+                    description: Error details (sanitized in production)
+
+  /api/grants/federal-agencies:
+    get:
+      tags: [Grants]
+      summary: List federal agencies
+      description: Get list of supported federal funding agencies
+      operationId: getFederalAgencies
+      security: []
+      responses:
+        '200':
+          description: List of agencies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  agencies:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code:
+                          type: string
+                        name:
+                          type: string
+                        description:
+                          type: string
+
+  /api/grants/analyze-match:
+    post:
+      tags: [Grants]
+      summary: Analyze grant match score
+      description: Calculate semantic match score between company profile and grant
+      operationId: analyzeMatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grant_id, company_profile]
+              properties:
+                grant_id:
+                  type: string
+                company_profile:
+                  $ref: '#/components/schemas/CompanyProfile'
+      responses:
+        '200':
+          description: Match analysis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  match_score:
+                    type: number
+                    minimum: 0
+                    maximum: 100
+                  analysis:
+                    type: object
+
+  /api/grants/application-timeline:
+    post:
+      tags: [Grants]
+      summary: Generate application timeline
+      description: Create timeline with milestones for grant application process
+      operationId: generateTimeline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grant_id, start_date]
+              properties:
+                grant_id:
+                  type: string
+                start_date:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Application timeline
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  timeline:
+                    type: array
+                    items:
+                      type: object
+
+  /api/grants/strategic-calendar:
+    get:
+      tags: [Grants]
+      summary: Get strategic grant calendar
+      description: Calendar view of upcoming grant deadlines
+      operationId: getStrategicCalendar
+      parameters:
+        - name: months
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+            default: 3
+      responses:
+        '200':
+          description: Calendar data
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/grants/validate-eligibility:
+    post:
+      tags: [Grants]
+      summary: Validate grant eligibility
+      description: Check if organization meets grant eligibility requirements
+      operationId: validateEligibility
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grant_id, organization_type]
+              properties:
+                grant_id:
+                  type: string
+                organization_type:
+                  type: string
+                  enum: [nonprofit, for-profit, academic, government]
+      responses:
+        '200':
+          description: Eligibility validation result
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/grants/generate-budget-justification:
+    post:
+      tags: [Grants]
+      summary: Generate budget justification
+      description: Create budget justification narrative for grant application
+      operationId: generateBudgetJustification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Budget justification document
+
+  /api/grants/certifications-checklist:
+    get:
+      tags: [Grants]
+      summary: Get certifications checklist
+      description: Required certifications for grant application
+      operationId: getCertificationsChecklist
+      parameters:
+        - name: agency
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Certifications list
+
+  /api/grants/pre-submission-review:
+    post:
+      tags: [Grants]
+      summary: Pre-submission review
+      description: Review grant application before submission
+      operationId: preSubmissionReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Review results
+
+  /api/grants/agency-template:
+    get:
+      tags: [Grants]
+      summary: Get agency proposal template
+      description: Retrieve proposal template for specific federal agency
+      operationId: getAgencyTemplate
+      parameters:
+        - name: agency
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agency template
+        '404':
+          description: Template not found
+
+  # ==========================================
+  # AUTH ENDPOINTS
+  # ==========================================
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: User login
+      description: Authenticate user and receive JWT token
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: User registration
+      description: Create new user account
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error or user already exists
+
+  /api/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh JWT token
+      description: Get new access token using refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /api/auth/set-password:
+    post:
+      tags: [Auth]
+      summary: Set/change password
+      description: Set or update user password
+      operationId: setPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                new_password:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '200':
+          description: Password updated
+
+  /api/auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset
+      description: Send password reset email
+      operationId: resetPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Reset email sent
+
+  /api/auth/confirm-reset:
+    post:
+      tags: [Auth]
+      summary: Confirm password reset
+      description: Complete password reset with token
+      operationId: confirmReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token:
+                  type: string
+                new_password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Password reset successful
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: User logout
+      description: Invalidate current session
+      operationId: logout
+      responses:
+        '200':
+          description: Logout successful
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: Retrieve authenticated user profile
+      operationId: getAuthMe
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  # ==========================================
+  # USERS ENDPOINTS
+  # ==========================================
+  /api/users/register:
+    post:
+      tags: [Users]
+      summary: Register new user
+      description: Create user account (alternative endpoint)
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created
+
+  /api/users/me:
+    get:
+      tags: [Users]
+      summary: Get my profile
+      description: Retrieve current user's profile
+      operationId: getUserMe
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  # ==========================================
+  # DASHBOARD ENDPOINTS (Admin)
+  # ==========================================
+  /api/dashboard/overview:
+    get:
+      tags: [Dashboard]
+      summary: Dashboard overview
+      description: High-level platform metrics
+      operationId: getDashboardOverview
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Dashboard overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  metrics:
+                    type: object
+
+  /api/dashboard/realtime:
+    get:
+      tags: [Dashboard]
+      summary: Real-time metrics
+      description: Live platform activity metrics
+      operationId: getRealtimeMetrics
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Real-time metrics
+
+  /api/dashboard/users:
+    get:
+      tags: [Dashboard]
+      summary: User analytics
+      description: User growth and engagement metrics
+      operationId: getUserAnalytics
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: User analytics
+
+  /api/dashboard/health:
+    get:
+      tags: [Dashboard]
+      summary: System health dashboard
+      description: System health and performance metrics
+      operationId: getSystemHealth
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: System health metrics
+
+  /api/dashboard/revenue:
+    get:
+      tags: [Dashboard]
+      summary: Revenue analytics
+      description: Subscription and payment metrics
+      operationId: getRevenueAnalytics
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Revenue metrics
+
+  /api/dashboard/api-usage:
+    get:
+      tags: [Dashboard]
+      summary: API usage statistics
+      description: Endpoint usage and performance stats
+      operationId: getAPIUsage
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: API usage stats
+
+  /api/dashboard/export:
+    get:
+      tags: [Dashboard]
+      summary: Export analytics data
+      description: Download analytics data as CSV/JSON
+      operationId: exportDashboard
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+      responses:
+        '200':
+          description: Exported data
+
+  # ==========================================
+  # ADMIN ENDPOINTS
+  # ==========================================
+  /api/admin/grants/init-schema:
+    post:
+      tags: [Admin]
+      summary: Initialize database schema
+      description: Create grants database tables and indexes
+      operationId: initGrantsSchema
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Schema initialized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  statements_executed:
+                    type: integer
+
+  /api/admin/grants/ingest:
+    post:
+      tags: [Admin]
+      summary: Ingest grants from all sources
+      description: |
+        Trigger data ingestion from federal APIs (Grants.gov, SBIR.gov, NSF.gov).
+        Populates D1 database with real grant data.
+      operationId: ingestGrants
+      security:
+        - AdminAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sources:
+                  type: array
+                  items:
+                    type: string
+                    enum: [grants.gov, sbir.gov, nsf.gov]
+                  example: ["grants.gov", "sbir.gov", "nsf.gov"]
+                query:
+                  type: string
+                  description: Optional search query filter
+                forceRefresh:
+                  type: boolean
+                  description: Force refresh even if cache valid
+      responses:
+        '200':
+          description: Ingestion completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  ingestion_summary:
+                    type: object
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/admin/grants/ingest/{source}:
+    post:
+      tags: [Admin]
+      summary: Ingest from single source
+      description: Trigger ingestion from specific federal API
+      operationId: ingestGrantsFromSource
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [grants.gov, sbir.gov, nsf.gov]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                forceRefresh:
+                  type: boolean
+      responses:
+        '200':
+          description: Ingestion completed
+        '400':
+          description: Invalid source
+
+  # ==========================================
+  # STRIPE ENDPOINTS
+  # ==========================================
+  /api/stripe/create-checkout:
+    post:
+      tags: [Stripe]
+      summary: Create Stripe checkout session
+      description: Create subscription checkout session for user
+      operationId: createCheckout
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  checkout_url:
+                    type: string
+                    format: uri
+                  session_id:
+                    type: string
+        '400':
+          description: Missing email
+        '503':
+          description: Stripe not configured
+
+  /api/stripe/webhook:
+    post:
+      tags: [Stripe]
+      summary: Stripe webhook handler
+      description: Process Stripe webhook events (signature verified)
+      operationId: stripeWebhook
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Stripe event object
+      responses:
+        '200':
+          description: Event processed
+        '400':
+          description: Invalid signature
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from /api/auth/login or /api/auth/register
+
+    AdminAuth:
+      type: http
+      scheme: bearer
+      description: Admin token from ADMIN_TOKEN environment variable
+
+  schemas:
+    # Core Domain Models
+    Grant:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "GRANTS-2025-001"
+        external_id:
+          type: string
+          example: "NSF-25-001"
+        title:
+          type: string
+          example: "AI Research Initiative"
+        agency:
+          type: string
+          enum: [NSF, DOD, DOE, NASA, NIH, USDA]
+        description:
+          type: string
+        amount:
+          type: number
+          description: Award amount in USD
+        deadline:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [active, closed, archived]
+        program_category:
+          type: string
+        eligibility:
+          type: string
+        matching_score:
+          type: number
+          minimum: 0
+          maximum: 100
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    GrantDetail:
+      allOf:
+        - $ref: '#/components/schemas/Grant'
+        - type: object
+          properties:
+            requirements:
+              type: string
+            application_url:
+              type: string
+              format: uri
+            contact_email:
+              type: string
+              format: email
+
+    GrantSearchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        count:
+          type: integer
+        grants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Grant'
+        data_source:
+          type: string
+          enum: [database, live_api, cache]
+        execution_type:
+          type: string
+          enum: [database, real, template]
+        timestamp:
+          type: string
+          format: date-time
+
+    CompanyProfile:
+      type: object
+      required: [name, organization_type]
+      properties:
+        name:
+          type: string
+          example: "TechCorp Inc."
+        organization_type:
+          type: string
+          enum: [nonprofit, for-profit, academic, government]
+        industry:
+          type: string
+        focus_areas:
+          type: array
+          items:
+            type: string
+        annual_revenue:
+          type: number
+        employee_count:
+          type: integer
+        description:
+          type: string
+
+    AIProposalRequest:
+      type: object
+      required: [grant_id, company_profile, grant_title, grant_agency]
+      properties:
+        grant_id:
+          type: string
+        company_profile:
+          $ref: '#/components/schemas/CompanyProfile'
+        grant_title:
+          type: string
+        grant_agency:
+          type: string
+        grant_description:
+          type: string
+        grant_amount:
+          type: number
+        grant_deadline:
+          type: string
+          format: date
+        options:
+          type: object
+
+    AIProposalResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        proposal:
+          type: object
+          properties:
+            metadata:
+              type: object
+              properties:
+                grant_id:
+                  type: string
+                agency:
+                  type: string
+                generated_at:
+                  type: string
+                  format: date-time
+                ai_enhanced:
+                  type: boolean
+                total_ai_cost:
+                  type: number
+            sections:
+              type: object
+            formatting:
+              type: object
+            compliance:
+              type: object
+        execution_type:
+          type: string
+          enum: [real, template]
+          description: "real = AI-generated, template = fallback"
+        ai_enhanced:
+          type: boolean
+        grant_details:
+          type: object
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        organization:
+          type: string
+        subscription_tier:
+          type: string
+          enum: [free, pro, enterprise]
+        created_at:
+          type: string
+          format: date-time
+
+    RegisterRequest:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        name:
+          type: string
+        organization:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+          description: JWT access token
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+          description: Token expiration in seconds
+
+    DetailedHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        version:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        database:
+          type: object
+          properties:
+            connected:
+              type: boolean
+            tables:
+              type: array
+              items:
+                type: string
+        services:
+          type: object
+        uptime:
+          type: number
+          description: Uptime in seconds
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code for programmatic handling
+        details:
+          type: object
+          description: Additional error details
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "Invalid request parameters"
+            code: "BAD_REQUEST"
+
+    Unauthorized:
+      description: Unauthorized - authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "Authentication required"
+            code: "AUTH_REQUIRED"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "Resource not found"
+            code: "NOT_FOUND"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "An internal error occurred"
+            code: "INTERNAL_ERROR"
