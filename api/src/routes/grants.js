@@ -604,11 +604,19 @@ grants.post('/generate-ai-proposal', async (c) => {
           });
         }
         
+        // Sanitize error messages for production to prevent internal detail exposure
+        const configService = new ConfigService(c.env);
+        const appConfig = configService.getAppConfig();
+        const isProduction = appConfig.ENVIRONMENT === 'production';
+
         return c.json({
           success: false,
           error: 'AI proposal generation failed. Real AI execution is required in production.',
           code: 'AI_EXECUTION_FAILED',
-          message: error.message,
+          // Sanitize in production to prevent internal detail exposure
+          message: isProduction
+            ? 'An error occurred during proposal generation. Please contact support for assistance.'
+            : error.message,
           grant_details: {
             id: grant.id,
             title: grant.title,
@@ -647,10 +655,19 @@ grants.post('/generate-ai-proposal', async (c) => {
     });
   } catch (error) {
     console.error('AI proposal generation error:', error);
+
+    // Sanitize error messages for production
+    const configService = new ConfigService(c.env);
+    const appConfig = configService.getAppConfig();
+    const isProduction = appConfig.ENVIRONMENT === 'production';
+
     return c.json({
       success: false,
       error: 'AI proposal generation failed',
-      code: 'AI_PROPOSAL_ERROR'
+      code: 'AI_PROPOSAL_ERROR',
+      message: isProduction
+        ? 'An unexpected error occurred. Please try again or contact support.'
+        : error.message
     }, 500);
   }
 });
