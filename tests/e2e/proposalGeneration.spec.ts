@@ -75,7 +75,7 @@ test.describe('Proposal Generation', () => {
       });
     });
 
-    await page.route('**/api/grants/generate-proposal', route => {
+    await page.route('**/api/grants/generate-ai-proposal', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -155,7 +155,7 @@ test.describe('Proposal Generation', () => {
 
   test('should show upgrade prompt when free tier limit reached', async ({ page }) => {
     // Mock API to return usage limit reached
-    await page.route('**/api/grants/generate-proposal', route => {
+    await page.route('**/api/grants/generate-ai-proposal', route => {
       route.fulfill({
         status: 429,
         contentType: 'application/json',
@@ -214,7 +214,7 @@ test.describe('Proposal Generation', () => {
 
   test('should handle proposal generation errors gracefully', async ({ page }) => {
     // Mock API to return error
-    await page.route('**/api/grants/generate-proposal', route => {
+    await page.route('**/api/grants/generate-ai-proposal', route => {
       route.fulfill({
         status: 500,
         contentType: 'application/json',

@@ -1066,8 +1066,15 @@
                         return;
                     }
 
+                    // Find grant details from local grants array
+                    const grant = this.grants.find(g => g.id === grantId);
+                    if (!grant) {
+                        this.showError('Grant not found. Please search again.');
+                        return;
+                    }
+
                     try {
-                        const response = await fetch(`${this.apiBase}/api/grants/generate-proposal`, {
+                        const response = await fetch(`${this.apiBase}/api/grants/generate-ai-proposal`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -1075,7 +1082,13 @@
                             },
                             body: JSON.stringify({
                                 grant_id: grantId,
-                                company_info: {
+                                grant_title: grant.title,
+                                grant_agency: grant.agency,
+                                grant_program: grant.program,
+                                grant_description: grant.description,
+                                grant_amount: grant.amount,
+                                grant_deadline: grant.deadline,
+                                company_profile: {
                                     name: 'VoidCat RDC',
                                     capabilities: 'AI/ML development, software engineering, federal compliance'
                                 }

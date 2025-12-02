@@ -558,6 +558,7 @@ grants.post('/generate-ai-proposal', async (c) => {
       id: grant_id,
       title: requestData.grant_title,
       agency: requestData.grant_agency,
+      program: requestData.grant_program,
       description: requestData.grant_description,
       amount: requestData.grant_amount,
       deadline: requestData.grant_deadline
@@ -567,7 +568,7 @@ grants.post('/generate-ai-proposal', async (c) => {
       return c.json({
         success: false,
         error: 'Grant details required',
-        message: 'Please provide grant_title and grant_agency from your search results. Other fields (grant_description, grant_amount, grant_deadline) are recommended.',
+        message: 'Please provide grant_title and grant_agency from your search results. Other fields (grant_program, grant_description, grant_amount, grant_deadline) are recommended.',
         code: 'MISSING_GRANT_DETAILS'
       }, 400);
     }
@@ -630,7 +631,7 @@ grants.post('/generate-ai-proposal', async (c) => {
       
       const telemetry = c.get('telemetry');
       if (telemetry) {
-        telemetry.logWarning('Using template generation - AI disabled', {
+        telemetry.logInfo('Using template generation - AI disabled', {
           grant_id: grant.id,
           execution: 'template',
           ai_enabled: false,
@@ -642,16 +643,77 @@ grants.post('/generate-ai-proposal', async (c) => {
       executionType = 'template';
     }
 
+    // Transform proposal to match expected frontend format
+    // Frontend expects flat structure with executive_summary, technical_approach, etc.
+    // New API returns nested structure with sections object
+    let transformedProposal = proposal;
+    
+    if (proposal && proposal.sections) {
+      // Extract sections and flatten
+      const sections = proposal.sections;
+      
+      // Create executive summary if missing - extract from technical approach or create a brief one
+      let executiveSummary = sections.executive_summary || '';
+      if (!executiveSummary && sections.technical_approach) {
+        // Extract first paragraph from technical approach as executive summary
+        const lines = sections.technical_approach.split('\n').filter(l => l.trim());
+        const firstParagraph = lines.find(l => !l.startsWith('#') && l.length > 50);
+        executiveSummary = firstParagraph || `Our organization proposes an innovative solution to ${grant.title} for ${grant.agency}. This proposal outlines our technical approach, team qualifications, and commercialization strategy.`;
+      }
+      
+      // Calculate budget based on grant amount (65% personnel, 15% equipment, 20% overhead)
+      const grantAmount = (typeof grant.amount === 'string' 
+        ? parseInt(grant.amount.replace(/[$,]/g, '')) 
+        : grant.amount) || 250000;
+      
+      const budgetSummary = {
+        personnel: Math.floor(grantAmount * 0.65),
+        equipment: Math.floor(grantAmount * 0.15),
+        overhead: Math.floor(grantAmount * 0.20),
+        total: grantAmount
+      };
+      
+      // Generate timeline based on grant program (Phase I = 6 months, Phase II = 24 months, default = 12)
+      const duration = grant.program?.includes('Phase I') ? 6 
+        : grant.program?.includes('Phase II') ? 24 
+        : 12;
+      const monthsPerPhase = Math.ceil(duration / 3);
+      
+      const timeline = [
+        { 
+          phase: `Months 1-${monthsPerPhase}`, 
+          task: "Requirements analysis, architecture design, and initial development" 
+        },
+        { 
+          phase: `Months ${monthsPerPhase + 1}-${monthsPerPhase * 2}`, 
+          task: "Core implementation, integration, and testing" 
+        },
+        { 
+          phase: `Months ${monthsPerPhase * 2 + 1}-${duration}`, 
+          task: "Performance optimization, validation, and documentation" 
+        }
+      ];
+      
+      transformedProposal = {
+        executive_summary: executiveSummary,
+        technical_approach: sections.technical_approach || '',
+        commercial_potential: sections.commercial_potential || '',
+        budget_summary: budgetSummary,
+        timeline: timeline
+      };
+    }
+
     return c.json({
       success: true,
-      proposal: proposal,
+      proposal: transformedProposal,
       execution_type: executionType, // ← Explicit marking per NO SIMULATIONS LAW
       ai_enhanced: c.env.FEATURE_REAL_AI || false,
       grant_details: {
         id: grant.id,
         title: grant.title,
         agency: grant.agency
-      }
+      },
+      generated_at: new Date().toISOString()
     });
   } catch (error) {
     console.error('AI proposal generation error:', error);
