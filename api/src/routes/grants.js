@@ -558,6 +558,7 @@ grants.post('/generate-ai-proposal', async (c) => {
       id: grant_id,
       title: requestData.grant_title,
       agency: requestData.grant_agency,
+      program: requestData.grant_program,
       description: requestData.grant_description,
       amount: requestData.grant_amount,
       deadline: requestData.grant_deadline
@@ -567,7 +568,7 @@ grants.post('/generate-ai-proposal', async (c) => {
       return c.json({
         success: false,
         error: 'Grant details required',
-        message: 'Please provide grant_title and grant_agency from your search results. Other fields (grant_description, grant_amount, grant_deadline) are recommended.',
+        message: 'Please provide grant_title and grant_agency from your search results. Other fields (grant_program, grant_description, grant_amount, grant_deadline) are recommended.',
         code: 'MISSING_GRANT_DETAILS'
       }, 400);
     }
@@ -660,15 +661,15 @@ grants.post('/generate-ai-proposal', async (c) => {
         executiveSummary = firstParagraph || `Our organization proposes an innovative solution to ${grant.title} for ${grant.agency}. This proposal outlines our technical approach, team qualifications, and commercialization strategy.`;
       }
       
-      // Calculate budget based on grant amount (60% personnel, 15% equipment, 15% overhead, 10% materials)
+      // Calculate budget based on grant amount (65% personnel, 15% equipment, 20% overhead)
       const grantAmount = (typeof grant.amount === 'string' 
         ? parseInt(grant.amount.replace(/[$,]/g, '')) 
         : grant.amount) || 250000;
       
       const budgetSummary = {
-        personnel: Math.floor(grantAmount * 0.60),
+        personnel: Math.floor(grantAmount * 0.65),
         equipment: Math.floor(grantAmount * 0.15),
-        overhead: Math.floor(grantAmount * 0.15),
+        overhead: Math.floor(grantAmount * 0.20),
         total: grantAmount
       };
       
