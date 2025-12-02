@@ -98,8 +98,13 @@ test.describe('API Contract & Backend Edge Cases @edge', () => {
   test('should handle proposal generation without authentication @edge', async ({ request }) => {
     console.log('🧪 Testing proposal generation without auth...');
     
-    const response = await request.post(`${API_BASE}/api/grants/generate-proposal`, {
-      data: { grant_id: 'SBIR-25-001' }
+    const response = await request.post(`${API_BASE}/api/grants/generate-ai-proposal`, {
+      data: { 
+        grant_id: 'SBIR-25-001',
+        grant_title: 'Test Grant',
+        grant_agency: 'Test Agency',
+        company_profile: { name: 'Test Company' }
+      }
     });
     
     // Should return 401 Unauthorized or similar
@@ -132,9 +137,14 @@ test.describe('API Contract & Backend Edge Cases @edge', () => {
       const requests = [];
       for (let i = 0; i < 15; i++) {
         requests.push(
-          request.post(`${API_BASE}/api/grants/generate-proposal`, {
+          request.post(`${API_BASE}/api/grants/generate-ai-proposal`, {
             headers: { 'Authorization': `Bearer ${apiKey}` },
-            data: { grant_id: 'SBIR-25-001' }
+            data: { 
+              grant_id: 'SBIR-25-001',
+              grant_title: 'Test Grant',
+              grant_agency: 'Test Agency',
+              company_profile: { name: 'Test Company' }
+            }
           })
         );
       }
@@ -288,7 +298,7 @@ test.describe('API Contract & Backend Edge Cases @edge', () => {
     const errorRequests = [
       { method: 'GET', url: `${API_BASE}/api/grants/nonexistent-id` },
       { method: 'POST', url: `${API_BASE}/api/users/register`, data: {} },
-      { method: 'POST', url: `${API_BASE}/api/grants/generate-proposal`, data: {} }
+      { method: 'POST', url: `${API_BASE}/api/grants/generate-ai-proposal`, data: {} }
     ];
     
     for (const req of errorRequests) {

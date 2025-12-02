@@ -110,7 +110,7 @@ test.describe('Edge Cases & Error Handling @edge', () => {
     console.log('🧪 Testing rate limiting handling...');
     
     // Mock API to return 429 rate limit response
-    await page.route('**/api/grants/generate-proposal*', (route) => {
+    await page.route('**/api/grants/generate-ai-proposal*', (route) => {
       route.fulfill({
         status: 429,
         headers: {
@@ -198,7 +198,7 @@ test.describe('Edge Cases & Error Handling @edge', () => {
     console.log('🧪 Testing proposal generation error handling...');
     
     // Mock proposal generation to return error
-    await page.route('**/api/grants/generate-proposal*', (route) => {
+    await page.route('**/api/grants/generate-ai-proposal*', (route) => {
       route.fulfill({
         status: 500,
         contentType: 'application/json',
