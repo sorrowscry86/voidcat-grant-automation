@@ -660,21 +660,45 @@ grants.post('/generate-ai-proposal', async (c) => {
         executiveSummary = firstParagraph || `Our organization proposes an innovative solution to ${grant.title} for ${grant.agency}. This proposal outlines our technical approach, team qualifications, and commercialization strategy.`;
       }
       
+      // Calculate budget based on grant amount (60% personnel, 15% equipment, 15% overhead, 10% materials)
+      const grantAmount = (typeof grant.amount === 'string' 
+        ? parseInt(grant.amount.replace(/[$,]/g, '')) 
+        : grant.amount) || 250000;
+      
+      const budgetSummary = {
+        personnel: Math.floor(grantAmount * 0.60),
+        equipment: Math.floor(grantAmount * 0.15),
+        overhead: Math.floor(grantAmount * 0.15),
+        total: grantAmount
+      };
+      
+      // Generate timeline based on grant program (Phase I = 6 months, Phase II = 24 months, default = 12)
+      const duration = grant.program?.includes('Phase I') ? 6 
+        : grant.program?.includes('Phase II') ? 24 
+        : 12;
+      const monthsPerPhase = Math.ceil(duration / 3);
+      
+      const timeline = [
+        { 
+          phase: `Months 1-${monthsPerPhase}`, 
+          task: "Requirements analysis, architecture design, and initial development" 
+        },
+        { 
+          phase: `Months ${monthsPerPhase + 1}-${monthsPerPhase * 2}`, 
+          task: "Core implementation, integration, and testing" 
+        },
+        { 
+          phase: `Months ${monthsPerPhase * 2 + 1}-${duration}`, 
+          task: "Performance optimization, validation, and documentation" 
+        }
+      ];
+      
       transformedProposal = {
         executive_summary: executiveSummary,
         technical_approach: sections.technical_approach || '',
         commercial_potential: sections.commercial_potential || '',
-        budget_summary: {
-          personnel: 162500,  // Parse from budget_narrative or use defaults
-          equipment: 37500,
-          overhead: 50000,
-          total: 250000
-        },
-        timeline: [
-          { phase: "Months 1-2", task: "Requirements analysis and initial development" },
-          { phase: "Months 3-4", task: "Core implementation and testing" },
-          { phase: "Months 5-6", task: "Validation and documentation" }
-        ]
+        budget_summary: budgetSummary,
+        timeline: timeline
       };
     }
 
