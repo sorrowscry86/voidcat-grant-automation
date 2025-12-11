@@ -1,0 +1,36 @@
+{
+  "project_name": "VoidCat Grant Automation",
+  "description": "Federal grant discovery and proposal automation platform",
+  
+  "map": {
+    "type": "openapi",
+    "path": "./api/openapi.yaml",
+    "version": "3.0.3"
+  },
+  
+  "territory": {
+    "language": "javascript/node",
+    "framework": "hono",
+    "routes_glob": "./api/src/routes/**/*.js",
+    "services_glob": "./api/src/services/**/*.js"
+  },
+  
+  "rules": {
+    "strict_params": false,
+    "strict_returns": false,
+    "strict_status_codes": false,
+    "allow_extensions": true
+  },
+  
+  "execution": {
+    "mode": "static",
+    "comment": "Static AST analysis. Can be upgraded to LLM-based analysis if api_key provided."
+  },
+  
+  "reporting": {
+    "output_format": "markdown",
+    "fail_on_errors": true,
+    "fail_on_warnings": false,
+    "include_info": true
+  }
+}

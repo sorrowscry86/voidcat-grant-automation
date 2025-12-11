@@ -150,6 +150,7 @@ paths:
             type: integer
             minimum: 0
             default: 0
+      x-voidcat-note: "Advanced filters (deadline, amount, program, opportunityType) are planned for Phase 2"
       responses:
         '200':
           description: Search results
@@ -322,9 +323,14 @@ paths:
   /api/grants/analyze-match:
     post:
       tags: [Grants]
-      summary: Analyze grant match score
-      description: Calculate semantic match score between company profile and grant
+      summary: "Analyze grant matching (Phase 2 Feature - NOT YET IMPLEMENTED)"
+      description: "[Phase 2] Calculate semantic match score between company profile and grant. Returns 501 until Phase 2 implementation."
       operationId: analyzeMatch
+      deprecated: true
+      x-voidcat-phase: "2"
+      x-voidcat-status: "planned"
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -338,17 +344,8 @@ paths:
                 company_profile:
                   $ref: '#/components/schemas/CompanyProfile'
       responses:
-        '200':
-          description: Match analysis
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  match_score:
-                    type: number
+        '501':
+          description: "Feature not yet implemented (Phase 2 - Coming Q1 2026)"
                     minimum: 0
                     maximum: 100
                   analysis:
