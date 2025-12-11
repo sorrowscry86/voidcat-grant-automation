@@ -1,4 +1,9 @@
 ---
+description: AI rules derived by SpecStory from the project AI interaction history
+globs: *
+---
+
+---
 description: VoidCat RDC Federal Grant Automation Platform - Comprehensive AI Instructions
 globs: *
 ---
@@ -37,6 +42,9 @@ curl http://localhost:8787/health
 
 # Test grant search 
 curl "http://localhost:8787/api/grants/search?query=AI"
+
+# Test data sources status
+curl http://localhost:8787/api/grants/data-sources-status
 ```
 
 **API Endpoints Available:**
@@ -46,6 +54,7 @@ curl "http://localhost:8787/api/grants/search?query=AI"
 - `POST /api/users/register` - User registration
 - `GET /api/users/me` - User profile
 - `POST /api/grants/generate-proposal` - AI proposal generation
+- `GET /api/grants/data-sources-status` - Returns the status of data sources
 
 ### Frontend Development
 ```bash
@@ -105,13 +114,19 @@ npx wrangler deploy --env production  # Takes 30-60 seconds
    # Should return: {"success":true,"count":7,"grants":[...],...}
    ```
 
-3. **Frontend Connectivity**:
+3. **Data Sources Status Endpoint**:
+   ```bash
+   curl http://localhost:8787/api/grants/data-sources-status
+   # Should return: {"success":true,"sources":{...},...}
+   ```
+
+4. **Frontend Connectivity**:
    - Open frontend in browser at http://localhost:3000
    - Verify search interface loads
    - Test grant search returns results
    - Verify registration modal opens/closes
 
-4. **Full E2E Test Suite**:
+5. **Full E2E Test Suite**:
    ```bash
    npm test  # Run complete 230+ test suite, takes 10-15 minutes
    ```
@@ -124,6 +139,8 @@ npx wrangler deploy --env production  # Takes 30-60 seconds
 - [ ] Registration modal opens/closes properly
 - [ ] Search form submits and displays results
 - [ ] Mobile responsive layout works
+- [ ] Data sources status endpoint returns data (`curl http://localhost:8787/api/grants/data-sources-status`)
+- [ ] **Generate Proposal buttons function correctly**
 
 ### Complete Developer Workflow Test
 ```bash
@@ -133,6 +150,7 @@ cd api && npx wrangler dev --local &
 sleep 8
 curl -s http://localhost:8787/health | grep "healthy"
 curl -s "http://localhost:8787/api/grants/search?query=AI" | grep "success"
+curl -s http://localhost:8787/api/grants/data-sources-status | grep "success"
 kill %1
 cd frontend && python3 -m http.server 3000 &
 sleep 2  
@@ -349,6 +367,20 @@ This platform targets federal grant automation with a freemium business model ($
 - Tests: `tests/e2e/*`
 - Health URL: `https://grant-search-api.sorrowscry86.workers.dev/health`
 
+## Workflow & Release Rules
+- **Before pushing changes**: Always sync the repository by fetching the latest from origin, fast-forwarding master, and pruning remote branches.
+- **Local Branch Management**: Delete fully merged local branches except for protected ones (e.g., master).
+- **Telemetry Integration**: When implementing telemetry, ensure to add `logWarning` and `trackDataSourceFetch` methods to the `TelemetryService`.
+- **Data Source Status Service**: Use the `sourceStatusService.js` for in-memory tracking of external data source fetches (no simulations).
+- **API Route Insertion**: When adding new API routes (e.g., `/api/grants/data-sources-status`), insert them in a logical order within the existing route structure (e.g., before the `/search` endpoint).
+
+## Debugging
+
+- If "Generate Proposal" buttons are not functioning:
+  - Check for duplicate `init` functions in `frontend/index.html`, as the latter may overwrite initialization steps.
+  - Verify that the API key is properly set and that the `generateProposal` function is correctly calling the API with the key.
+  - Inspect the `frontend/index.html` file for issues with how `proposalText` is handled.
+
 ---
 
-Last updated: 2025-09-24
+Last updated: 2025-12-03

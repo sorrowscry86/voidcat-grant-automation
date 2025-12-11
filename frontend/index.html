@@ -319,8 +319,8 @@
                             <h3 class="text-2xl font-bold">📝 Generated Proposal</h3>
                             <p class="text-blue-100 mt-1" x-text="currentProposal?.grant_id ? `Grant ID: ${currentProposal.grant_id}` : 'AI-Generated Grant Proposal'"></p>
                         </div>
-                        <button @click="showProposalModal = false" 
-                                class="text-blue-100 hover:text-white text-2xl font-bold"
+                        <button @click="showProposalModal = false; currentProposalText = ''" 
+                            class="text-blue-100 hover:text-white text-2xl font-bold"
                                 aria-label="Close">
                             ×
                         </button>
@@ -330,8 +330,8 @@
                 <!-- Modal Body -->
                 <div class="p-6 overflow-y-auto max-h-[60vh]">
                     <div class="prose max-w-none">
-                        <pre class="whitespace-pre-wrap text-gray-800 dark:text-gray-200 font-mono text-sm leading-relaxed bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border dark:border-gray-600" 
-                             x-text="currentProposal?.proposal || currentProposal"></pre>
+                            <pre class="whitespace-pre-wrap text-gray-800 dark:text-gray-200 font-mono text-sm leading-relaxed bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border dark:border-gray-600"
+                                x-text="currentProposalText || (currentProposal?.proposal ? JSON.stringify(currentProposal.proposal, null, 2) : currentProposal)"></pre>
                     </div>
                 </div>
                 
@@ -349,7 +349,7 @@
                             </button>
                         </div>
                         <div class="flex gap-3">
-                            <button @click="showProposalModal = false" 
+                                <button @click="showProposalModal = false; currentProposalText = ''" 
                                     class="border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-white">
                                 Close
                             </button>
@@ -456,10 +456,22 @@
                             💡 <strong>Tip:</strong> Click "Generate Proposal" to create an AI-powered application for this grant.
                         </p>
                         <div class="flex gap-3">
-                            <template x-if="currentGrantDetails && user">
-                                <button @click="generateProposal(currentGrantDetails.id); showGrantDetailsModal = false" 
-                                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                                    ✨ Generate Proposal
+                            <template x-if="currentGrantDetails">
+                                <button @click="generateProposal(currentGrantDetails.id); if (user) showGrantDetailsModal = false"
+                                        :disabled="loading"
+                                        :title="user ? 'Generate an AI proposal for this opportunity' : 'Register or log in to unlock proposal generation'"
+                                        :class="[
+                                            'px-4 py-2 rounded-lg text-sm font-semibold transition-colors focus:outline-none',
+                                            loading ? 'bg-gray-400 cursor-not-allowed' : (user ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-800 hover:bg-gray-300')
+                                        ]">
+                                    <span x-show="!loading" x-text="user ? '✨ Generate Proposal' : '✨ Register to Generate Proposal'"></span>
+                                    <span x-show="loading" class="flex items-center">
+                                        <svg class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Generating...
+                                    </span>
                                 </button>
                             </template>
                             <button @click="showGrantDetailsModal = false" 
@@ -581,9 +593,20 @@
                             📋 View Details
                         </button>
                         <button @click="generateProposal(grant.id)"
-                                :disabled="!user"
-                                class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 transition-colors text-sm">
-                            🤖 Generate Proposal
+                                :disabled="loading"
+                                :title="user ? 'Generate an AI proposal for this opportunity' : 'Register or log in to unlock AI proposals'"
+                                :class="[
+                                    'px-4 py-2 rounded transition-colors text-sm font-semibold',
+                                    loading ? 'bg-gray-400 cursor-not-allowed' : (user ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-yellow-500 text-white hover:bg-yellow-600')
+                                ]">
+                            <span x-show="!loading" x-text="user ? '🤖 Generate Proposal' : '🤖 Generate Proposal · Register to Unlock'"></span>
+                            <span x-show="loading" class="flex items-center">
+                                <svg class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Generating...
+                            </span>
                         </button>
                         <button @click="toggleSaveGrant(grant.id)"
                                 :class="isSaved(grant.id) ? 'bg-yellow-500 text-white hover:bg-yellow-600' : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white'"
@@ -840,6 +863,7 @@
                 
                 // Modal content
                 currentProposal: null,
+                currentProposalText: '',
                 currentGrantDetails: null,
                 notificationMessage: '',
                 errorMessage: '',
@@ -1055,13 +1079,19 @@
 
                 // Generate proposal
                 async generateProposal(grantId) {
+                    console.log('🤖 Generate Proposal clicked for grant:', grantId);
+                    console.log('Current user:', this.user);
+                    console.log('API Key present:', !!this.apiKey);
+                    
                     if (!this.user) {
+                        console.log('⚠️ No user logged in - showing registration modal');
                         this.showRegister = true;
                         return;
                     }
 
                     // Check usage limits for free users
                     if (this.user.subscription_tier === 'free' && (this.user.usage_count || 0) >= 1) {
+                        console.log('⚠️ Free tier limit reached - showing upgrade prompt');
                         this.showUpgradePrompt = true;
                         return;
                     }
@@ -1069,9 +1099,13 @@
                     // Find grant details from local grants array
                     const grant = this.grants.find(g => g.id === grantId);
                     if (!grant) {
+                        console.error('❌ Grant not found:', grantId);
                         this.showError('Grant not found. Please search again.');
                         return;
                     }
+                    
+                    console.log('📝 Generating proposal for grant:', grant.title);
+                    this.loading = true;
 
                     try {
                         const response = await fetch(`${this.apiBase}/api/grants/generate-ai-proposal`, {
@@ -1095,41 +1129,61 @@
                             })
                         });
 
+                        this.loading = false;
                         const data = await response.json();
+                        console.log('📥 API Response:', data);
+                        
                         if (data.success) {
-                            const proposal = data.proposal;
+                            console.log('✅ Proposal generated successfully');
+                            const proposal = data.proposal || {};
+                            const budget = proposal.budget_summary || {};
+                            const formatCurrency = (value) => {
+                                const num = typeof value === 'number' ? value : (parseInt(value, 10) || 0);
+                                return `$${num.toLocaleString()}`;
+                            };
+                            const timeline = Array.isArray(proposal.timeline) ? proposal.timeline : [];
+                            const timelineText = timeline.length
+                                ? timeline.map(t => `• ${t.phase || 'Phase'}: ${t.task || 'Work in progress'}`).join('\n')
+                                : '• Timeline details will be refined by the AI.';
+                            const generatedAt = data.generated_at
+                                ? new Date(data.generated_at).toLocaleString()
+                                : new Date().toLocaleString();
                             const proposalText = `
 🤖 AI-Generated Proposal Preview
 
+Grant: ${grant.title || 'Selected Opportunity'} (${grant.agency || 'Agency'})
+
 📝 Executive Summary:
-${proposal.executive_summary}
+${proposal.executive_summary || 'Executive summary will be generated by the AI.'}
 
 🔬 Technical Approach:
-${proposal.technical_approach}
+${proposal.technical_approach || 'Technical approach details will be prepared by the AI.'}
 
 💼 Commercial Potential:
-${proposal.commercial_potential}
+${proposal.commercial_potential || 'Commercial potential narrative is coming soon.'}
 
 💰 Budget Summary:
-• Personnel: $${proposal.budget_summary.personnel.toLocaleString()}
-• Equipment: $${proposal.budget_summary.equipment.toLocaleString()}
-• Overhead: $${proposal.budget_summary.overhead.toLocaleString()}
-• Total: $${proposal.budget_summary.total.toLocaleString()}
+• Personnel: ${formatCurrency(budget.personnel)}
+• Equipment: ${formatCurrency(budget.equipment)}
+• Overhead: ${formatCurrency(budget.overhead)}
+• Total: ${formatCurrency(budget.total)}
 
 📅 Timeline:
-${proposal.timeline.map(t => `• ${t.phase}: ${t.task}`).join('\n')}
+${timelineText}
 
-Generated at: ${new Date(data.generated_at).toLocaleString()}
+Generated at: ${generatedAt}
 
 Note: This is an AI-generated draft. Review and customize before submission.
                             `;
-                            this.showProposal(data);
+                            this.showProposal(data, proposalText.trim());
                         } else {
+                            console.error('❌ API Error:', data.error);
                             this.showError('Error generating proposal: ' + data.error);
                         }
                     } catch (error) {
-                        console.error('Error generating proposal:', error);
-                        this.showError('Error generating proposal. Please try again.');
+                        console.error('❌ Error generating proposal:', error);
+                        this.loading = false;
+                        this.showError('Error generating proposal. Please try again. Check console for details.');
                     }
                 },
 
@@ -1198,8 +1252,9 @@ Note: This is an AI-generated draft. Review and customize before submission.
                     this.showErrorModal = true;
                 },
 
-                showProposal(proposalData) {
+                showProposal(proposalData, previewText = '') {
                     this.currentProposal = proposalData;
+                    this.currentProposalText = previewText;
                     this.showProposalModal = true;
                 },
 
@@ -1210,6 +1265,7 @@ Note: This is an AI-generated draft. Review and customize before submission.
 
                 closeAllModals() {
                     this.showProposalModal = false;
+                    this.currentProposalText = '';
                     this.showGrantDetailsModal = false;
                     this.showNotificationModal = false;
                     this.showErrorModal = false;
@@ -1221,7 +1277,7 @@ Note: This is an AI-generated draft. Review and customize before submission.
                 exportProposalAsMarkdown() {
                     if (!this.currentProposal) return;
                     
-                    const markdownContent = this.currentProposal.proposal || this.currentProposal;
+                    const markdownContent = this.currentProposalText || this.currentProposal?.proposal || this.currentProposal;
                     const blob = new Blob([markdownContent], { type: 'text/markdown' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -1240,7 +1296,7 @@ Note: This is an AI-generated draft. Review and customize before submission.
                     if (!this.currentProposal) return;
 
                     try {
-                        const content = this.currentProposal.proposal || this.currentProposal;
+                        const content = this.currentProposalText || this.currentProposal?.proposal || this.currentProposal;
                         await navigator.clipboard.writeText(content);
                         this.showNotification('Proposal copied to clipboard!', 'success');
                     } catch (error) {

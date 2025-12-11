@@ -1,6 +1,7 @@
 // Grant-related endpoints for VoidCat Grant Automation Platform
 
 import { Hono } from 'hono';
+import { getSourceStatuses } from '../services/sourceStatusService.js';
 import RateLimiter from '../services/rateLimiter.js';
 import ConfigService from '../services/configService.js';
 import DatabaseGrantService from '../services/databaseGrantService.js';
@@ -21,6 +22,19 @@ const aiProposalService = new AIProposalService();
 
 // DataService is now managed by factory to prevent inconsistent instantiation
 
+
+// Data sources status endpoint
+grants.get('/data-sources-status', async (c) => {
+  const telemetry = c.get('telemetry');
+  const sources = getSourceStatuses();
+  if (telemetry) telemetry.logInfo('Data sources status requested', { source_count: Object.keys(sources).length });
+  return c.json({
+    success: true,
+    sources,
+    execution_type: c.env.FEATURE_LIVE_DATA ? 'real' : 'fallback',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Grant search endpoint
 grants.get('/search', async (c) => {

@@ -162,6 +162,16 @@ export class TelemetryService {
   }
 
   /**
+   * Log warning message
+   */
+  logWarning(message, metadata = {}) {
+    if (!this.shouldLog('WARN')) return;
+
+    const logEntry = this.createLogEntry('WARN', message, metadata);
+    console.log(JSON.stringify(logEntry));
+  }
+
+  /**
    * Log error message
    */
   logError(message, error, metadata = {}) {
@@ -194,6 +204,24 @@ export class TelemetryService {
         data_source: dataSource,
         fallback_occurred: fallbackOccurred,
         search_successful: resultsCount > 0
+      }
+    });
+  }
+
+  /**
+   * Track external data source fetch
+   */
+  trackDataSourceFetch(source, success, durationMs, resultCount, errorMessage = null) {
+    if (!this.enabledFeatures.performanceMetrics) return;
+
+    this.logInfo('Data source fetch', {
+      metrics: {
+        type: 'data_source_fetch',
+        source,
+        success,
+        duration_ms: durationMs,
+        result_count: resultCount,
+        error: errorMessage
       }
     });
   }
