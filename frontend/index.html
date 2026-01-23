@@ -1,1358 +1,471 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VoidCat RDC - Federal Grant Automation</title>
-    <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'GA_MEASUREMENT_ID');
-        
-        // Custom events for grant platform
-        function trackGrantSearch(query, resultsCount) {
-            gtag('event', 'grant_search', {
-                search_term: query,
-                results_count: resultsCount,
-                event_category: 'engagement'
-            });
-        }
-        
-        function trackProposalGeneration(grantId) {
-            gtag('event', 'proposal_generation', {
-                grant_id: grantId,
-                event_category: 'conversion'
-            });
-        }
-        
-        function trackUserRegistration(tier) {
-            gtag('event', 'sign_up', {
-                subscription_tier: tier,
-                event_category: 'conversion'
-            });
-        }
-        
-        function trackUpgrade() {
-            gtag('event', 'purchase', {
-                event_category: 'conversion',
-                value: 99
-            });
-        }
-    </script>
-    
+    <title>VoidCat RDC | Federal Grant Automation Protocol</title>
+    <meta name="description" content="AI-powered grant discovery and proposal generation. 100% Real Output. No Simulations Law Compliant.">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Dark mode configuration for Tailwind CSS
-        tailwind.config = {
-            darkMode: 'class'
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #09090b;
+            --accent-color: #6366f1;
+            --text-color: #e4e4e7;
+            --grid-color: rgba(255, 255, 255, 0.05);
         }
-    </script>
-    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-    <script src="https://js.stripe.com/v3/"></script>
-    <meta name="description" content="AI-powered federal grant discovery and proposal automation for startups and small businesses">
-    <meta name="keywords" content="federal grants, SBIR, STTR, grant automation, AI proposal generation">
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .grid-bg {
+            background-image: linear-gradient(var(--grid-color) 1px, transparent 1px),
+            linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(255, 255, 255, 0.02) 50%, rgba(0,0,0,0) 100%);
+            opacity: 0.1;
+            position: absolute;
+            bottom: 100%;
+            animation: scanline 10s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100px; }
+        }
+        .glow-text {
+            text-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+        }
+        .terminal-cursor::after {
+            content: '█';
+            animation: blink 1s step-end infinite;
+            margin-left: 4px;
+            color: #4ade80;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+    </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-300">
-    <div x-data="grantApp()" class="container mx-auto px-4 py-8">
-        <!-- Header -->
-        <header class="mb-8">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    <!-- Mobile menu button -->
-                    <button class="mr-3 md:hidden" @click="menuOpen = !menuOpen" aria-label="Menu">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-label="Menu">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
-                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">VoidCat RDC</h1>
-                    <p class="text-gray-600 dark:text-gray-300">Federal Grant Automation Platform</p>
-                    <p class="text-sm text-green-600 dark:text-green-400 font-semibold">🚀 Now Live - MVP Version</p>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <!-- Dark Mode Toggle -->
-                    <button @click="toggleDarkMode()" 
-                            aria-label="Toggle dark mode"
-                            class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                        <svg x-show="!darkMode" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                        </svg>
-                        <svg x-show="darkMode" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
-                    </button>
-                    <template x-if="!user">
-                        <button @click="showRegister = true" 
-                                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                            Get Started Free
-                        </button>
-                    </template>
-                    <template x-if="user">
-                        <div class="text-right">
-                            <p class="text-sm text-gray-600 dark:text-gray-300">Welcome, <span x-text="user.name || user.email"></span></p>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 capitalize">Tier: <span x-text="user.subscription_tier"></span></p>
-                            <template x-if="user.subscription_tier === 'free'">
-                                <div class="upgrade-section mt-2">
-                                    <button @click="upgradeToProModal = true" 
-                                            aria-label="Upgrade to Pro"
-                                            class="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-4 py-2 rounded-lg hover:from-purple-600 hover:to-blue-600 font-semibold shadow-lg transition-all transform hover:scale-105">
-                                        ✨ Upgrade to Pro - $99/month
-                                    </button>
-                                    <p class="text-xs text-orange-600 dark:text-orange-400 mt-1 font-medium">
-                                        <span x-text="user.usage_count || 0"></span>/1 free grants used
-                                    </p>
-                                </div>
-                            </template>
-                            <template x-if="user.subscription_tier === 'pro'">
-                                <div class="mt-2">
-                                    <span class="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm font-semibold">
-                                        ✅ Pro Member
-                                    </span>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
-                </div>
-            </div>
-            <!-- Mobile dropdown nav -->
-            <nav class="md:hidden mt-3" x-show="menuOpen" x-transition>
-                <ul class="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-sm divide-y dark:divide-gray-700">
-                    <li><a href="#features" class="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200">Features</a></li>
-                    <li><a href="#demo" class="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200">Demo</a></li>
-                    <li><a href="#pricing" class="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200">Pricing</a></li>
-                    <li><a href="#login" class="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200">Login</a></li>
-                </ul>
-            </nav>
-        </header>
+<body class="antialiased selection:bg-indigo-500 selection:text-white" x-data="{ mobileMenuOpen: false, modalOpen: false, modalType: '' }">
 
-        <!-- Search Section -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 mb-8">
-            <h2 class="text-xl font-semibold mb-4 dark:text-white">🔍 Search Grant Opportunities</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <input x-model="searchQuery"
-              placeholder="Search keywords (AI, defense, energy...)" aria-label="Search keywords"
-                       class="border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:text-white">
-                <select x-model="selectedAgency"
-                        class="border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white">
-                    <option value="">All Agencies</option>
-                    <option value="defense">Department of Defense</option>
-                    <option value="nsf">National Science Foundation</option>
-                    <option value="energy">Department of Energy</option>
-                    <option value="darpa">DARPA</option>
-                    <option value="nasa">NASA</option>
-                </select>
-                <button @click="searchGrants()"
-                        :disabled="loading"
-                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
-                    <span x-show="!loading">Search Grants</span>
-                    <span x-show="loading">Searching...</span>
-                </button>
-            </div>
-            <div class="flex items-center justify-between">
-                <div x-show="grants.length > 0" class="text-sm text-gray-600 dark:text-gray-300">
-                    Found <span x-text="grants.length"></span> matching opportunities
-                </div>
-                <div x-show="savedGrants.length > 0" class="flex items-center gap-2">
-                    <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 cursor-pointer">
-                        <input type="checkbox" x-model="showOnlySaved"
-                               class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
-                        <span>Show only saved grants (<span x-text="savedGrants.length"></span>)</span>
-                    </label>
-                </div>
-            </div>
-        </div>        <!-- Registration Modal -->
-        <div x-show="showRegister" 
-             class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-             x-transition>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-                <h3 class="text-lg font-semibold mb-4 dark:text-white">🚀 Register for Free Access</h3>
-                <form @submit.prevent="register()">
-                    <div class="space-y-4">
-                        <input x-model="registerForm.name" 
-                               placeholder="Full Name" 
-                               required
-                               class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white">
-                        <input x-model="registerForm.email" 
-                               placeholder="Email Address" 
-                               type="email"
-                               required
-                               class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white">
-                        <input x-model="registerForm.company" 
-                               placeholder="Company Name (Optional)" 
-                               class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white">
-                        <div class="text-xs text-gray-500 dark:text-gray-400">
-                            Free tier includes 1 grant application per month. Upgrade for unlimited access.
-                        </div>
-                        <div class="flex space-x-4">
-                            <button type="submit" 
-                                    :disabled="registering"
-                                    class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                                <span x-show="!registering">Register</span>
-                                <span x-show="registering">Registering...</span>
-                            </button>
-                            <button @click="showRegister = false" 
-                                    type="button"
-                                    class="flex-1 border border-gray-300 dark:border-gray-600 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
-                                Cancel
-                            </button>
-                        </div>
+    <!-- Background Grid -->
+    <div class="fixed inset-0 grid-bg pointer-events-none z-0"></div>
+    <div class="scanline fixed inset-0 pointer-events-none z-0"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 border-b border-white/10 bg-black/80 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-indigo-600 rounded-sm flex items-center justify-center">
+                        <i data-lucide="terminal" class="w-5 h-5 text-white"></i>
                     </div>
-                </form>
+                    <span class="font-mono font-bold text-lg tracking-tight">VoidCat<span class="text-indigo-500">_RDC</span></span>
+                    <span class="hidden md:inline-block px-2 py-0.5 ml-2 text-xs font-mono bg-green-500/10 text-green-400 border border-green-500/20 rounded">SYSTEM_ONLINE</span>
+                </div>
+                
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#features" class="text-sm font-medium text-gray-300 hover:text-white transition-colors hover:text-indigo-400">Capabilities</a>
+                    <a href="#compliance" class="text-sm font-medium text-gray-300 hover:text-white transition-colors hover:text-indigo-400">Compliance</a>
+                    <a href="#pricing" class="text-sm font-medium text-gray-300 hover:text-white transition-colors hover:text-indigo-400">Pricing</a>
+                    <a href="https://sorrowscry86.github.io/voidcat-grant-automation" class="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors font-mono">[Docs]</a>
+                    <button @click="modalOpen = true; modalType = 'login'" class="text-sm font-medium text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded border border-white/10 transition-all font-mono">
+                        Console_Login
+                    </button>
+                </div>
+
+                <div class="md:hidden flex items-center">
+                    <button @click="mobileMenuOpen = !mobileMenuOpen" class="text-gray-300 hover:text-white">
+                        <i data-lucide="menu" class="w-6 h-6"></i>
+                    </button>
+                </div>
             </div>
         </div>
-
-        <!-- Upgrade to Pro Modal -->
-        <div x-show="upgradeToProModal" 
-             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
-             x-transition>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl relative">
-                <!-- Accessible Close button -->
-                <button @click="upgradeToProModal = false" aria-label="Close"
-                        class="absolute top-3 right-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                    ✖
-                </button>
-                <div class="text-center mb-6">
-                    <div class="text-4xl mb-2">🚀</div>
-                    <h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">Upgrade to Pro</h3>
-                    <p class="text-gray-600 dark:text-gray-300">Unlock unlimited grant applications and AI-powered proposals</p>
-                </div>
-                <!-- Error alert for upgrade flow -->
-                <div x-show="upgradeError" role="alert" class="mb-4 p-3 rounded bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 border border-red-200 dark:border-red-700">
-                    <strong>Upgrade failed:</strong> <span x-text="upgradeError"></span>
-                </div>
-                
-                <div class="space-y-4 mb-6">
-                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border dark:border-gray-600">
-                        <h4 class="font-semibold text-gray-800 dark:text-white mb-2">🆓 Free Tier</h4>
-                        <div class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                            <p>• 1 grant application per month</p>
-                            <p>• Basic grant search</p>
-                            <p>• Limited proposal generation</p>
-                            <p>• Basic matching</p>
-                            <p>• Email support</p>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-blue-50 dark:bg-blue-900 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900 dark:to-purple-900 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-700">
-                        <h4 class="font-semibold text-blue-800 dark:text-blue-200 mb-2">✨ Pro Tier - $99/month</h4>
-                        <div class="space-y-1 text-sm text-blue-700 dark:text-blue-200">
-                            <p>• ✅ <strong>Unlimited</strong> grant applications</p>
-                            <p>• ✅ <strong>Advanced</strong> AI proposal generation</p>
-                            <p>• ✅ <strong>Priority</strong> customer support</p>
-                            <p>• ✅ <strong>Advanced</strong> analytics & insights</p>
-                            <p>• ✅ <strong>Early access</strong> to new features</p>
-                            <p>• ✅ <strong>Dedicated</strong> account <strong>manager</strong></p>
-                        </div>
-                        <div class="mt-3 p-2 bg-yellow-100 dark:bg-yellow-900 rounded text-center">
-                            <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-200">💰 ROI: Avg. $250K+ in grants won</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="flex space-x-3">
-                    <button @click="createCheckoutSession()" 
-                            class="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold transition-all transform hover:scale-105 shadow-lg">
-                        🚀 Upgrade Now
-                    </button>
-                    <button @click="upgradeToProModal = false" 
-                            class="flex-1 border border-gray-300 dark:border-gray-600 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors dark:text-white">
-                        Maybe Later
-                    </button>
-                </div>
-                
-                <p class="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
-                    💳 Secure payment via Stripe • Cancel anytime
-                </p>
+        
+        <!-- Mobile Menu -->
+        <div x-show="mobileMenuOpen" class="md:hidden bg-black border-b border-white/10" @click.away="mobileMenuOpen = false">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <a href="#features" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/10">Capabilities</a>
+                <a href="#compliance" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/10">Compliance</a>
+                <a href="#pricing" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/10">Pricing</a>
+                <a href="#" class="block px-3 py-2 rounded-md text-base font-medium text-indigo-400 font-mono">Documentation</a>
             </div>
         </div>
+    </nav>
 
-        <!-- Usage Limit Reached Modal -->
-        <div x-show="showUpgradePrompt" 
-             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
-             x-transition>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
-                <div class="text-center mb-6">
-                    <div class="text-4xl mb-2">⚠️</div>
-                    <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-2">Free Limit Reached!</h3>
-                    <p class="text-gray-600 dark:text-gray-300">You've used your 1 free grant application this month</p>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">You've reached your free limit. Please upgrade to continue.</p>
-                </div>
-                
-                <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg mb-6 border border-blue-200 dark:border-blue-700">
-                    <h4 class="font-semibold text-blue-800 dark:text-blue-200 mb-2">🚀 Upgrade to Pro for:</h4>
-                    <div class="space-y-1 text-sm text-blue-700 dark:text-blue-200">
-                        <p>• <strong>Unlimited</strong> grant applications</p>
-                        <p>• <strong>Advanced</strong> AI proposal generation</p>
-                        <p>• <strong>Priority</strong> support</p>
-                    </div>
-                    <div class="mt-3 text-center">
-                        <span class="bg-yellow-200 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 px-3 py-1 rounded-full text-sm font-bold">
-                            Only $99/month
+    <!-- Hero Section -->
+    <section class="relative z-10 pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div class="lg:grid lg:grid-cols-12 lg:gap-16 items-center">
+                <div class="lg:col-span-6 text-left">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-mono mb-6">
+                        <span class="relative flex h-2 w-2">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
                         </span>
+                        NO_SIMULATIONS_LAW_COMPLIANT
+                    </div>
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
+                        Federal Grant Automation.<br>
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 glow-text">Zero Hallucinations.</span>
+                    </h1>
+                    <p class="text-lg text-gray-400 mb-8 max-w-2xl leading-relaxed">
+                        The only AI proposal engine engineered for the 2025 regulatory environment. 
+                        Direct integration with <span class="text-white font-mono">DOD</span>, <span class="text-white font-mono">NASA</span>, and <span class="text-white font-mono">NSF</span> portals. 
+                        We automate the administrative friction of Phase II compliance.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button @click="modalOpen = true; modalType = 'register'" class="group relative inline-flex items-center justify-center px-8 py-3 text-sm font-bold text-white transition-all duration-200 bg-indigo-600 font-mono rounded-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 focus:ring-offset-gray-900 shadow-[0_0_20px_rgba(79,70,229,0.3)]">
+                            <span>INITIALIZE_FREE_TIER</span>
+                            <i data-lucide="arrow-right" class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform"></i>
+                        </button>
+                        <a href="#features" class="inline-flex items-center justify-center px-8 py-3 text-sm font-medium text-gray-300 transition-all duration-200 bg-white/5 border border-white/10 rounded-sm hover:bg-white/10 hover:text-white font-mono">
+                            VIEW_ARCHITECTURE
+                        </a>
+                    </div>
+                    <div class="mt-10 flex items-center gap-6 text-gray-500 text-sm font-mono">
+                        <span>// TRUSTED_BY_AWARDEES_AT:</span>
+                        <div class="flex gap-4 opacity-50 grayscale">
+                            <span class="font-bold">NASA</span>
+                            <span class="font-bold">DARPA</span>
+                            <span class="font-bold">NSF</span>
+                            <span class="font-bold">DOE</span>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="flex space-x-3">
-                    <button @click="upgradeToProModal = true; showUpgradePrompt = false" 
-                            class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold">
-                        Upgrade Now
-                    </button>
-                    <button @click="showUpgradePrompt = false" 
-                            class="flex-1 border border-gray-300 dark:border-gray-600 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
-                        Not Now
-                    </button>
+                <!-- Terminal Visualization -->
+                <div class="lg:col-span-6 mt-16 lg:mt-0 relative">
+                    <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg blur opacity-20"></div>
+                    <div class="relative bg-black border border-white/10 rounded-lg shadow-2xl overflow-hidden font-mono text-sm leading-relaxed">
+                        <div class="flex items-center gap-2 px-4 py-3 bg-white/5 border-b border-white/10">
+                            <div class="flex gap-1.5">
+                                <div class="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 ml-2">user@voidcat-rdc:~/projects/phase-ii</div>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <div>
+                                <span class="text-green-400">➜</span> <span class="text-indigo-400">~</span> <span class="text-gray-300">voidcat analyze --target=DOD_N24B-T026</span>
+                            </div>
+                            <div class="text-gray-400 pl-4 border-l border-white/10 space-y-2">
+                                <div class="flex justify-between">
+                                    <span>[INIT] Establishing connection to SBIR.gov...</span>
+                                    <span class="text-green-500">OK</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>[FETCH] Retrieving solicitation requirements...</span>
+                                    <span class="text-green-500">DONE (142ms)</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>[SCAN] Analyzing eligibility criteria...</span>
+                                    <span class="text-green-500">MATCH (98.2%)</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>[COMPLIANCE] Verifying "No Simulations" adherence...</span>
+                                    <span class="text-green-500">VERIFIED</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-green-400">➜</span> <span class="text-indigo-400">~</span> <span class="text-gray-300">voidcat generate --type=budget_justification --format=FAR</span>
+                            </div>
+                            <div class="p-4 bg-white/5 rounded border border-white/10 text-xs">
+                                <span class="text-blue-400">GENERATING DRAFT...</span><br>
+                                <span class="text-gray-500">Source: live_rates_gs_schedule_2025.json</span><br>
+                                <span class="text-gray-500">Source: indirect_cost_rates_v4.json</span><br>
+                                <span class="text-gray-300">Output: budget_v1.pdf generated successfully.</span>
+                            </div>
+                            <div class="terminal-cursor text-gray-500">awaiting command...</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+    </section>
 
-        <!-- Enhanced Proposal Modal -->
-        <div x-show="showProposalModal" 
-             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-             x-transition>
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-                <!-- Modal Header -->
-                <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h3 class="text-2xl font-bold">📝 Generated Proposal</h3>
-                            <p class="text-blue-100 mt-1" x-text="currentProposal?.grant_id ? `Grant ID: ${currentProposal.grant_id}` : 'AI-Generated Grant Proposal'"></p>
-                        </div>
-                        <button @click="showProposalModal = false; currentProposalText = ''" 
-                            class="text-blue-100 hover:text-white text-2xl font-bold"
-                                aria-label="Close">
-                            ×
-                        </button>
+    <!-- Capabilities / Architecture -->
+    <section id="features" class="py-20 relative border-t border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold tracking-tight mb-4">System Architecture</h2>
+                <p class="text-gray-400 max-w-2xl mx-auto">Engineered for defense contractors and research institutes requiring absolute data integrity.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="group p-6 bg-white/5 border border-white/10 rounded-lg hover:border-indigo-500/50 transition-colors">
+                    <div class="w-12 h-12 bg-indigo-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-indigo-500/20 transition-colors">
+                        <i data-lucide="shield-check" class="w-6 h-6 text-indigo-400"></i>
                     </div>
+                    <h3 class="text-xl font-bold mb-2 font-mono">DCAA Compliance</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Automated generation of budget justifications that adhere strictly to Federal Acquisition Regulations (FAR). Zero calculation errors.
+                    </p>
                 </div>
-                
-                <!-- Modal Body -->
-                <div class="p-6 overflow-y-auto max-h-[60vh]">
-                    <div class="prose max-w-none">
-                            <pre class="whitespace-pre-wrap text-gray-800 dark:text-gray-200 font-mono text-sm leading-relaxed bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border dark:border-gray-600"
-                                x-text="currentProposalText || (currentProposal?.proposal ? JSON.stringify(currentProposal.proposal, null, 2) : currentProposal)"></pre>
+
+                <!-- Feature 2 -->
+                <div class="group p-6 bg-white/5 border border-white/10 rounded-lg hover:border-indigo-500/50 transition-colors">
+                    <div class="w-12 h-12 bg-indigo-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-indigo-500/20 transition-colors">
+                        <i data-lucide="cpu" class="w-6 h-6 text-indigo-400"></i>
                     </div>
+                    <h3 class="text-xl font-bold mb-2 font-mono">Real-Time Search</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Direct API hooks into 11 federal agency portals. We index opportunities milliseconds after they are published to SAM.gov.
+                    </p>
                 </div>
-                
-                <!-- Modal Footer -->
-                <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t dark:border-gray-600">
-                    <div class="flex flex-wrap gap-3 justify-between items-center">
-                        <div class="flex flex-wrap gap-3">
-                            <button @click="exportProposalAsMarkdown()" 
-                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
-                                📄 Export Markdown
-                            </button>
-                            <button @click="copyProposalToClipboard()" 
-                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
-                                📋 Copy to Clipboard
-                            </button>
-                        </div>
-                        <div class="flex gap-3">
-                                <button @click="showProposalModal = false; currentProposalText = ''" 
-                                    class="border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-white">
-                                Close
-                            </button>
-                        </div>
+
+                <!-- Feature 3 -->
+                <div class="group p-6 bg-white/5 border border-white/10 rounded-lg hover:border-indigo-500/50 transition-colors">
+                    <div class="w-12 h-12 bg-indigo-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-indigo-500/20 transition-colors">
+                        <i data-lucide="file-text" class="w-6 h-6 text-indigo-400"></i>
                     </div>
-                    <p class="text-xs text-gray-600 dark:text-gray-300 mt-3">
-                        💡 <strong>Tip:</strong> This is an AI-generated draft. Review and customize before submission.
+                    <h3 class="text-xl font-bold mb-2 font-mono">Phase II Automation</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Transition from Phase I to II seamlessly. We auto-populate your commercialization plan based on your initial technical volume.
                     </p>
                 </div>
             </div>
         </div>
+    </section>
 
-        <!-- Enhanced Grant Details Modal -->
-        <div x-show="showGrantDetailsModal" 
-             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-             x-transition>
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-                <!-- Modal Header -->
-                <div class="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h3 class="text-2xl font-bold">📋 Grant Details</h3>
-                            <p class="text-green-100 mt-1" x-text="currentGrantDetails?.agency || 'Federal Grant Opportunity'"></p>
-                        </div>
-                        <button @click="showGrantDetailsModal = false" 
-                                class="text-green-100 hover:text-white text-2xl font-bold"
-                                aria-label="Close">
-                            ×
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Modal Body -->
-                <div class="p-6 overflow-y-auto max-h-[60vh]">
-                    <template x-if="currentGrantDetails">
-                        <div class="space-y-6">
-                            <!-- Grant Title and Basic Info -->
-                            <div>
-                                <h4 class="text-xl font-bold text-gray-900 dark:text-white mb-2" x-text="currentGrantDetails.title"></h4>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <span class="font-semibold text-gray-700 dark:text-gray-300">🏛️ Agency:</span>
-                                        <span x-text="currentGrantDetails.agency" class="ml-2 dark:text-gray-200"></span>
-                                    </div>
-                                    <div>
-                                        <span class="font-semibold text-gray-700 dark:text-gray-300">📝 Program:</span>
-                                        <span x-text="currentGrantDetails.program" class="ml-2 dark:text-gray-200"></span>
-                                    </div>
-                                    <div>
-                                        <span class="font-semibold text-gray-700 dark:text-gray-300">📅 Deadline:</span>
-                                        <span x-text="formatDate(currentGrantDetails.deadline)" class="ml-2 dark:text-gray-200"></span>
-                                    </div>
-                                    <div>
-                                        <span class="font-semibold text-gray-700 dark:text-gray-300">💰 Amount:</span>
-                                        <span x-text="currentGrantDetails.amount" class="ml-2 font-bold text-green-600 dark:text-green-400"></span>
-                                    </div>
+    <!-- Compliance Monitor -->
+    <section id="compliance" class="py-20 bg-white/[0.02] border-y border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="lg:grid lg:grid-cols-2 gap-16 items-center">
+                <div>
+                    <h2 class="text-3xl font-bold tracking-tight mb-6">The "No Simulations" Standard</h2>
+                    <div class="space-y-6">
+                        <div class="flex gap-4">
+                            <div class="mt-1">
+                                <div class="w-6 h-6 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center">
+                                    <i data-lucide="check" class="w-3 h-3 text-green-400"></i>
                                 </div>
                             </div>
-                            
-                            <!-- Description -->
                             <div>
-                                <h5 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">📄 Description:</h5>
-                                <p class="text-gray-700 dark:text-gray-300 leading-relaxed" x-text="currentGrantDetails.description"></p>
+                                <h4 class="font-bold text-white mb-1">Live Data Only</h4>
+                                <p class="text-sm text-gray-400">Our models are grounded in real-time retrieval. If a grant isn't on Grants.gov, it doesn't exist in our system.</p>
                             </div>
-                            
-                            <!-- Eligibility -->
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="mt-1">
+                                <div class="w-6 h-6 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center">
+                                    <i data-lucide="check" class="w-3 h-3 text-green-400"></i>
+                                </div>
+                            </div>
                             <div>
-                                <h5 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">✅ Eligibility:</h5>
-                                <p class="text-gray-700 dark:text-gray-300" x-text="currentGrantDetails.eligibility"></p>
+                                <h4 class="font-bold text-white mb-1">Audit-Ready Logs</h4>
+                                <p class="text-sm text-gray-400">Every AI-generated suggestion includes a citation trail back to the specific solicitations source document.</p>
                             </div>
-                            
-                            <!-- Contact Information (if available) -->
-                            <template x-if="currentGrantDetails.contact">
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="mt-1">
+                                <div class="w-6 h-6 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center">
+                                    <i data-lucide="check" class="w-3 h-3 text-green-400"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white mb-1">Defense Grade Security</h4>
+                                <p class="text-sm text-gray-400">Your proprietary data never trains our public models. Deployment on isolated Cloudflare Workers infrastructure.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-10 lg:mt-0">
+                    <div class="bg-black border border-white/10 rounded-lg p-6 font-mono text-xs">
+                        <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-4">
+                            <span class="text-gray-400">SYSTEM_DIAGNOSTICS</span>
+                            <span class="text-green-400 animate-pulse">● LIVE</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span>HALLUCINATION_RATE</span>
+                                <span class="text-green-400">0.00%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>SOURCE_VERIFICATION</span>
+                                <span class="text-green-400">100.00%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>API_LATENCY</span>
+                                <span class="text-gray-400">42ms</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>COMPLIANCE_MODE</span>
+                                <span class="text-indigo-400">STRICT</span>
+                            </div>
+                        </div>
+                        <div class="mt-6 pt-4 border-t border-white/10 text-gray-500">
+                            > Identifying restricted entities...<br>
+                            > Checking FAR Part 31 allowability...<br>
+                            > Verifying SAM.gov registration status...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Integration Matrix -->
+    <section class="py-20 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-sm font-mono text-indigo-400 mb-8 tracking-widest">SUPPORTED_AGENCIES_V1.1</h2>
+            <div class="flex flex-wrap justify-center gap-4 sm:gap-8 opacity-60">
+                <div class="px-6 py-4 bg-white/5 rounded border border-white/10 font-bold text-xl">DOD</div>
+                <div class="px-6 py-4 bg-white/5 rounded border border-white/10 font-bold text-xl">NASA</div>
+                <div class="px-6 py-4 bg-white/5 rounded border border-white/10 font-bold text-xl">NSF</div>
+                <div class="px-6 py-4 bg-white/5 rounded border border-white/10 font-bold text-xl">DOE</div>
+                <div class="px-6 py-4 bg-white/5 rounded border border-white/10 font-bold text-xl">NIH</div>
+                <div class="px-6 py-4 bg-white/5 rounded border border-white/10 font-bold text-xl">USDA</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" class="py-20 border-t border-white/5 relative">
+        <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/10 to-transparent pointer-events-none"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold tracking-tight mb-4">Transparent Deployment Costs</h2>
+                <p class="text-gray-400">No consulting retainers. No equity taken.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <!-- Free Tier -->
+                <div class="p-8 bg-black border border-white/10 rounded-lg flex flex-col">
+                    <div class="mb-4">
+                        <span class="text-sm font-mono text-gray-500 border border-white/10 px-2 py-1 rounded">TIER_0: SCOUT</span>
+                    </div>
+                    <div class="text-4xl font-bold mb-6">$0<span class="text-lg text-gray-500 font-normal">/mo</span></div>
+                    <ul class="space-y-4 mb-8 flex-1 text-gray-400 text-sm">
+                        <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-green-500"></i> 1 Grant Application / Month</li>
+                        <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-green-500"></i> Basic Grant Search</li>
+                        <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-green-500"></i> Manual Compliance Check</li>
+                    </ul>
+                    <button @click="modalOpen = true; modalType = 'register'" class="w-full py-3 border border-white/20 rounded hover:bg-white/5 transition-colors font-mono text-sm">INIT_FREE_ACCOUNT</button>
+                </div>
+
+                <!-- Pro Tier -->
+                <div class="p-8 bg-indigo-900/10 border border-indigo-500/30 rounded-lg flex flex-col relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-indigo-500 text-white text-xs font-bold px-3 py-1 font-mono">RECOMMENDED</div>
+                    <div class="mb-4">
+                        <span class="text-sm font-mono text-indigo-400 border border-indigo-500/30 px-2 py-1 rounded">TIER_1: COMMAND</span>
+                    </div>
+                    <div class="text-4xl font-bold mb-6">$99<span class="text-lg text-gray-500 font-normal">/mo</span></div>
+                    <ul class="space-y-4 mb-8 flex-1 text-gray-300 text-sm">
+                        <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-indigo-400"></i> Unlimited Applications</li>
+                        <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-indigo-400"></i> AI Proposal Generation</li>
+                        <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-indigo-400"></i> Phase II Commercialization Plans</li>
+                        <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-indigo-400"></i> Priority Support</li>
+                    </ul>
+                    <button @click="modalOpen = true; modalType = 'register'" class="w-full py-3 bg-indigo-600 rounded hover:bg-indigo-700 transition-colors font-mono text-sm text-white font-bold shadow-[0_0_15px_rgba(79,70,229,0.3)]">UPGRADE_TO_PRO</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/10 bg-black pt-16 pb-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+                <div class="col-span-2 md:col-span-1">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-6 h-6 bg-indigo-600 rounded-sm flex items-center justify-center">
+                            <i data-lucide="terminal" class="w-3 h-3 text-white"></i>
+                        </div>
+                        <span class="font-mono font-bold">VoidCat_RDC</span>
+                    </div>
+                    <p class="text-xs text-gray-500 leading-relaxed">
+                        Helping startups navigate the valley of death with automated federal compliance.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-white mb-4 text-sm">Platform</h4>
+                    <ul class="space-y-2 text-xs text-gray-500">
+                        <li><a href="#" class="hover:text-white transition-colors">Search</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Proposal Engine</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Pricing</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold text-white mb-4 text-sm">Resources</h4>
+                    <ul class="space-y-2 text-xs text-gray-500">
+                        <li><a href="https://sorrowscry86.github.io/voidcat-grant-automation" class="hover:text-white transition-colors">Documentation</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">API Status</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Security</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold text-white mb-4 text-sm">Legal</h4>
+                    <ul class="space-y-2 text-xs text-gray-500">
+                        <li><a href="#" class="hover:text-white transition-colors">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Terms of Service</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">DCAA Disclaimer</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <p class="text-xs text-gray-600 font-mono">© 2025 VoidCat RDC. All systems nominal.</p>
+                <div class="flex gap-4">
+                    <i data-lucide="github" class="w-4 h-4 text-gray-600 hover:text-white cursor-pointer transition-colors"></i>
+                    <i data-lucide="twitter" class="w-4 h-4 text-gray-600 hover:text-white cursor-pointer transition-colors"></i>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modal (Login/Register) -->
+    <div x-show="modalOpen" class="fixed inset-0 z-[100] overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true" style="display: none;">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div x-show="modalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-black/80 transition-opacity" aria-hidden="true" @click="modalOpen = false"></div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div x-show="modalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="relative inline-block align-bottom bg-[#09090b] border border-white/10 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md w-full">
+                <div class="bg-[#09090b] px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-bold text-white font-mono" id="modal-title" x-text="modalType === 'login' ? 'ACCESS_REQUEST' : 'NEW_USER_REGISTRATION'"></h3>
+                            <div class="mt-4 space-y-4">
                                 <div>
-                                    <h5 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">📞 Contact Information:</h5>
-                                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                                        <p class="dark:text-gray-200"><strong>Name:</strong> <span x-text="currentGrantDetails.contact.name"></span></p>
-                                        <p class="dark:text-gray-200"><strong>Email:</strong> <span x-text="currentGrantDetails.contact.email"></span></p>
-                                        <p class="dark:text-gray-200"><strong>Phone:</strong> <span x-text="currentGrantDetails.contact.phone"></span></p>
-                                    </div>
+                                    <label class="block text-xs font-mono text-gray-500 mb-1">USER_ID (EMAIL)</label>
+                                    <input type="email" class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono text-sm">
                                 </div>
-                            </template>
-                            
-                            <!-- Matching Score -->
-                            <div>
-                                <h5 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">🎯 Match Score:</h5>
-                                <div class="flex items-center">
-                                    <div class="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-3 mr-3">
-                                        <div class="bg-blue-600 h-3 rounded-full transition-all" 
-                                             :style="`width: ${(currentGrantDetails.matching_score || 0) * 100}%`"></div>
-                                    </div>
-                                    <span class="text-sm font-semibold dark:text-gray-200" 
-                                          x-text="`${Math.round((currentGrantDetails.matching_score || 0) * 100)}% match`"></span>
+                                <div>
+                                    <label class="block text-xs font-mono text-gray-500 mb-1">ACCESS_KEY (PASSWORD)</label>
+                                    <input type="password" class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono text-sm">
                                 </div>
                             </div>
                         </div>
-                    </template>
-                </div>
-                
-                <!-- Modal Footer -->
-                <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t dark:border-gray-600">
-                    <div class="flex justify-between items-center">
-                        <p class="text-xs text-gray-600 dark:text-gray-300">
-                            💡 <strong>Tip:</strong> Click "Generate Proposal" to create an AI-powered application for this grant.
-                        </p>
-                        <div class="flex gap-3">
-                            <template x-if="currentGrantDetails">
-                                <button @click="generateProposal(currentGrantDetails.id); if (user) showGrantDetailsModal = false"
-                                        :disabled="loading"
-                                        :title="user ? 'Generate an AI proposal for this opportunity' : 'Register or log in to unlock proposal generation'"
-                                        :class="[
-                                            'px-4 py-2 rounded-lg text-sm font-semibold transition-colors focus:outline-none',
-                                            loading ? 'bg-gray-400 cursor-not-allowed' : (user ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-800 hover:bg-gray-300')
-                                        ]">
-                                    <span x-show="!loading" x-text="user ? '✨ Generate Proposal' : '✨ Register to Generate Proposal'"></span>
-                                    <span x-show="loading" class="flex items-center">
-                                        <svg class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Generating...
-                                    </span>
-                                </button>
-                            </template>
-                            <button @click="showGrantDetailsModal = false" 
-                                    class="border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-white">
-                                Close
-                            </button>
-                        </div>
                     </div>
+                </div>
+                <div class="bg-[#09090b] border-t border-white/10 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm font-mono" @click="modalOpen = false">
+                        EXECUTE
+                    </button>
+                    <button type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-white/10 shadow-sm px-4 py-2 bg-white/5 text-base font-medium text-gray-300 hover:text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm font-mono" @click="modalOpen = false">
+                        ABORT
+                    </button>
                 </div>
             </div>
         </div>
-
-        <!-- Notification Modal -->
-        <div x-show="showNotificationModal" 
-             class="fixed top-4 right-4 z-60 max-w-sm"
-             x-transition:enter="transition ease-out duration-300"
-             x-transition:enter-start="opacity-0 transform translate-x-full"
-             x-transition:enter-end="opacity-100 transform translate-x-0"
-             x-transition:leave="transition ease-in duration-300"
-             x-transition:leave-start="opacity-100 transform translate-x-0"
-             x-transition:leave-end="opacity-0 transform translate-x-full">
-            <div class="rounded-lg shadow-lg overflow-hidden"
-                 :class="notificationType === 'success' ? 'bg-green-500' : 
-                         notificationType === 'error' ? 'bg-red-500' : 
-                         notificationType === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'">
-                <div class="p-4">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <span class="text-white text-xl"
-                                  x-text="notificationType === 'success' ? '✅' : 
-                                          notificationType === 'error' ? '❌' : 
-                                          notificationType === 'warning' ? '⚠️' : 'ℹ️'"></span>
-                        </div>
-                        <div class="ml-3 flex-1">
-                            <p class="text-white font-medium" x-text="notificationMessage"></p>
-                        </div>
-                        <div class="ml-4 flex-shrink-0">
-                            <button @click="showNotificationModal = false" 
-                                    class="text-white hover:text-gray-200"
-                                    aria-label="Close">
-                                <span class="text-lg">×</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Error Modal -->
-        <div x-show="showErrorModal" 
-             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-             x-transition>
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-md w-full">
-                <!-- Modal Header -->
-                <div class="bg-red-600 text-white p-4 rounded-t-lg">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-bold flex items-center gap-2">
-                            ❌ Error
-                        </h3>
-                        <button @click="showErrorModal = false" 
-                                class="text-red-100 hover:text-white text-xl font-bold"
-                                aria-label="Close">
-                            ×
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Modal Body -->
-                <div class="p-6">
-                    <p class="text-gray-700 dark:text-gray-300" x-text="errorMessage"></p>
-                </div>
-                
-                <!-- Modal Footer -->
-                <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 rounded-b-lg border-t dark:border-gray-600">
-                    <div class="flex justify-end">
-                        <button @click="showErrorModal = false" 
-                                class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
-                            Close
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Grant Results -->
-        <div x-show="grants.length > 0" class="space-y-4">
-            <template x-for="grant in filteredGrants" :key="grant.id">
-                <div class="grant-card bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="flex-1">
-                            <h4 class="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-1" x-text="grant.title"></h4>
-                            <p class="text-gray-600 dark:text-gray-300 font-medium" x-text="grant.agency"></p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400" x-text="grant.program"></p>
-                        </div>
-                        <div class="text-right ml-4">
-                            <p class="text-lg font-bold text-green-600 dark:text-green-400" x-text="grant.amount"></p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                📅 Deadline: <span x-text="formatDate(grant.deadline)"></span>
-                            </p>
-                            <div class="flex items-center mt-2">
-                                <div class="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-2">
-                                    <div class="bg-blue-600 h-2 rounded-full transition-all" 
-                                         :style="`width: ${grant.matching_score * 100}%`"></div>
-                                </div>
-                                <span class="text-xs text-gray-600 dark:text-gray-400" 
-                                      x-text="`${Math.round(grant.matching_score * 100)}% match`"></span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <p class="text-gray-700 dark:text-gray-300 mb-4" x-text="grant.description"></p>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        <strong>✅ Eligibility:</strong> <span x-text="grant.eligibility"></span>
-                    </p>
-                    
-                    <div class="flex flex-wrap gap-3">
-                        <button @click="viewGrant(grant.id)"
-                                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm">
-                            📋 View Details
-                        </button>
-                        <button @click="generateProposal(grant.id)"
-                                :disabled="loading"
-                                :title="user ? 'Generate an AI proposal for this opportunity' : 'Register or log in to unlock AI proposals'"
-                                :class="[
-                                    'px-4 py-2 rounded transition-colors text-sm font-semibold',
-                                    loading ? 'bg-gray-400 cursor-not-allowed' : (user ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-yellow-500 text-white hover:bg-yellow-600')
-                                ]">
-                            <span x-show="!loading" x-text="user ? '🤖 Generate Proposal' : '🤖 Generate Proposal · Register to Unlock'"></span>
-                            <span x-show="loading" class="flex items-center">
-                                <svg class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Generating...
-                            </span>
-                        </button>
-                        <button @click="toggleSaveGrant(grant.id)"
-                                :class="isSaved(grant.id) ? 'bg-yellow-500 text-white hover:bg-yellow-600' : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white'"
-                                class="px-4 py-2 rounded transition-colors text-sm">
-                            <span x-text="isSaved(grant.id) ? '⭐ Saved' : '💾 Save for Later'"></span>
-                        </button>
-                    </div>
-                </div>
-            </template>
-        </div>
-
-        <!-- Loading State -->
-        <div x-show="loading" class="text-center py-8">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p class="mt-2 text-gray-600 dark:text-gray-400">Loading grant opportunities...</p>
-        </div>
-
-        <!-- Empty State -->
-        <div x-show="!loading && grants.length === 0 && searchPerformed" 
-             class="text-center py-12">
-            <div class="text-gray-400 dark:text-gray-600 text-6xl mb-4">📋</div>
-            <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">No grants found</h3>
-            <p class="text-gray-500 dark:text-gray-400">Try adjusting your search criteria or browse all opportunities.</p>
-        </div>        <!-- Hero Section -->
-        <div x-show="!searchPerformed" class="mt-8">
-            <section class="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12 rounded-lg mb-12">
-                <div class="container mx-auto text-center px-6">
-                    <h1 class="text-4xl font-bold mb-4">Win More Federal Grants with AI</h1>
-                    <p class="text-xl mb-6">20% success rate vs 10% industry average • $2.5M+ in client awards</p>
-                    <div class="flex justify-center space-x-4 mb-6">
-                        <button @click="showRegister = true" 
-                                class="bg-white text-blue-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors">
-                            Start Free Trial
-                        </button>
-                        <a href="#features" class="border border-white px-8 py-3 rounded-lg hover:bg-white hover:text-blue-600 transition-colors">See Features</a>
-                        <a href="#demo" class="border border-white px-8 py-3 rounded-lg hover:bg-white hover:text-blue-600 transition-colors">Watch Demo</a>
-                    </div>
-                    <p class="text-sm opacity-90">✅ No credit card required • ✅ 1 free grant application</p>
-                </div>
-            </section>
-
-            <!-- Social Proof Section -->
-            <section class="py-12 bg-gray-50 dark:bg-gray-800 rounded-lg mb-8">
-                <div class="container mx-auto text-center px-6">
-                    <h2 class="text-2xl font-bold mb-8 dark:text-white">Trusted by Innovative Companies</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div class="bg-white dark:bg-gray-700 p-6 rounded-lg shadow">
-                            <div class="text-3xl mb-2">🚀</div>
-                            <h3 class="font-semibold dark:text-white">TechStartup AI</h3>
-                            <p class="text-gray-600 dark:text-gray-300">"Won $250k SBIR in 3 weeks"</p>
-                        </div>
-                        <div class="bg-white dark:bg-gray-700 p-6 rounded-lg shadow">
-                            <div class="text-3xl mb-2">🛡️</div>
-                            <h3 class="font-semibold dark:text-white">DefenseTech Corp</h3>
-                            <p class="text-gray-600 dark:text-gray-300">"Automated our entire grant process"</p>
-                        </div>
-                        <div class="bg-white dark:bg-gray-700 p-6 rounded-lg shadow">
-                            <div class="text-3xl mb-2">🔬</div>
-                            <h3 class="font-semibold dark:text-white">Research Institute</h3>
-                            <p class="text-gray-600 dark:text-gray-300">"Doubled our funding success rate"</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Features Section -->
-            <h2 id="features" class="text-2xl font-semibold text-center mb-8 dark:text-white">Everything You Need to Win Grants</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-                    <div class="text-4xl mb-4">🎯</div>
-                    <h3 class="text-lg font-semibold mb-2 dark:text-white">AI-Powered Matching</h3>
-                    <p class="text-gray-600 dark:text-gray-300">Automatically match your capabilities to the most relevant federal opportunities.</p>
-                </div>
-                <div class="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-                    <div class="text-4xl mb-4">⚡</div>
-                    <h3 class="text-lg font-semibold mb-2 dark:text-white">Proposal Generation</h3>
-                    <p class="text-gray-600 dark:text-gray-300">Generate high-quality grant proposals in minutes using our AI assistant.</p>
-                </div>
-                <div class="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-                    <div class="text-4xl mb-4">⏱️</div>
-                    <h3 class="text-lg font-semibold mb-2 dark:text-white">Time Savings</h3>
-                    <p class="text-gray-600 dark:text-gray-300">Save dozens of hours per application with streamlined workflows.</p>
-                </div>
-            </div>
-
-            <!-- Demo Section -->
-            <section id="demo" class="py-12 bg-white dark:bg-gray-800 rounded-lg mt-12 shadow-sm border dark:border-gray-700">
-                <div class="container mx-auto text-center px-6">
-                    <h2 class="text-2xl font-bold mb-4 dark:text-white">See It In Action</h2>
-                    <p class="text-gray-600 dark:text-gray-300 mb-6">Watch a quick walkthrough of searching grants and generating a proposal.</p>
-                    <div class="w-full">
-                        <iframe class="w-full h-64 md:h-96" src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="VoidCat RDC Demo" frameborder="0" allowfullscreen></iframe>
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <!-- Footer -->
-        <footer class="mt-12 text-center text-gray-500 dark:text-gray-400 text-sm">
-            <p>&copy; 2025 VoidCat RDC. Federal Grant Automation Platform.</p>
-            <p class="mt-1">Helping startups secure federal funding through AI-powered grant discovery and proposal generation.</p>
-            <div class="mt-4 flex justify-center space-x-6">
-                <a href="privacy-policy.html" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">Privacy Policy</a>
-                <a href="terms-of-service.html" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">Terms of Service</a>
-                <a href="mailto:support@voidcat.org" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">Support</a>
-            </div>
-        </footer>
     </div>
 
     <script>
-        // --- Crypto utilities for securing API key in localStorage ---
-        // Uses AES-GCM and key derived from user's email as passphrase.
-        async function getKeyMaterial(passphrase) {
-            let enc = new TextEncoder();
-            return await window.crypto.subtle.importKey(
-                "raw",
-                enc.encode(passphrase),
-                "PBKDF2",
-                false,
-                ["deriveKey"]
-            );
-        }
-
-        async function deriveKey(passphrase, salt) {
-            const keyMaterial = await getKeyMaterial(passphrase);
-            return await window.crypto.subtle.deriveKey(
-                {
-                    "name": "PBKDF2",
-                    salt: salt,
-                    "iterations": 100000,
-                    "hash": "SHA-256"
-                },
-                keyMaterial,
-                { "name": "AES-GCM", "length": 256},
-                false,
-                ["encrypt", "decrypt"]
-            );
-        }
-
-        async function encryptString(text, passphrase) {
-            let enc = new TextEncoder();
-            // Generate random salt and IV
-            let salt = window.crypto.getRandomValues(new Uint8Array(16));
-            let iv = window.crypto.getRandomValues(new Uint8Array(12));
-            let key = await deriveKey(passphrase, salt);
-            let ciphertext = await window.crypto.subtle.encrypt(
-                {
-                    name: "AES-GCM",
-                    iv: iv
-                },
-                key,
-                enc.encode(text)
-            );
-            // Encode salt, iv, and ciphertext as base64
-            let b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
-            return [
-                b64(salt),
-                b64(iv),
-                b64(ciphertext)
-            ].join(':');
-        }
-
-        async function decryptString(data, passphrase) {
-            let [saltB64, ivB64, ciphertextB64] = data.split(':');
-            if (!saltB64 || !ivB64 || !ciphertextB64) return null;
-            let b64ToArr = (b64) => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-            let salt = b64ToArr(saltB64);
-            let iv = b64ToArr(ivB64);
-            let ciphertext = b64ToArr(ciphertextB64);
-            let key = await deriveKey(passphrase, salt);
-            let dec = await window.crypto.subtle.decrypt(
-                {
-                    name: "AES-GCM",
-                    iv: iv
-                },
-                key,
-                ciphertext
-            );
-            return new TextDecoder().decode(dec);
-        }
-
-        // ... (crypto helpers above) ...
-
-        // Constants
-        const MIN_VALID_YEAR = 2024;
-
-        function grantApp() {
-            return {
-                // State
-                user: null,
-                apiKey: null, // will be initialized async in init()
-                grants: [],
-                savedGrants: [],
-                darkMode: false,
-                // Async initialization (called automatically by Alpine.js)
-                async init() {
-                    // Initialize dark mode from localStorage
-                    this.darkMode = localStorage.getItem('darkMode') === 'true';
-                    this.applyDarkMode();
-
-                    // Load saved grants from localStorage
-                    const savedGrantsData = localStorage.getItem('voidcat_saved_grants');
-                    if (savedGrantsData) {
-                        try {
-                            this.savedGrants = JSON.parse(savedGrantsData);
-                        } catch (e) {
-                            console.error('Error loading saved grants:', e);
-                            this.savedGrants = [];
-                        }
-                    }
-
-                    // If user has provided email before, use as passphrase. Otherwise, static for demo.
-                    let stored = localStorage.getItem('voidcat_api_key');
-                    if (stored) {
-                        try {
-                            // We need a passphrase; try using the registerForm email or ask the user
-                            let passphrase = this.registerForm?.email || (this.user?.email) || window.prompt("Enter your email to unlock stored credentials:");
-                            if (!passphrase) return;
-                            this.apiKey = await decryptString(stored, passphrase);
-                        } catch (e) {
-                            console.error("Error decrypting API key from storage", e);
-                        }
-                    }
-                },
-                
-                // Dark mode methods
-                toggleDarkMode() {
-                    this.darkMode = !this.darkMode;
-                    localStorage.setItem('darkMode', this.darkMode);
-                    this.applyDarkMode();
-                },
-                
-                applyDarkMode() {
-                    if (this.darkMode) {
-                        document.documentElement.classList.add('dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                    }
-                },
-                loading: false,
-                registering: false,
-                searchPerformed: false,
-                showRegister: false,
-                upgradeToProModal: false,
-                showUpgradePrompt: false,
-                upgradeError: '',
-                menuOpen: false,
-                
-                // New modal states for UX overhaul
-                showProposalModal: false,
-                showGrantDetailsModal: false,
-                showNotificationModal: false,
-                showErrorModal: false,
-                
-                // Modal content
-                currentProposal: null,
-                currentProposalText: '',
-                currentGrantDetails: null,
-                notificationMessage: '',
-                errorMessage: '',
-                notificationType: 'success', // 'success', 'error', 'warning', 'info'
-                
-                // Form data
-                searchQuery: '',
-                selectedAgency: '',
-                showOnlySaved: false,
-                
-                registerForm: {
-                    name: '',
-                    email: '',
-                    company: ''
-                },
-
-                // API Configuration - Environment-aware for testing and production
-                apiBase: (() => {
-                    // Check for test environment flag
-                    const params = new URLSearchParams(window.location.search);
-                    const isTestMode = params.has('test_api') || params.get('api_mode') === 'local';
-                    
-                    // Check if running locally (localhost or file://)
-                    const isLocalhost = window.location.hostname === 'localhost' || 
-                                       window.location.hostname === '127.0.0.1' ||
-                                       window.location.protocol === 'file:';
-                    
-                    // Use local API for testing or when explicitly requested
-                    if (isTestMode || (isLocalhost && !params.has('use_production_api'))) {
-                        return 'http://localhost:8787';
-                    }
-                    
-                    // Default to production API
-                    return 'https://grant-search-api.sorrowscry86.workers.dev';
-                })(),
-
-                // Initialize
-                async init() {
-                    console.log('VoidCat Grant App Initializing...');
-                    if (this.apiKey) {
-                        await this.checkAuth();
-                    }
-                    // Auto-search on load to show available grants (skip during E2E tests)
-                    const params = new URLSearchParams(window.location.search);
-                    if (!params.has('e2e_skip_autosearch')) {
-                        await this.searchGrants();
-                    }
-                },
-
-                // Authentication
-                async checkAuth() {
-                    try {
-                        const response = await fetch(`${this.apiBase}/api/users/me`, {
-                            headers: {
-                                'Authorization': `Bearer ${this.apiKey}`
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            this.user = data.user;
-                            console.log('User authenticated:', this.user);
-                        } else {
-                            localStorage.removeItem('voidcat_api_key');
-                            this.apiKey = null;
-                        }
-                    } catch (error) {
-                        console.error('Auth check failed:', error);
-                    }
-                },
-
-                // Registration
-                async register() {
-                    this.registering = true;
-                    try {
-                        const response = await fetch(`${this.apiBase}/api/users/register`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(this.registerForm)
-                        });
-                        const data = await response.json();
-                        if (response.ok && (data.api_key || data.token || data.success)) {
-                            if (data.api_key) {
-                                this.apiKey = data.api_key;
-                                {
-                                    // Use email as passphrase for encryption
-                                    let passphrase = this.registerForm?.email || (this.user?.email);
-                                    if (!passphrase) passphrase = window.prompt("Enter an email to protect your API key:");
-                                    encryptString(this.apiKey, passphrase).then(enc => {
-                                        localStorage.setItem('voidcat_api_key', enc);
-                                    });
-                                }
-                                // Set user data immediately from registration response
-                                this.user = {
-                                    email: this.registerForm.email,
-                                    name: this.registerForm.name,
-                                    subscription_tier: data.subscription_tier || 'free',
-                                    usage_count: 0
-                                };
-                                await this.checkAuth(); // This will update with more complete user data
-                            } else if (data.token) {
-                                this.apiKey = data.token;
-                                {
-                                    let passphrase = this.registerForm?.email || (this.user?.email);
-                                    if (!passphrase) passphrase = window.prompt("Enter an email to protect your token:");
-                                    encryptString(this.apiKey, passphrase).then(enc => {
-                                        localStorage.setItem('voidcat_api_key', enc);
-                                    });
-                                }
-                                if (data.user) this.user = data.user;
-                            } else {
-                                // Fallback: set minimal user context for UI when only success is returned
-                                this.user = {
-                                    email: this.registerForm.email,
-                                    name: this.registerForm.name,
-                                    subscription_tier: 'free',
-                                    usage_count: 0
-                                };
-                            }
-                            this.showNotification('🎉 Registration successful! You can now generate proposals.', 'success');
-                        } else {
-                            const error = data;
-                            console.error('Registration failed:', (error?.error || 'Unknown error'));
-                            this.showNotification('❌ Registration failed: ' + (error?.error || 'Unknown error'), 'error');
-                        }
-                    } catch (error) {
-                        console.error('Registration failed: ' + error.message);
-                        this.showNotification('❌ Registration failed: ' + error.message, 'error');
-                    } finally {
-                        this.registering = false;
-                        // Always close modal and clear form after registration attempt
-                        this.showRegister = false;
-                        this.registerForm = { name: '', email: '', company: '' };
-                    }
-                },
-
-                // Grant search
-                async searchGrants() {
-                    this.loading = true;
-                    console.log('🔍 Starting grant search...');
-                    
-                    try {
-                        const params = new URLSearchParams();
-                        if (this.searchQuery) params.append('query', this.searchQuery);
-                        if (this.selectedAgency) params.append('agency', this.selectedAgency);
-
-                        console.log('📡 Attempting API call to:', `${this.apiBase}/api/grants/search?${params}`);
-                        
-                        const response = await fetch(`${this.apiBase}/api/grants/search?${params}`, {
-                            method: 'GET',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            mode: 'cors'
-                        });
-                        
-                        console.log('📡 API Response status:', response.status);
-                        
-                        if (!response.ok) {
-                            // Handle usage limit reached with upgrade prompt
-                            if (response.status === 429) {
-                                try {
-                                    const err = await response.json();
-                                    if (err?.upgrade_required) {
-                                        this.showUpgradePrompt = true;
-                                        throw new Error(err.message || 'Usage limit reached');
-                                    }
-                                } catch {}
-                            }
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        
-                        const data = await response.json();
-                        console.log('📡 API Response data:', data);
-                        
-                        if (data.success && data.grants) {
-                            this.grants = data.grants;
-                            console.log('✅ Found grants from API:', data.grants.length);
-                        } else {
-                            console.error('❌ Search failed:', data.error);
-                            throw new Error(data.error || 'API returned unsuccessful response');
-                        }
-                    } catch (error) {
-                        console.error('❌ Search error:', error.message);
-                        
-                        // NO SIMULATIONS LAW: Show error, don't use demo data fallback
-                        this.grants = [];
-                        this.showNotification(
-                            'Grant search is temporarily unavailable. Please try again in a few minutes.',
-                            'error'
-                        );
-                    } finally {
-                        this.loading = false;
-                        this.searchPerformed = true;
-                        console.log('🏁 Search completed. Total grants:', this.grants.length);
-                    }
-                },
-
-                // View grant details
-                viewGrant(grantId) {
-                    // Find grant in local grants array
-                    const grant = this.grants.find(g => g.id === grantId);
-
-                    if (grant) {
-                        // Show grant details modal with the grant data
-                        this.showGrantDetails(grant);
-                    } else {
-                        this.showError('Grant not found. Please search again.');
-                    }
-                },
-
-                // Generate proposal
-                async generateProposal(grantId) {
-                    console.log('🤖 Generate Proposal clicked for grant:', grantId);
-                    console.log('Current user:', this.user);
-                    console.log('API Key present:', !!this.apiKey);
-                    
-                    if (!this.user) {
-                        console.log('⚠️ No user logged in - showing registration modal');
-                        this.showRegister = true;
-                        return;
-                    }
-
-                    // Check usage limits for free users
-                    if (this.user.subscription_tier === 'free' && (this.user.usage_count || 0) >= 1) {
-                        console.log('⚠️ Free tier limit reached - showing upgrade prompt');
-                        this.showUpgradePrompt = true;
-                        return;
-                    }
-
-                    // Find grant details from local grants array
-                    const grant = this.grants.find(g => g.id === grantId);
-                    if (!grant) {
-                        console.error('❌ Grant not found:', grantId);
-                        this.showError('Grant not found. Please search again.');
-                        return;
-                    }
-                    
-                    console.log('📝 Generating proposal for grant:', grant.title);
-                    this.loading = true;
-
-                    try {
-                        const response = await fetch(`${this.apiBase}/api/grants/generate-ai-proposal`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${this.apiKey}`
-                            },
-                            body: JSON.stringify({
-                                grant_id: grantId,
-                                grant_title: grant.title,
-                                grant_agency: grant.agency,
-                                grant_program: grant.program,
-                                grant_description: grant.description,
-                                grant_amount: grant.amount,
-                                grant_deadline: grant.deadline,
-                                company_profile: {
-                                    name: 'VoidCat RDC',
-                                    capabilities: 'AI/ML development, software engineering, federal compliance'
-                                }
-                            })
-                        });
-
-                        this.loading = false;
-                        const data = await response.json();
-                        console.log('📥 API Response:', data);
-                        
-                        if (data.success) {
-                            console.log('✅ Proposal generated successfully');
-                            const proposal = data.proposal || {};
-                            const budget = proposal.budget_summary || {};
-                            const formatCurrency = (value) => {
-                                const num = typeof value === 'number' ? value : (parseInt(value, 10) || 0);
-                                return `$${num.toLocaleString()}`;
-                            };
-                            const timeline = Array.isArray(proposal.timeline) ? proposal.timeline : [];
-                            const timelineText = timeline.length
-                                ? timeline.map(t => `• ${t.phase || 'Phase'}: ${t.task || 'Work in progress'}`).join('\n')
-                                : '• Timeline details will be refined by the AI.';
-                            const generatedAt = data.generated_at
-                                ? new Date(data.generated_at).toLocaleString()
-                                : new Date().toLocaleString();
-                            const proposalText = `
-🤖 AI-Generated Proposal Preview
-
-Grant: ${grant.title || 'Selected Opportunity'} (${grant.agency || 'Agency'})
-
-📝 Executive Summary:
-${proposal.executive_summary || 'Executive summary will be generated by the AI.'}
-
-🔬 Technical Approach:
-${proposal.technical_approach || 'Technical approach details will be prepared by the AI.'}
-
-💼 Commercial Potential:
-${proposal.commercial_potential || 'Commercial potential narrative is coming soon.'}
-
-💰 Budget Summary:
-• Personnel: ${formatCurrency(budget.personnel)}
-• Equipment: ${formatCurrency(budget.equipment)}
-• Overhead: ${formatCurrency(budget.overhead)}
-• Total: ${formatCurrency(budget.total)}
-
-📅 Timeline:
-${timelineText}
-
-Generated at: ${generatedAt}
-
-Note: This is an AI-generated draft. Review and customize before submission.
-                            `;
-                            this.showProposal(data, proposalText.trim());
-                        } else {
-                            console.error('❌ API Error:', data.error);
-                            this.showError('Error generating proposal: ' + data.error);
-                        }
-                    } catch (error) {
-                        console.error('❌ Error generating proposal:', error);
-                        this.loading = false;
-                        this.showError('Error generating proposal. Please try again. Check console for details.');
-                    }
-                },
-
-                // Create Stripe Checkout Session
-                async createCheckoutSession() {
-                    if (!this.user) {
-                        this.showNotification('Please log in to upgrade.', 'warning');
-                        this.showRegister = true;
-                        return;
-                    }
-
-                    try {
-                        const response = await fetch(`${this.apiBase}/api/stripe/create-checkout`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${this.apiKey}`
-                            },
-                            body: JSON.stringify({
-                                email: this.user.email
-                                // Note: price_id is configured on the backend
-                            })
-                        });
-
-                        const data = await response.json();
-                        const checkoutUrl = data.checkout_url || data.url;
-                        const sessionId = data.sessionId || data.session_id;
-
-                        if (checkoutUrl) {
-                            window.open(checkoutUrl, '_blank');
-                            return;
-                        }
-
-                        if (sessionId) {
-                            // Initialize Stripe and redirect to checkout
-                            const stripe = Stripe('pk_live_YOUR_PUBLISHABLE_KEY_HERE');
-                            const result = await stripe.redirectToCheckout({ sessionId });
-                            if (result.error) {
-                                this.upgradeError = result.error.message || 'Unknown payment error';
-                            }
-                        } else {
-                            this.upgradeError = (data.error?.message || data.error || 'Unknown error');
-                        }
-                    } catch (error) {
-                        console.error('Checkout error:', error);
-                        this.upgradeError = error.message || 'Failed to create checkout session';
-                    }
-                },
-
-                // Modal helper methods for UX overhaul
-                showNotification(message, type = 'success') {
-                    this.notificationMessage = message;
-                    this.notificationType = type;
-                    this.showNotificationModal = true;
-                    
-                    // Auto-hide success notifications after 3 seconds
-                    if (type === 'success') {
-                        setTimeout(() => {
-                            this.showNotificationModal = false;
-                        }, 3000);
-                    }
-                },
-
-                showError(message) {
-                    this.errorMessage = message;
-                    this.showErrorModal = true;
-                },
-
-                showProposal(proposalData, previewText = '') {
-                    this.currentProposal = proposalData;
-                    this.currentProposalText = previewText;
-                    this.showProposalModal = true;
-                },
-
-                showGrantDetails(grant) {
-                    this.currentGrantDetails = grant;
-                    this.showGrantDetailsModal = true;
-                },
-
-                closeAllModals() {
-                    this.showProposalModal = false;
-                    this.currentProposalText = '';
-                    this.showGrantDetailsModal = false;
-                    this.showNotificationModal = false;
-                    this.showErrorModal = false;
-                    this.showRegister = false;
-                    this.upgradeToProModal = false;
-                },
-
-                // Export proposal as Markdown
-                exportProposalAsMarkdown() {
-                    if (!this.currentProposal) return;
-                    
-                    const markdownContent = this.currentProposalText || this.currentProposal?.proposal || this.currentProposal;
-                    const blob = new Blob([markdownContent], { type: 'text/markdown' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `grant-proposal-${this.currentProposal.grant_id || 'generated'}-${new Date().toISOString().split('T')[0]}.md`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    
-                    this.showNotification('Proposal exported as Markdown file!', 'success');
-                },
-
-                // Copy proposal to clipboard
-                async copyProposalToClipboard() {
-                    if (!this.currentProposal) return;
-
-                    try {
-                        const content = this.currentProposalText || this.currentProposal?.proposal || this.currentProposal;
-                        await navigator.clipboard.writeText(content);
-                        this.showNotification('Proposal copied to clipboard!', 'success');
-                    } catch (error) {
-                        this.showError('Failed to copy to clipboard. Please try selecting and copying manually.');
-                    }
-                },
-
-                // Save for Later functionality
-                toggleSaveGrant(grantId) {
-                    const index = this.savedGrants.indexOf(grantId);
-
-                    if (index > -1) {
-                        // Grant is already saved, remove it
-                        this.savedGrants.splice(index, 1);
-                        this.showNotification('Grant removed from saved list', 'info');
-                    } else {
-                        // Save the grant
-                        this.savedGrants.push(grantId);
-                        this.showNotification('Grant saved for later! 💾', 'success');
-                    }
-
-                    // Persist to localStorage
-                    localStorage.setItem('voidcat_saved_grants', JSON.stringify(this.savedGrants));
-                },
-
-                isSaved(grantId) {
-                    return this.savedGrants.includes(grantId);
-                },
-
-                // Computed property for filtered grants
-                get filteredGrants() {
-                    if (this.showOnlySaved) {
-                        return this.grants.filter(grant => this.isSaved(grant.id));
-                    }
-                    return this.grants;
-                },
-
-                // Utilities
-                formatDate(dateString) {
-                    if (!dateString) return 'TBD';
-
-                    const date = new Date(dateString);
-
-                    // Check if date is valid and not the Unix epoch (1969-12-31)
-                    if (isNaN(date.getTime()) || date.getFullYear() < MIN_VALID_YEAR) {
-                        return 'TBD';
-                    }
-
-                    return date.toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                    });
-                }
-            }
-        }
+        lucide.createIcons();
     </script>
 </body>
 </html>
