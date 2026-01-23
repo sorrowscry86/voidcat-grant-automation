@@ -1,6 +1,9 @@
 # VoidCat RDC Federal Grant Automation Platform
 
-AI-powered federal grant discovery and proposal automation platform built with Cloudflare Workers API and static frontend.
+> [!IMPORTANT]
+> ⚠️ DISCLOSURE: VoidCat RDC is an administrative automation tool for drafting and compliance validation. It does not possess legal authority to sign or submit documents to federal portals on behalf of users. Final submission requires human review and authentication via Login.gov constraints.
+
+AI-powered grant discovery and compliance-ready proposal drafting for startups. 100% Real Data. Human-Review Required.
 
 ## 🔒 NO SIMULATIONS LAW - PRODUCTION ACTIVE
 
@@ -19,7 +22,7 @@ See [NO_SIMULATIONS_LAW_COMPLIANCE_REPORT.md](./NO_SIMULATIONS_LAW_COMPLIANCE_RE
 ## 🚀 Features
 
 - Federal grant search and discovery
-- AI-powered proposal generation
+- AI-powered proposal drafting
 - Compliance automation and validation
 - Freemium business model with success-based fees
 - Comprehensive E2E testing (230+ tests)

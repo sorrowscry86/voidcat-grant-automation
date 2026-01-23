@@ -658,21 +658,29 @@ if (matchAnalysis.matching_analysis.overall_score > 70) {
 
 **VoidCat Platform:**
 - ✅ End-to-end automation
-- ✅ AI-powered proposal generation
+- ✅ AI-powered proposal drafting
 - ✅ Automated compliance checking
 - ✅ 0-100% semantic matching
 - ✅ Strategic calendar planning
-- ✅ FAR-compliant budget generation
+- ✅ FAR-compliant draft generation
 - ✅ Agency-specific templates
-- ✅ Pre-submission validation
+- ✅ Human-review-ready validation
 
 ### Key Innovations
 
 1. **Semantic Matching Algorithm**: Advanced NLP-based matching with 0-100% scoring across 10 technical domains
 2. **Strategic Calendar**: Workload analysis and timeline optimization
 3. **Compliance Automation**: FAR Part 31 cost principles automation
-4. **AI Proposal Generation**: Template-based generation with agency-specific requirements
-5. **Pre-Submission Review**: Comprehensive compliance checking before submission
+4. **AI Proposal Drafting**: Template-based drafting with agency-specific requirements
+5. **Pre-Submission Review**: Comprehensive compliance checking of drafts before human portal submission
+
+## Human Handoff Protocol
+
+VoidCat RDC does not perform robo-signing or direct portal submission. The platform generates compliance-ready drafts that require human authentication for final submission.
+
+1. **Draft Generation**: Once VoidCat generates the DCAA-compliant budget or technical volume, the file is available for secure download.
+2. **PI Review**: A qualified Principal Investigator (PI) must review and validate the generated technical volume.
+3. **Portal Upload**: The user must manually upload the validated files to the specific agency portal (e.g., Grants.gov, NIH eRA Commons) using their own authenticated credentials (Login.gov).
 
 ## Performance Metrics
 
