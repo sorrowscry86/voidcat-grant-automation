@@ -42,68 +42,68 @@ grants.get('/search', async (c) => {
     const configService = new ConfigService(c.env);
     const validationConfig = configService.getValidationConfig();
     const dataConfig = configService.getDataConfig();
-    
+
     const { query, agency, deadline, amount, program, opportunityType } = c.req.query();
-    
+
     // Validate input parameters
-    if (query && query.length > validationConfig.MAX_SEARCH_QUERY_LENGTH) {
+    if (query && (query.length > validationConfig.MAX_SEARCH_QUERY_LENGTH || !/^[a-zA-Z0-9\s,\.-]+$/.test(query))) {
       return c.json({
         success: false,
-        error: `Search query is too long. Please use fewer than ${validationConfig.MAX_SEARCH_QUERY_LENGTH} characters.`,
-        code: 'QUERY_TOO_LONG'
+        error: `Search query is invalid or too long (max ${validationConfig.MAX_SEARCH_QUERY_LENGTH} chars, allowed chars: alphanumeric and , . -).`,
+        code: 'INVALID_QUERY'
       }, 400);
     }
-    
+
     try {
-        // Get DataService instance from D1 binding
-        const dbService = new DatabaseGrantService(c.env.VOIDCAT_DB);
+      // Get DataService instance from D1 binding
+      const dbService = new DatabaseGrantService(c.env.VOIDCAT_DB);
 
-        // Perform database search with filters
-        const results = await dbService.searchGrants(query, {
-            agency: agency,
-            status: 'active',
-            limit: 50,
-            offset: 0,
-            sortBy: 'matching_score',
-            sortOrder: 'DESC'
-        });
+      // Perform database search with filters
+      const results = await dbService.searchGrants(query, {
+        agency: agency,
+        status: 'active',
+        limit: 50,
+        offset: 0,
+        sortBy: 'matching_score',
+        sortOrder: 'DESC'
+      });
 
-        // Get total count
-        const totalCount = results.length;
+      // Get total count
+      const totalCount = results.length;
 
-        const telemetry = c.get('telemetry');
-        if (telemetry) {
-            telemetry.trackGrantSearch(query, agency, results.length, 'database', false);
-        }
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.trackGrantSearch(query, agency, results.length, 'database', false);
+      }
 
-        return c.json({
-            success: true,
-            count: totalCount,
-            grants: results,
-            data_source: 'database', // Correctly reports 'database'
-            fallback_occurred: false,
-            execution_type: 'database', // A new, accurate execution type
-            timestamp: new Date().toISOString(),
-            live_data_ready: true,
-            search_params: { query, agency, deadline, amount, program, opportunityType }
-        });
+      return c.json({
+        success: true,
+        count: totalCount,
+        grants: results,
+        data_source: 'database', // Correctly reports 'database'
+        fallback_occurred: false,
+        execution_type: 'database', // A new, accurate execution type
+        timestamp: new Date().toISOString(),
+        live_data_ready: true,
+        search_params: { query, agency, deadline, amount, program, opportunityType }
+      });
 
     } catch (error) {
-        console.error('Database search failed:', error);
-        const telemetry = c.get('telemetry');
-        if (telemetry) {
-            telemetry.logError('Database search FAILED', error, {
-                execution: 'failed',
-                query: query || '',
-                agency: agency || '',
-            });
-        }
-        return c.json({
-            success: false,
-            error: 'Grant search service is temporarily unavailable.',
-            code: 'DATABASE_SEARCH_ERROR',
-            execution_type: 'failed'
-        }, 503);
+      console.error('Database search failed:', error);
+      const telemetry = c.get('telemetry');
+      if (telemetry) {
+        telemetry.logError('Database search FAILED', error, {
+          execution: 'failed',
+          query: query || '',
+          agency: agency || '',
+        });
+      }
+      return c.json({
+        success: false,
+        error: 'Grant search service is temporarily unavailable.',
+        code: 'DATABASE_SEARCH_ERROR',
+        execution_type: 'failed'
+      }, 503);
     }
 
   } catch (error) {
@@ -147,26 +147,26 @@ grants.get('/:id', async (c) => {
   try {
     const configService = new ConfigService(c.env);
     const validationConfig = configService.getValidationConfig();
-    
+
     const grantId = c.req.param('id');
-    
+
     // Validate grant ID format
     if (!grantId || grantId.trim().length === 0) {
-      return c.json({ 
-        success: false, 
+      return c.json({
+        success: false,
         error: 'Grant ID is required',
         code: 'MISSING_GRANT_ID'
       }, 400);
     }
-    
+
     if (grantId.length > validationConfig.MAX_GRANT_ID_LENGTH) {
-      return c.json({ 
-        success: false, 
+      return c.json({
+        success: false,
         error: 'Invalid grant ID format',
         code: 'INVALID_GRANT_ID'
       }, 400);
     }
-    
+
     // In production mode, grant details must be fetched from live sources
     const telemetry = c.get('telemetry');
     if (telemetry) {
@@ -198,33 +198,33 @@ grants.post('/generate-proposal', async (c) => {
   try {
     const configService = new ConfigService(c.env);
     const rateLimitConfig = configService.getRateLimitConfig();
-    
+
     // Check authentication
     const authHeader = c.req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ 
-        success: false, 
+      return c.json({
+        success: false,
         error: 'Authentication required. Please provide an API key to generate proposals.',
         code: 'AUTH_REQUIRED'
       }, 401);
     }
 
     const apiKey = authHeader.replace('Bearer ', '');
-    
+
     // Apply rate limiting for proposal generation
     const rateLimiter = new RateLimiter(c.env);
     const rateLimitResult = await rateLimiter.checkAndIncrement(apiKey, 'proposal_generation', rateLimitConfig.PROPOSALS_PER_MINUTE);
-    
+
     // Set rate limit headers
     c.header('X-RateLimit-Limit', rateLimitResult.limit.toString());
     c.header('X-RateLimit-Remaining', Math.max(0, rateLimitResult.limit - rateLimitResult.currentCount).toString());
     c.header('X-RateLimit-Reset', Math.floor(rateLimitResult.resetTime.getTime() / 1000).toString());
-    
+
     if (!rateLimitResult.allowed) {
       if (rateLimitResult.retryAfter) {
         c.header('Retry-After', rateLimitResult.retryAfter.toString());
       }
-      
+
       // Log rate limit hit
       const telemetry = c.get('telemetry');
       if (telemetry) {
@@ -237,7 +237,7 @@ grants.post('/generate-proposal', async (c) => {
           }
         });
       }
-      
+
       return c.json({
         success: false,
         error: `Rate limit exceeded. You can generate proposals at most ${rateLimitResult.limit} times per minute.`,
@@ -250,7 +250,7 @@ grants.post('/generate-proposal', async (c) => {
         }
       }, 429);
     }
-    
+
     // Parse request data
     let requestData;
     try {
@@ -262,9 +262,9 @@ grants.post('/generate-proposal', async (c) => {
         code: 'INVALID_JSON'
       }, 400);
     }
-    
+
     const { grant_id, company_info } = requestData;
-    
+
     if (!grant_id) {
       return c.json({
         success: false,
@@ -272,7 +272,7 @@ grants.post('/generate-proposal', async (c) => {
         code: 'MISSING_GRANT_ID'
       }, 400);
     }
-    
+
     // NO SIMULATIONS LAW: Mock proposals are not allowed
     return c.json({
       success: false,
@@ -405,7 +405,7 @@ grants.post('/application-timeline', async (c) => {
 grants.get('/strategic-calendar', async (c) => {
   try {
     const { max_concurrent } = c.req.query();
-    
+
     // Production mode: strategic calendar requires live grant data
     return c.json({
       success: false,
@@ -590,13 +590,13 @@ grants.post('/generate-ai-proposal', async (c) => {
     // Phase 2A: Generate AI-powered proposal with real AI integration
     let proposal;
     let executionType;
-    
+
     if (c.env.FEATURE_REAL_AI) {
       try {
         // Use Phase 2A enhanced AI generation with Claude and GPT-4
         proposal = await aiProposalService.generateProposalWithAI(grant, company_profile, c.env, c.get('telemetry'));
         executionType = 'real';
-        
+
         // Log successful real AI execution
         const telemetry = c.get('telemetry');
         if (telemetry) {
@@ -609,7 +609,7 @@ grants.post('/generate-ai-proposal', async (c) => {
       } catch (error) {
         // NO SIMULATIONS LAW: Throw error on AI failure in production
         console.error('AI proposal generation failed:', error);
-        
+
         const telemetry = c.get('telemetry');
         if (telemetry) {
           telemetry.logError('AI proposal generation FAILED', error, {
@@ -618,7 +618,7 @@ grants.post('/generate-ai-proposal', async (c) => {
             timestamp: new Date().toISOString()
           });
         }
-        
+
         // Sanitize error messages for production to prevent internal detail exposure
         const configService = new ConfigService(c.env);
         const appConfig = configService.getAppConfig();
@@ -642,7 +642,7 @@ grants.post('/generate-ai-proposal', async (c) => {
     } else {
       // Template-based generation only allowed in development
       console.log('⚠️ FEATURE_REAL_AI disabled - using template generation (development only)');
-      
+
       const telemetry = c.get('telemetry');
       if (telemetry) {
         telemetry.logInfo('Using template generation - AI disabled', {
@@ -652,7 +652,7 @@ grants.post('/generate-ai-proposal', async (c) => {
           timestamp: new Date().toISOString()
         });
       }
-      
+
       proposal = await aiProposalService.generateProposal(grant, company_profile, options || {});
       executionType = 'template';
     }
@@ -661,11 +661,11 @@ grants.post('/generate-ai-proposal', async (c) => {
     // Frontend expects flat structure with executive_summary, technical_approach, etc.
     // New API returns nested structure with sections object
     let transformedProposal = proposal;
-    
+
     if (proposal && proposal.sections) {
       // Extract sections and flatten
       const sections = proposal.sections;
-      
+
       // Create executive summary if missing - extract from technical approach or create a brief one
       let executiveSummary = sections.executive_summary || '';
       if (!executiveSummary && sections.technical_approach) {
@@ -674,40 +674,40 @@ grants.post('/generate-ai-proposal', async (c) => {
         const firstParagraph = lines.find(l => !l.startsWith('#') && l.length > 50);
         executiveSummary = firstParagraph || `Our organization proposes an innovative solution to ${grant.title} for ${grant.agency}. This proposal outlines our technical approach, team qualifications, and commercialization strategy.`;
       }
-      
+
       // Calculate budget based on grant amount (65% personnel, 15% equipment, 20% overhead)
-      const grantAmount = (typeof grant.amount === 'string' 
-        ? parseInt(grant.amount.replace(/[$,]/g, '')) 
+      const grantAmount = (typeof grant.amount === 'string'
+        ? parseInt(grant.amount.replace(/[$,]/g, ''))
         : grant.amount) || 250000;
-      
+
       const budgetSummary = {
         personnel: Math.floor(grantAmount * 0.65),
         equipment: Math.floor(grantAmount * 0.15),
         overhead: Math.floor(grantAmount * 0.20),
         total: grantAmount
       };
-      
+
       // Generate timeline based on grant program (Phase I = 6 months, Phase II = 24 months, default = 12)
-      const duration = grant.program?.includes('Phase I') ? 6 
-        : grant.program?.includes('Phase II') ? 24 
-        : 12;
+      const duration = grant.program?.includes('Phase I') ? 6
+        : grant.program?.includes('Phase II') ? 24
+          : 12;
       const monthsPerPhase = Math.ceil(duration / 3);
-      
+
       const timeline = [
-        { 
-          phase: `Months 1-${monthsPerPhase}`, 
-          task: "Requirements analysis, architecture design, and initial development" 
+        {
+          phase: `Months 1-${monthsPerPhase}`,
+          task: "Requirements analysis, architecture design, and initial development"
         },
-        { 
-          phase: `Months ${monthsPerPhase + 1}-${monthsPerPhase * 2}`, 
-          task: "Core implementation, integration, and testing" 
+        {
+          phase: `Months ${monthsPerPhase + 1}-${monthsPerPhase * 2}`,
+          task: "Core implementation, integration, and testing"
         },
-        { 
-          phase: `Months ${monthsPerPhase * 2 + 1}-${duration}`, 
-          task: "Performance optimization, validation, and documentation" 
+        {
+          phase: `Months ${monthsPerPhase * 2 + 1}-${duration}`,
+          task: "Performance optimization, validation, and documentation"
         }
       ];
-      
+
       transformedProposal = {
         executive_summary: executiveSummary,
         technical_approach: sections.technical_approach || '',

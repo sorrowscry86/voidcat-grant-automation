@@ -19,7 +19,7 @@ export class TelemetryService {
     return async (c, next) => {
       const requestId = (() => { try { return crypto.randomUUID(); } catch { return `req-${Math.random().toString(36).slice(2, 10)}-${Date.now()}`; } })();
       const startTime = Date.now();
-      
+
       // Attach telemetry instance to context
       c.set('telemetry', this);
       c.set('requestId', requestId);
@@ -234,7 +234,7 @@ export class TelemetryService {
 
     this.logInfo('User registration completed', {
       metrics: {
-        type: 'user_registration', 
+        type: 'user_registration',
         email_domain: email.split('@')[1],
         welcome_email_sent: emailSent,
         subscription_tier: subscriptionTier,
@@ -261,9 +261,9 @@ export class TelemetryService {
   }
 
   /**
-   * Track proposal generation
+   * Track proposal generation and AI token usage
    */
-  trackProposalGeneration(grantId, userId, success, generationTimeMs) {
+  trackProposalGeneration(grantId, userId, success, generationTimeMs, aiMetadata = null) {
     if (!this.enabledFeatures.performanceMetrics) return;
 
     this.logInfo('Proposal generation completed', {
@@ -272,7 +272,38 @@ export class TelemetryService {
         grant_id: grantId,
         user_id: userId,
         success: success,
-        generation_time_ms: generationTimeMs
+        generation_time_ms: generationTimeMs,
+        ...aiMetadata // Include model, tokens, etc if provided
+      }
+    });
+  }
+
+  /**
+   * Track specific AI token usage for cost estimation
+   */
+  trackAITokenUsage(userId, model, promptTokens, completionTokens, requestId) {
+    if (!this.enabledFeatures.performanceMetrics) return;
+
+    // Estimate cost (Placeholder rates - Aligned with VoidCat RDC financial tracking)
+    const rates = {
+      'claude-3-sonnet': { prompt: 0.003 / 1000, completion: 0.015 / 1000 },
+      'gpt-4': { prompt: 0.03 / 1000, completion: 0.06 / 1000 },
+      'default': { prompt: 0.01 / 1000, completion: 0.03 / 1000 }
+    };
+
+    const modelRates = rates[model] || rates['default'];
+    const estimatedCost = (promptTokens * modelRates.prompt) + (completionTokens * modelRates.completion);
+
+    this.logInfo('AI Token Usage Tracked', {
+      metrics: {
+        type: 'ai_token_usage',
+        user_id: userId,
+        model: model,
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        total_tokens: promptTokens + completionTokens,
+        estimated_cost_usd: parseFloat(estimatedCost.toFixed(6)),
+        request_id: requestId
       }
     });
   }

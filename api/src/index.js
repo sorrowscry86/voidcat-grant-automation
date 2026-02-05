@@ -16,6 +16,7 @@ import usersRoutes from './routes/users.js';
 import authRoutes from './routes/auth.js'; // New: JWT authentication routes
 import dashboardRoutes from './routes/dashboard.js'; // New: Metrics dashboard routes
 import adminRoutes from './routes/admin.js'; // Database population management
+import { handleScheduledIngestion } from './workers/grantIngestionWorker.js';
 
 // Initialize Hono app
 const app = new Hono();
@@ -23,7 +24,7 @@ const app = new Hono();
 // Configuration validation middleware - Validate required config at startup
 app.use('*', async (c, next) => {
   const configService = new ConfigService(c.env);
-  
+
   // Validate configuration on first request (acts as startup validation)
   if (!c.env._configValidated) {
     const validation = configService.validateRequiredConfig();
@@ -39,7 +40,7 @@ app.use('*', async (c, next) => {
     console.log('✅ Configuration validation passed');
     c.env._configValidated = true;
   }
-  
+
   return next();
 });
 
@@ -47,7 +48,7 @@ app.use('*', async (c, next) => {
 app.use('*', async (c, next) => {
   const configService = new ConfigService(c.env);
   const appConfig = configService.getAppConfig();
-  
+
   return cors({
     origin: appConfig.CORS_ORIGINS,
     allowHeaders: ['Content-Type', 'Authorization'],
@@ -73,10 +74,10 @@ app.route('/api/admin', adminRoutes); // Database population management
 app.post('/api/stripe/create-checkout', async (c) => {
   try {
     const { email } = await c.req.json();
-    
+
     if (!email) {
-      return c.json({ 
-        success: false, 
+      return c.json({
+        success: false,
         error: 'Email is required for checkout',
         code: 'MISSING_EMAIL'
       }, 400);
@@ -89,8 +90,8 @@ app.post('/api/stripe/create-checkout', async (c) => {
 
     if (!stripeConfig.SECRET_KEY) {
       console.error('Stripe secret key not configured');
-      return c.json({ 
-        success: false, 
+      return c.json({
+        success: false,
         error: 'Payment system is currently unavailable. Please contact support if this issue persists.',
         code: 'STRIPE_CONFIG_ERROR'
       }, 503);
@@ -98,8 +99,8 @@ app.post('/api/stripe/create-checkout', async (c) => {
 
     if (!stripeConfig.PRICE_ID) {
       console.error('Stripe price ID not configured');
-      return c.json({ 
-        success: false, 
+      return c.json({
+        success: false,
         error: 'Payment system configuration error. Please contact support.',
         code: 'STRIPE_PRICE_CONFIG_ERROR'
       }, 503);
@@ -130,8 +131,8 @@ app.post('/api/stripe/create-checkout', async (c) => {
 
   } catch (error) {
     console.error('Stripe checkout creation failed:', error);
-    return c.json({ 
-      success: false, 
+    return c.json({
+      success: false,
       error: 'Unable to create checkout session. Please try again.',
       code: 'CHECKOUT_CREATION_ERROR'
     }, 500);
@@ -141,15 +142,15 @@ app.post('/api/stripe/create-checkout', async (c) => {
 app.post('/api/stripe/webhook', async (c) => {
   try {
     const sig = c.req.header('stripe-signature');
-    
+
     // Get Stripe configuration using ConfigService
     const configService = new ConfigService(c.env);
     const stripeConfig = configService.getStripeConfig();
 
     if (!stripeConfig.WEBHOOK_SECRET) {
       console.error('Stripe webhook secret not configured');
-      return c.json({ 
-        success: false, 
+      return c.json({
+        success: false,
         error: 'Webhook authentication error',
         code: 'WEBHOOK_CONFIG_ERROR'
       }, 400);
@@ -174,16 +175,16 @@ app.post('/api/stripe/webhook', async (c) => {
     switch (event.type) {
       case 'checkout.session.completed':
         console.log('Checkout session completed:', event.data.object.id);
-        
+
         // CRITICAL SECURITY FIX: Implement subscription upgrade logic
         try {
           const session = event.data.object;
           const customerEmail = session.customer_details?.email || session.customer_email;
-          
+
           if (customerEmail) {
             const { getDB } = await import('./db/connection.js');
             const db = await getDB(c.env);
-            
+
             // Update user subscription tier to 'pro'
             const updateResult = await db.prepare(`
               UPDATE users 
@@ -193,14 +194,14 @@ app.post('/api/stripe/webhook', async (c) => {
                   stripe_subscription_id = ?
               WHERE email = ?
             `).bind(
-              session.customer, 
-              session.subscription, 
+              session.customer,
+              session.subscription,
               customerEmail
             ).run();
-            
+
             if (updateResult.success && updateResult.changes > 0) {
               console.log(`Successfully upgraded user ${customerEmail} to Pro subscription`);
-              
+
               // Log the upgrade for telemetry
               const telemetry = c.get('telemetry');
               if (telemetry) {
@@ -237,7 +238,7 @@ app.post('/api/stripe/webhook', async (c) => {
 app.get('/', async (c) => {
   const configService = new ConfigService(c.env);
   const appConfig = configService.getAppConfig();
-  
+
   return c.json({
     service: appConfig.SERVICE_NAME,
     version: appConfig.VERSION,
@@ -266,12 +267,10 @@ export default {
   async scheduled(event, env, ctx) {
     try {
       console.log('🕐 Scheduled grant ingestion triggered at:', new Date().toISOString());
-      
-      // Use dynamic concatenation to avoid bundler including the worker at build-time
-      const workerPath = './workers/' + 'grantIngestionWorker.js';
-      const { handleScheduledIngestion } = await import(workerPath);
+
+      // STATIC IMPORT (Aligned with Structural Pillars): Optimized for build-time resolution
       await handleScheduledIngestion(env);
-      
+
       console.log('✅ Scheduled grant ingestion completed successfully');
     } catch (error) {
       console.error('❌ Scheduled grant ingestion failed:', error);
