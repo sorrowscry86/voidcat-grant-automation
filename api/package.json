@@ -19,12 +19,12 @@
   "license": "MIT",
   "dependencies": {
     "@playwright/test": "^1.56.1",
-    "hono": "^4.10.3",
+    "hono": "^4.11.10",
     "stripe": "^19.3.1",
-    "fast-xml-parser": "^4.5.0",
+    "fast-xml-parser": "^5.3.6",
     "fflate": "^0.8.2"
   },
   "devDependencies": {
-    "wrangler": "^4.32.0"
+    "wrangler": "^4.59.1"
   }
 }
