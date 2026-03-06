@@ -110,7 +110,7 @@ node scripts/populate-grants-db.js full
 ```
 
 **Problem**: "Schema already exists"
-**Solution**: Safe to ignore - schema is idempotent
+**Solution**: Safe to ignore - schema is repeatable and won't overwrite data
 
 **Problem**: Ingestion failures
 **Solution**: Check logs

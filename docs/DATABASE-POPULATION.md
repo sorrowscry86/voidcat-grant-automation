@@ -142,7 +142,7 @@ curl -X POST https://grant-search-api.sorrowscry86.workers.dev/api/admin/grants/
 ## Admin API Endpoints
 
 ### POST /api/admin/grants/init-schema
-Initialize database schema (idempotent - safe to run multiple times)
+Initialize database schema (safe to run multiple times without data loss)
 
 **Response:**
 ```json
@@ -331,7 +331,7 @@ const results = await dbService.searchGrants(query, {
 
 ## Troubleshooting
 
-**Schema already exists error**: Safe to ignore - schema is idempotent
+**Schema already exists error**: Safe to ignore - initialization is repeatable and won't duplicate data
 
 **No grants returned**: Run manual ingestion to populate initial data
 
