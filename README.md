@@ -43,6 +43,22 @@ See [NO_SIMULATIONS_LAW_COMPLIANCE_REPORT.md](./NO_SIMULATIONS_LAW_COMPLIANCE_RE
 - **Deployment**: GitHub Pages or Cloudflare Pages
 - **Features**: Responsive design, real-time search, payment integration, dark mode
 
+### Mobile App (iOS + Android)
+
+- **Location**: `/mobile/`
+- **Framework**: Expo (SDK 57) + React Native, expo-router
+- **Distribution**: App Store and Google Play via EAS
+- **Features**: Grant search with agency filters, opportunity detail, offline
+  saved grants and proposal drafts, AI proposal drafting, account management
+
+```bash
+cd mobile && npm install && npm start
+```
+
+See [`mobile/README.md`](./mobile/README.md) for development and
+[`docs/MOBILE-STORE-SUBMISSION.md`](./docs/MOBILE-STORE-SUBMISSION.md) for the
+store release runbook.
+
 ---
 
 ## 🚀 Quick Deploy
@@ -138,6 +154,7 @@ GET  /api/grants/:id                - Get grant details
 POST /api/users/register            - User registration
 GET  /api/users/me                  - User profile
 POST /api/grants/generate-proposal  - AI proposal generation
+POST /api/auth/delete-account       - Delete account and personal data
 ```
 
 ### Discovery Engine Endpoints ✨ NEW
@@ -191,6 +208,7 @@ GET  /api/grants/agency-template            - Agency-specific templates
 │   └── security/            # Security policies and environment setup
 ├── api/                      # 🔧 Cloudflare Workers API
 ├── frontend/                 # 🎨 Static frontend application
+├── mobile/                   # 📱 iOS + Android app (Expo / React Native)
 ├── tests/                    # 🧪 E2E test suite (Playwright)
 ├── scripts/                  # 🚀 Deployment and utility scripts
 └── package.json             # Root dependencies and test configuration

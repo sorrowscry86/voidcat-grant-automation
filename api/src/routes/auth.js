@@ -6,7 +6,9 @@ import PasswordService from '../services/passwordService.js';
 import EmailService from '../services/emailService.js';
 import MetricsService from '../services/metricsService.js';
 import { validateInput, createResponse } from '../util/response.js';
+import ConfigService from '../services/configService.js';
 import { getDB } from '../db/connection.js';
+import Stripe from 'stripe';
 
 const auth = new Hono();
 
@@ -501,6 +503,109 @@ auth.get('/me', async (c) => {
   } catch (error) {
     console.error('Get user error:', error);
     return createResponse(c, false, 'Failed to get user information', 500, 'GET_USER_ERROR');
+  }
+});
+
+/**
+ * Permanently delete the authenticated user's account.
+ * POST /api/auth/delete-account
+ *
+ * Required by App Store Review Guideline 5.1.1(v): any app offering account
+ * creation must let the user initiate deletion from inside the app.
+ *
+ * The caller must pass their own email in `confirm_email` so a stray or
+ * replayed request cannot destroy an account.
+ */
+auth.post('/delete-account', async (c) => {
+  try {
+    const { jwt } = initServices(c.env);
+    const authHeader = c.req.header('Authorization');
+
+    if (!authHeader) {
+      return createResponse(c, false, 'Authentication required', 401, 'NO_AUTH_HEADER');
+    }
+
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+    const db = await getDB(c.env);
+    let user = null;
+
+    // Accept either a JWT or a legacy API key, matching GET /api/auth/me.
+    try {
+      if (jwt.isValidTokenFormat(token)) {
+        const payload = await jwt.verifyToken(token, 'access');
+        user = await db.prepare(`
+          SELECT id, email, stripe_subscription_id FROM users WHERE email = ?
+        `).bind(payload.user.email).first();
+      }
+    } catch (error) {
+      user = null;
+    }
+
+    if (!user) {
+      user = await db.prepare(`
+        SELECT id, email, stripe_subscription_id FROM users WHERE api_key = ?
+      `).bind(token).first();
+    }
+
+    if (!user) {
+      return createResponse(c, false, 'Invalid authentication', 401, 'INVALID_AUTH');
+    }
+
+    let requestData = {};
+    try {
+      requestData = await c.req.json();
+    } catch (parseError) {
+      requestData = {};
+    }
+
+    const confirmEmail = (requestData.confirm_email || '').trim().toLowerCase();
+    if (confirmEmail !== String(user.email).toLowerCase()) {
+      return createResponse(
+        c,
+        false,
+        'Please confirm your account email address to delete your account.',
+        400,
+        'CONFIRMATION_REQUIRED'
+      );
+    }
+
+    // Cancel any live subscription first, so deleting the account never leaves
+    // the user being billed for something they can no longer reach.
+    if (user.stripe_subscription_id) {
+      try {
+        const configService = new ConfigService(c.env);
+        const stripeConfig = configService.getStripeConfig();
+        if (stripeConfig.SECRET_KEY) {
+          const stripe = new Stripe(stripeConfig.SECRET_KEY, { apiVersion: stripeConfig.API_VERSION });
+          await stripe.subscriptions.cancel(user.stripe_subscription_id);
+        }
+      } catch (error) {
+        console.error('Failed to cancel subscription during account deletion:', error);
+        return createResponse(
+          c,
+          false,
+          'We could not cancel your active subscription. Please contact support so we can remove your account safely.',
+          502,
+          'SUBSCRIPTION_CANCEL_FAILED'
+        );
+      }
+    }
+
+    // Revoke sessions, then strip the identifiers from analytics rows before
+    // removing the account itself. Metrics keep their aggregate value without
+    // remaining tied to a deleted person.
+    await db.prepare('DELETE FROM refresh_tokens WHERE user_id = ?').bind(user.id).run();
+    await db.prepare('UPDATE metrics SET user_id = NULL WHERE user_id = ? OR user_id = ?')
+      .bind(String(user.id), user.email).run();
+    await db.prepare('UPDATE api_logs SET user_id = NULL WHERE user_id = ? OR user_id = ?')
+      .bind(String(user.id), user.email).run();
+    await db.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
+
+    return createResponse(c, true, 'Your account and personal data have been deleted.', 200);
+
+  } catch (error) {
+    console.error('Account deletion error:', error);
+    return createResponse(c, false, 'Account deletion failed. Please try again.', 500, 'DELETE_ACCOUNT_ERROR');
   }
 });
 
